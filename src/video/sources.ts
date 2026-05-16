@@ -4,6 +4,7 @@
 
 import placeholderFs from './shaders/source-placeholder.frag?raw';
 import videoFs from './shaders/source-video.frag?raw';
+import type { CouplingContext } from '../core/coupling';
 
 const VS_FULLSCREEN = /* glsl */ `#version 300 es
 out vec2 v_uv;
@@ -53,8 +54,16 @@ function buildProgram(gl: WebGL2RenderingContext, fragSrc: string): WebGLProgram
 
 export interface VideoSourceStage {
   readonly kind: string;
-  /** Render into the currently-bound framebuffer. */
-  render(gl: WebGL2RenderingContext, time: number): void;
+  /**
+   * Render into the currently-bound framebuffer. `params` is the source
+   * instance's effective param map (empty for input sources that have none);
+   * `ctx` provides time/baseFreq/rate for procedural sources.
+   */
+  render(
+    gl: WebGL2RenderingContext,
+    params: Readonly<Record<string, number>>,
+    ctx: CouplingContext,
+  ): void;
   dispose(gl: WebGL2RenderingContext): void;
 }
 
@@ -70,9 +79,13 @@ export class PlaceholderSource implements VideoSourceStage {
     this.#uTime = u;
   }
 
-  render(gl: WebGL2RenderingContext, time: number): void {
+  render(
+    gl: WebGL2RenderingContext,
+    _params: Readonly<Record<string, number>>,
+    ctx: CouplingContext,
+  ): void {
     gl.useProgram(this.#program);
-    gl.uniform1f(this.#uTime, time);
+    gl.uniform1f(this.#uTime, ctx.time);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
@@ -110,7 +123,11 @@ export class VideoElementSource implements VideoSourceStage {
     this.#uTex = u;
   }
 
-  render(gl: WebGL2RenderingContext, _time: number): void {
+  render(
+    gl: WebGL2RenderingContext,
+    _params: Readonly<Record<string, number>>,
+    _ctx: CouplingContext,
+  ): void {
     // Upload only when the <video> has advanced; saves bandwidth on paused playback.
     const t = this.video.currentTime;
     if (this.video.readyState >= 2 && t !== this.#lastUploadTime) {

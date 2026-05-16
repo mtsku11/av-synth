@@ -91,6 +91,20 @@ This file is project-scoped engineering memory, distinct from Claude's harness m
 
 **How to apply**: Operator stages should always read `ctx.time` from setUniforms/setParams — never `performance.now()` or `Date.now()` directly. Tests that depend on time should pass a CouplingContext with a fixed time value.
 
+---
+
+### 2026-05-16 — Source architecture: separate registry from operators
+
+**Decision**: Procedural sources (Hydra's `osc`, `noise`, `voronoi`, `shape`, `gradient`, `solid`) live in their own registry at `src/core/sources.ts` with `SourceDef` and `SourceInstance` mirroring `OperatorDef` / `OperatorInstance`. Coupling specs go through the same `coupling.ts` registry — sources are coupled operators, just with no upstream input.
+
+`VideoSourceStage.render(gl, params, ctx)` was extended to receive the source's params object and the global `CouplingContext`. `AudioSourceStage` gained an optional `setParams(params, ctx)` called from the engine's 60Hz poll. External (non-procedural) sources — the existing `PlaceholderSource` / `VideoElementSource` and `SilentSource` / `VideoElementAudioSource` — are *not* registered with the source registry; they're host-level inputs picked alongside procedural sources from the UI chip-row.
+
+**Why**: Sources and operators share the coupling story but differ structurally (no input texture, no AudioNode input). Keeping registries separate makes the renderer's source slot unambiguous and the source picker UI distinct. Coupling stays unified — the registry — because that's the product.
+
+**How to apply**: When adding the next Hydra source (`noise`, `voronoi`, …), follow `src/sources/osc.ts` — separate file per source, frag shader under `src/video/shaders/source-<name>.frag`, registered via `src/sources/index.ts`. Audio analogues per `plan.md §1.2`–`§1.6`.
+
+---
+
 ## Open mathematical questions
 
 (Mirrored from `plan.md §11` — resolve here as decisions land.)

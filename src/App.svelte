@@ -3,10 +3,18 @@
   import { clock } from './core/clock.svelte';
   import { audio } from './audio/engine';
   import { VideoRenderer } from './video/renderer';
-  import { VideoElementSource } from './video/sources';
-  import { VideoElementAudioSource } from './audio/sources';
+  import { PlaceholderSource, VideoElementSource } from './video/sources';
+  import { SilentSource, VideoElementAudioSource } from './audio/sources';
   import { createInstance, type OperatorInstance } from './core/operators';
+  import {
+    createSourceInstance,
+    attachSourceAudio,
+    disposeSourceInstance,
+    listSources,
+    type SourceInstance,
+  } from './core/sources';
   import { DEFAULT_CHAIN } from './ops';
+  import { DEFAULT_SOURCE } from './sources';
   import type { CouplingContext } from './core/coupling';
   import { loadPresets, applyPreset, type PresetBank } from './core/presets';
   import Slider from './ui/Slider.svelte';
@@ -40,6 +48,13 @@
   let presets = $state<PresetBank>({});
   let activePreset = $state<string | null>(null);
 
+  // Source kind: 'video' = external <video> element, 'placeholder' = built-in
+  // plasma, or a registered procedural source name (e.g. 'osc').
+  type SourceKind = 'video' | 'placeholder' | string;
+  const proceduralSources = listSources(); // computed once on mount; ops are registered before this component
+  let sourceKind = $state<SourceKind>('placeholder');
+  let sourceInstance = $state<SourceInstance | null>(null);
+
   const couplingCtx = $derived<CouplingContext>({
     baseFreq: clock.baseFreq,
     bpm: clock.bpm,
@@ -70,6 +85,24 @@
     ),
   );
 
+  // Source has its own (smaller, separate) params row list, rendered above
+  // the operator-chain sliders so the patch reads top-down: source → chain.
+  interface SourceParamRow {
+    paramId: string;
+    label: string;
+    instance: SourceInstance;
+  }
+
+  const sourceParamRows = $derived<SourceParamRow[]>(
+    sourceInstance
+      ? sourceInstance.def.paramOrder.map((paramId) => ({
+          paramId,
+          label: `${sourceInstance!.def.op} · ${sourceInstance!.def.coupling.params[paramId]?.spec.label ?? paramId}`,
+          instance: sourceInstance!,
+        }))
+      : [],
+  );
+
   onMount(async () => {
     if (!canvasEl) return;
     try {
@@ -77,6 +110,9 @@
       instances = DEFAULT_CHAIN.map((op) => createInstance(op, renderer!.gl));
       renderer.setInstances(instances);
       renderer.start();
+      // Default to a procedural source so the AV-coupling story is visible
+      // immediately without needing a file load.
+      setSourceKind(DEFAULT_SOURCE);
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
       return;
@@ -87,6 +123,55 @@
       initError = e instanceof Error ? e.message : String(e);
     }
   });
+
+  function setSourceKind(kind: SourceKind): void {
+    if (!renderer) return;
+    sourceKind = kind;
+
+    // Tear down any current procedural source instance.
+    if (sourceInstance) {
+      disposeSourceInstance(sourceInstance, renderer.gl);
+      sourceInstance = null;
+    }
+
+    if (kind === 'placeholder') {
+      renderer.setSource(new PlaceholderSource(renderer.gl), {});
+      if (audio.isInitialised) {
+        audio.setSource(new SilentSource(audio.ctx), {});
+      }
+      sourceLoaded = false;
+      return;
+    }
+
+    if (kind === 'video') {
+      if (!videoEl || !videoEl.src) {
+        // No file loaded yet — leave existing source in place.
+        sourceKind = 'placeholder';
+        renderer.setSource(new PlaceholderSource(renderer.gl), {});
+        return;
+      }
+      renderer.setSource(new VideoElementSource(renderer.gl, videoEl), {});
+      if (audio.isInitialised) {
+        try {
+          audio.setSource(new VideoElementAudioSource(audio.ctx, videoEl), {});
+        } catch (e) {
+          initError = e instanceof Error ? e.message : String(e);
+        }
+      }
+      sourceLoaded = true;
+      return;
+    }
+
+    // Procedural source from the registry.
+    const inst = createSourceInstance(kind, renderer.gl);
+    sourceInstance = inst;
+    renderer.setSource(inst.videoStage, inst.params);
+    if (audio.isInitialised) {
+      attachSourceAudio(inst, audio.ctx);
+      if (inst.audioStage) audio.setSource(inst.audioStage, inst.params);
+    }
+    sourceLoaded = false;
+  }
 
   function onPreset(name: string) {
     const p = presets[name];
@@ -116,6 +201,23 @@
   async function onStart() {
     audio.init();
     audio.setInstances(instances);
+
+    // Audio side of the active source needs the AudioContext, so wire it now
+    // if a procedural source is selected. For input sources we leave whatever
+    // SilentSource the engine init() created in place until the user picks one.
+    if (sourceInstance) {
+      attachSourceAudio(sourceInstance, audio.ctx);
+      if (sourceInstance.audioStage) {
+        audio.setSource(sourceInstance.audioStage, sourceInstance.params);
+      }
+    } else if (sourceKind === 'video' && videoEl && videoEl.src) {
+      try {
+        audio.setSource(new VideoElementAudioSource(audio.ctx, videoEl), {});
+      } catch (e) {
+        initError = e instanceof Error ? e.message : String(e);
+      }
+    }
+
     await clock.start();
   }
 
@@ -136,19 +238,8 @@
     } catch {
       // Autoplay can fail before user gesture — that's OK; user can click Start.
     }
-    renderer.setSource(new VideoElementSource(renderer.gl, videoEl));
-    sourceLoaded = true;
-
-    if (audio.isInitialised) {
-      try {
-        const audioSrc = new VideoElementAudioSource(audio.ctx, videoEl);
-        audio.setSource(audioSrc);
-      } catch (e) {
-        // MediaElementAudioSource can only be created once per element; if the
-        // user loads a second file we'd need to recreate the element. M5 work.
-        initError = e instanceof Error ? e.message : String(e);
-      }
-    }
+    // Loading a file implicitly switches the source kind to 'video'.
+    setSourceKind('video');
   }
 </script>
 
@@ -158,7 +249,7 @@
   <header class="topbar">
     <div class="brand">
       <h1>av-synth</h1>
-      <span class="boot">M2 · {instances.length} ops · source: {sourceLoaded ? 'video' : 'placeholder'}</span>
+      <span class="boot">M3 · {instances.length} ops · source: {sourceKind}</span>
     </div>
     <div class="transport">
       <label class="file">
@@ -190,6 +281,29 @@
     {/if}
   </section>
 
+  <section class="sources">
+    <span class="sec-label">source</span>
+    <button
+      class:active={sourceKind === 'placeholder'}
+      onclick={() => setSourceKind('placeholder')}
+    >
+      placeholder
+    </button>
+    <button
+      class:active={sourceKind === 'video'}
+      onclick={() => setSourceKind('video')}
+      disabled={!sourceLoaded && sourceKind !== 'video'}
+      title={sourceLoaded ? '' : 'load a video file first'}
+    >
+      video
+    </button>
+    {#each proceduralSources as name (name)}
+      <button class:active={sourceKind === name} onclick={() => setSourceKind(name)}>
+        {name}
+      </button>
+    {/each}
+  </section>
+
   <section class="stage">
     <div class="canvas-wrap">
       {#if initError}
@@ -203,6 +317,18 @@
   <section class="controls">
     <Slider spec={rateSpec} bind:value={clock.rate} />
     <Slider spec={bpmSpec} bind:value={clock.bpm} />
+    {#if sourceParamRows.length > 0}
+      <hr />
+      {#each sourceParamRows as row (sourceInstance!.id + '/' + row.paramId)}
+        <Slider
+          spec={{
+            ...row.instance.def.coupling.params[row.paramId]!.spec,
+            label: row.label,
+          }}
+          bind:value={row.instance.params[row.paramId] as number}
+        />
+      {/each}
+    {/if}
     <hr />
     {#each paramRows as row (row.instanceId + '/' + row.paramId)}
       <Slider
@@ -226,22 +352,33 @@
 <style>
   .shell {
     display: grid;
-    grid-template-rows: auto auto 1fr auto auto;
+    grid-template-rows: auto auto auto 1fr auto auto;
     min-height: 100vh;
     color: var(--fg);
     background: var(--bg);
     font-family: var(--font-mono);
   }
 
-  .presets {
+  .presets,
+  .sources {
     display: flex;
     gap: 0.4rem;
     padding: 0.5rem 1.5rem;
     border-bottom: 1px solid var(--line);
     flex-wrap: wrap;
+    align-items: center;
   }
 
-  .presets button {
+  .sec-label {
+    color: var(--muted);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-right: 0.3rem;
+  }
+
+  .presets button,
+  .sources button {
     background: var(--bg);
     color: var(--fg);
     border: 1px solid var(--line);
@@ -252,15 +389,22 @@
     letter-spacing: 0.04em;
   }
 
-  .presets button:hover {
+  .presets button:hover,
+  .sources button:hover {
     border-color: var(--accent);
     color: var(--accent);
   }
 
-  .presets button.active {
+  .presets button.active,
+  .sources button.active {
     border-color: var(--accent);
     color: var(--accent);
     background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+  }
+
+  .sources button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .topbar {

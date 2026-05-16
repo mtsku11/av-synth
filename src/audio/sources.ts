@@ -3,9 +3,20 @@
 // video file creates a VideoElementAudioSource that taps the same <video>
 // element the renderer is reading.
 
+import type { CouplingContext } from '../core/coupling';
+
 export interface AudioSourceStage {
   readonly kind: string;
   readonly output: AudioNode;
+  /**
+   * Procedural sources (osc, noise, …) read parameter values and the global
+   * coupling context here. Input sources (silent, video element) have no
+   * params and can omit this. Called from the audio engine's poll.
+   */
+  setParams?(
+    params: Readonly<Record<string, number>>,
+    ctx: CouplingContext,
+  ): void;
   dispose(): void;
 }
 

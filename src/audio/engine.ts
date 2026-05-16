@@ -17,6 +17,7 @@ export class AudioEngine {
   #fftMagnitudes: Float32Array<ArrayBuffer> | null = null;
 
   #source: AudioSourceStage | null = null;
+  #sourceParams: Readonly<Record<string, number>> = {};
   #instances: OperatorInstance[] = [];
   #paramTimer = 0;
 
@@ -67,12 +68,18 @@ export class AudioEngine {
    * Replace the audio source. Disconnects the old; reconnects the chain.
    * Cannot be called before init().
    */
-  setSource(source: AudioSourceStage): void {
+  setSource(source: AudioSourceStage, params?: Readonly<Record<string, number>>): void {
     if (!this.#ctx) throw new Error('AudioEngine.setSource called before init()');
     const old = this.#source;
     this.#source = source;
+    this.#sourceParams = params ?? {};
     this.#rewire();
     old?.dispose();
+  }
+
+  /** Procedural sources mutate their own params object; this exposes it. */
+  setSourceParams(params: Readonly<Record<string, number>>): void {
+    this.#sourceParams = params;
   }
 
   /**
@@ -160,6 +167,7 @@ export class AudioEngine {
       time: this.#ctx.currentTime,
       rate: clock.rate,
     };
+    this.#source?.setParams?.(this.#sourceParams, ctx);
     for (const inst of this.#instances) {
       inst.audioStage?.setParams(inst.params, ctx);
     }

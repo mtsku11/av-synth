@@ -115,6 +115,7 @@ export class VideoRenderer {
   #useA = true;
 
   #source: VideoSourceStage;
+  #sourceParams: Readonly<Record<string, number>> = {};
   #instances: readonly OperatorInstance[] = [];
   #couplingCtx: CouplingContext;
 
@@ -166,10 +167,16 @@ export class VideoRenderer {
     this.#couplingCtx = ctx;
   }
 
-  setSource(source: VideoSourceStage): void {
+  setSource(source: VideoSourceStage, params?: Readonly<Record<string, number>>): void {
     const old = this.#source;
     this.#source = source;
+    this.#sourceParams = params ?? {};
     old.dispose(this.gl);
+  }
+
+  /** Procedural sources mutate their own params object; this exposes it. */
+  setSourceParams(params: Readonly<Record<string, number>>): void {
+    this.#sourceParams = params;
   }
 
   setInstances(instances: readonly OperatorInstance[]): void {
@@ -225,7 +232,7 @@ export class VideoRenderer {
     // 1. Render source into pingA.
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.#pingA.fbo);
     gl.viewport(0, 0, this.#pingA.width, this.#pingA.height);
-    this.#source.render(gl, t);
+    this.#source.render(gl, this.#sourceParams, ctx);
     this.#useA = true; // pingA now holds the upstream value
 
     // 2. Walk the chain.
