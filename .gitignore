@@ -35,4 +35,4 @@ scratch/
 
 # Playwright local screenshots
 .playwright-mcp/
-m0-boot.png
+m[0-9]*-*.png
