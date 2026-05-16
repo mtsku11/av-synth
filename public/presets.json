@@ -1,0 +1,86 @@
+{
+  "tunnel": {
+    "clock.rate": 0.15,
+    "feedback.feedback": 0.92,
+    "feedback.delayTime": 0.18,
+    "modulate.amount": 0.10,
+    "scale.amount": 1.05,
+    "rotate.angle": 0.02,
+    "kaleid.nSides": 1,
+    "chromaShift.amount": 0.0,
+    "posterize.bins": 64,
+    "posterize.gamma": 1.0
+  },
+  "bloom": {
+    "clock.rate": 1.2,
+    "feedback.feedback": 0.88,
+    "feedback.delayTime": 0.32,
+    "modulate.amount": 0.55,
+    "scale.amount": 1.0,
+    "rotate.angle": 0.0,
+    "kaleid.nSides": 1,
+    "chromaShift.amount": 0.012,
+    "posterize.bins": 64,
+    "posterize.gamma": 1.0
+  },
+  "lattice": {
+    "clock.rate": 2.4,
+    "feedback.feedback": 0.78,
+    "feedback.delayTime": 0.09,
+    "modulate.amount": 0.35,
+    "scale.amount": 1.0,
+    "rotate.angle": 0.0,
+    "kaleid.nSides": 8,
+    "chromaShift.amount": 0.0,
+    "posterize.bins": 27,
+    "posterize.gamma": 1.0
+  },
+  "chaos": {
+    "clock.rate": 1.8,
+    "feedback.feedback": 0.93,
+    "feedback.delayTime": 0.45,
+    "modulate.amount": 0.7,
+    "scale.amount": 0.97,
+    "rotate.angle": 0.18,
+    "kaleid.nSides": 5,
+    "chromaShift.amount": 0.025,
+    "posterize.bins": 43,
+    "posterize.gamma": 1.0
+  },
+  "ghost": {
+    "clock.rate": 0.5,
+    "feedback.feedback": 0.95,
+    "feedback.delayTime": 0.62,
+    "modulate.amount": 0.2,
+    "scale.amount": 1.01,
+    "rotate.angle": -0.01,
+    "kaleid.nSides": 1,
+    "chromaShift.amount": 0.005,
+    "posterize.bins": 64,
+    "posterize.gamma": 1.0
+  },
+  "kaleido": {
+    "clock.rate": 0.8,
+    "feedback.feedback": 0.82,
+    "feedback.delayTime": 0.24,
+    "modulate.amount": 0.25,
+    "scale.amount": 1.01,
+    "rotate.angle": 0.04,
+    "kaleid.nSides": 9,
+    "chromaShift.amount": 0.0,
+    "posterize.bins": 58,
+    "posterize.gamma": 1.0
+  },
+  "zero": {
+    "clock.rate": 0.3,
+    "feedback.feedback": 0.0,
+    "feedback.delayTime": 0.18,
+    "modulate.amount": 0.0,
+    "scale.amount": 1.0,
+    "rotate.angle": 0.0,
+    "kaleid.nSides": 1,
+    "chromaShift.amount": 0.0,
+    "posterize.bins": 64,
+    "posterize.gamma": 1.0
+  }
+}

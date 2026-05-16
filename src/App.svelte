@@ -8,6 +8,7 @@
   import { createInstance, type OperatorInstance } from './core/operators';
   import { DEFAULT_CHAIN } from './ops';
   import type { CouplingContext } from './core/coupling';
+  import { loadPresets, applyPreset, type PresetBank } from './core/presets';
   import Slider from './ui/Slider.svelte';
   import Patch from './ui/Patch.svelte';
   import type { ParamSpec } from './core/params';
@@ -36,6 +37,8 @@
   let initError = $state<string | null>(null);
   let instances = $state<OperatorInstance[]>([]);
   let sourceLoaded = $state(false);
+  let presets = $state<PresetBank>({});
+  let activePreset = $state<string | null>(null);
 
   const couplingCtx = $derived<CouplingContext>({
     baseFreq: clock.baseFreq,
@@ -67,7 +70,7 @@
     ),
   );
 
-  onMount(() => {
+  onMount(async () => {
     if (!canvasEl) return;
     try {
       renderer = new VideoRenderer(canvasEl, couplingCtx);
@@ -76,8 +79,23 @@
       renderer.start();
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
+      return;
+    }
+    try {
+      presets = await loadPresets();
+    } catch (e) {
+      initError = e instanceof Error ? e.message : String(e);
     }
   });
+
+  function onPreset(name: string) {
+    const p = presets[name];
+    if (!p) return;
+    applyPreset(p, instances);
+    activePreset = name;
+    // Trigger reactivity on params by replacing each instance's params ref.
+    instances = instances.map((inst) => ({ ...inst, params: { ...inst.params } }));
+  }
 
   // Push the latest coupling context into the renderer whenever bpm/baseFreq change.
   $effect(() => {
@@ -161,6 +179,17 @@
     </div>
   </header>
 
+  <section class="presets">
+    {#each Object.keys(presets) as name (name)}
+      <button class:active={activePreset === name} onclick={() => onPreset(name)}>
+        {name}
+      </button>
+    {/each}
+    {#if Object.keys(presets).length === 0}
+      <span class="muted">presets loading…</span>
+    {/if}
+  </section>
+
   <section class="stage">
     <div class="canvas-wrap">
       {#if initError}
@@ -197,11 +226,41 @@
 <style>
   .shell {
     display: grid;
-    grid-template-rows: auto 1fr auto auto;
+    grid-template-rows: auto auto 1fr auto auto;
     min-height: 100vh;
     color: var(--fg);
     background: var(--bg);
     font-family: var(--font-mono);
+  }
+
+  .presets {
+    display: flex;
+    gap: 0.4rem;
+    padding: 0.5rem 1.5rem;
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+
+  .presets button {
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--line);
+    padding: 0.25rem 0.6rem;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+  }
+
+  .presets button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .presets button.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg));
   }
 
   .topbar {
