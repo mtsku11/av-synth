@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AV/HYDRA · coupled audiovisual synth preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --panel: #111;
+    --line: #1f1f1f;
+    --line-bright: #2a2a2a;
+    --text: #d4d4c8;
+    --dim: #6a6a60;
+    --accent: #ff7a18;
+    --accent-dim: #5a2c08;
+    --bad: #c33;
+    --good: #6a8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    overflow: hidden;
+    user-select: none;
+  }
+  body {
+    display: grid;
+    grid-template-rows: 36px 1fr 24px;
+    grid-template-columns: 1fr 320px;
+    grid-template-areas:
+      "head head"
+      "view panel"
+      "foot foot";
+  }
+  @media (max-width: 768px) {
+    html, body { overflow: auto; }
+    body {
+      grid-template-rows: 36px 50vh auto 24px;
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        "head"
+        "view"
+        "panel"
+        "foot";
+      height: auto;
+      min-height: 100%;
+    }
+    aside.panel {
+      border-left: none !important;
+      border-top: 1px solid var(--line-bright);
+      max-height: none !important;
+    }
+    main.view { min-height: 50vh; }
+    input[type="range"] {
+      height: 28px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      width: 8px;
+      height: 22px;
+      margin-top: -10px;
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 8px;
+      height: 22px;
+    }
+    header .brand small { display: none; }
+    header button, header label.file-btn { padding: 0 10px; font-size: 10px; }
+    footer { flex-wrap: wrap; gap: 12px; padding: 4px 12px; }
+  }
+  header {
+    grid-area: head;
+    border-bottom: 1px solid var(--line-bright);
+    display: flex;
+    align-items: stretch;
+    background: var(--panel);
+  }
+  header .brand {
+    padding: 8px 16px;
+    border-right: 1px solid var(--line-bright);
+    font-family: 'VT323', monospace;
+    font-size: 22px;
+    letter-spacing: 1px;
+    color: var(--accent);
+  }
+  header .brand small {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    margin-left: 8px;
+    letter-spacing: 0.5px;
+  }
+  header nav {
+    display: flex;
+    align-items: stretch;
+    margin-left: auto;
+  }
+  header button, header label.file-btn {
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--line-bright);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 0 16px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    transition: background 0.1s;
+  }
+  header button:hover, header label.file-btn:hover {
+    background: var(--line);
+    color: var(--accent);
+  }
+  header button.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+  header .file-btn input { display: none; }
+  main.view {
+    grid-area: view;
+    background: #000;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas#output {
+    max-width: 100%;
+    max-height: 100%;
+    image-rendering: pixelated;
+    background: #000;
+  }
+  .empty {
+    color: var(--dim);
+    font-size: 13px;
+    text-align: center;
+    line-height: 2;
+  }
+  .empty .key { color: var(--accent); }
+  aside.panel {
+    grid-area: panel;
+    background: var(--panel);
+    border-left: 1px solid var(--line-bright);
+    overflow-y: auto;
+    padding: 0;
+  }
+  .group {
+    border-bottom: 1px solid var(--line);
+    padding: 12px 16px;
+  }
+  .group-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--dim);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .group-title .bracket { color: var(--line-bright); }
+  .slider {
+    margin: 10px 0;
+  }
+  .slider-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .slider-name {
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    color: var(--text);
+  }
+  .slider-name .domain {
+    color: var(--dim);
+    font-weight: 300;
+    font-size: 10px;
+    margin-left: 6px;
+  }
+  .slider-value {
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    font-size: 11px;
+  }
+  .slider-coupling {
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .slider-coupling .av {
+    color: var(--good);
+    margin-right: 4px;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 14px;
+    background: transparent;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 2px;
+    background: var(--line-bright);
+  }
+  input[type="range"]::-moz-range-track {
+    height: 2px;
+    background: var(--line-bright);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 4px;
+    height: 14px;
+    background: var(--accent);
+    margin-top: -6px;
+    border: none;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 4px;
+    height: 14px;
+    background: var(--accent);
+    border: none;
+    border-radius: 0;
+  }
+  .presets {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .presets button {
+    background: transparent;
+    border: 1px solid var(--line-bright);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 10px;
+    padding: 6px 8px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: all 0.1s;
+  }
+  .presets button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  footer {
+    grid-area: foot;
+    border-top: 1px solid var(--line-bright);
+    background: var(--panel);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    font-size: 10px;
+    color: var(--dim);
+    gap: 24px;
+    letter-spacing: 0.5px;
+  }
+  footer .stat { display: flex; gap: 6px; }
+  footer .stat .label { color: var(--dim); }
+  footer .stat .val { color: var(--text); font-variant-numeric: tabular-nums; }
+  footer .stat .val.live { color: var(--good); }
+  .blink { animation: blink 1.6s infinite; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+  .badge {
+    display: inline-block;
+    padding: 1px 5px;
+    border: 1px solid currentColor;
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">AV/HYDRA <small>v0.1 · COUPLED SYNTH PREVIEW</small></div>
+  <nav>
+    <label class="file-btn">
+      <input type="file" id="file-input" accept="video/*,video/mp4,video/quicktime,.mov,.mp4">
+      ◊ LOAD VIDEO
+    </label>
+    <button id="play-btn" disabled>▶ PLAY</button>
+    <button id="stop-btn" disabled>■ STOP</button>
+  </nav>
+</header>
+
+<main class="view">
+  <canvas id="output" width="960" height="540"></canvas>
+  <div class="empty" id="empty">
+    LOAD A VIDEO FILE TO BEGIN<br>
+    <small style="font-size:10px;">↑ click <span class="key">LOAD VIDEO</span> in the top bar</small><br><br>
+    <small style="font-size:10px; color:#3a3a30;">RECOMMENDED: high-contrast footage with motion<br>portraits · dance · close-ups · fast cuts</small>
+  </div>
+  <video id="src-video" style="display:none" playsinline webkit-playsinline></video>
+</main>
+
+<aside class="panel">
+
+  <div class="group">
+    <div class="group-title"><span>PARAMETERS</span><span class="bracket">[ A·V ]</span></div>
+
+    <div class="slider">
+      <div class="slider-head">
+        <span class="slider-name">FEEDBACK <span class="domain">[0–0.95]</span></span>
+        <span class="slider-value" id="v-feedback">0.85</span>
+      </div>
+      <div class="slider-coupling"><span class="av">A·V</span>frame echo · audio delay regen</div>
+      <input type="range" id="s-feedback" min="0" max="0.95" step="0.01" value="0.85">
+    </div>
+
+    <div class="slider">
+      <div class="slider-head">
+        <span class="slider-name">MODULATE <span class="domain">[0–1]</span></span>
+        <span class="slider-value" id="v-modulate">0.35</span>
+      </div>
+      <div class="slider-coupling"><span class="av">A·V</span>coord warp · vibrato (modulated delay)</div>
+      <input type="range" id="s-modulate" min="0" max="1" step="0.01" value="0.35">
+    </div>
+
+    <div class="slider">
+      <div class="slider-head">
+        <span class="slider-name">KALEID <span class="domain">[0–1]</span></span>
+        <span class="slider-value" id="v-kaleid">0.00</span>
+      </div>
+      <div class="slider-coupling"><span class="av">A·V</span>polar fold · wavefold (amplitude fold)</div>
+      <input type="range" id="s-kaleid" min="0" max="1" step="0.01" value="0">
+    </div>
+
+    <div class="slider">
+      <div class="slider-head">
+        <span class="slider-name">ROTATE <span class="domain">[−π — π]</span></span>
+        <span class="slider-value" id="v-rotate">0.04</span>
+      </div>
+      <div class="slider-coupling"><span class="av">A·V</span>feedback spin · stereo phase shift</div>
+      <input type="range" id="s-rotate" min="-3.14159" max="3.14159" step="0.005" value="0.04">
+    </div>
+
+    <div class="slider">
+      <div class="slider-head">
+        <span class="slider-name">SCALE <span class="domain">[0.5–1.5]</span></span>
+        <span class="slider-value" id="v-scale">1.02</span>
+      </div>
+      <div class="slider-coupling"><span class="av">A·V</span>feedback zoom · playback rate</div>
+      <input type="range" id="s-scale" min="0.5" max="1.5" step="0.005" value="1.02">
+    </div>
+
+    <div class="slider">
+      <div class="slider-head">
+        <span class="slider-name">CRUSH <span class="domain">[0–1]</span></span>
+        <span class="slider-value" id="v-crush">0.00</span>
+      </div>
+      <div class="slider-coupling"><span class="av">A·V</span>posterize · bit reduction</div>
+      <input type="range" id="s-crush" min="0" max="1" step="0.01" value="0.0">
+    </div>
+
+    <div class="slider">
+      <div class="slider-head">
+        <span class="slider-name">SHIFT <span class="domain">[0–0.08]</span></span>
+        <span class="slider-value" id="v-shift">0.00</span>
+      </div>
+      <div class="slider-coupling"><span class="av">A·V</span>chromatic offset · tremolo depth</div>
+      <input type="range" id="s-shift" min="0" max="0.08" step="0.001" value="0.0">
+    </div>
+
+    <div class="slider">
+      <div class="slider-head">
+        <span class="slider-name">RATE <span class="domain">[0.05–8 Hz]</span></span>
+        <span class="slider-value" id="v-rate">0.30</span>
+      </div>
+      <div class="slider-coupling"><span class="av">A·V</span>shared LFO · ring carrier · tremolo</div>
+      <input type="range" id="s-rate" min="0.05" max="8" step="0.01" value="0.3">
+    </div>
+
+    <div class="slider">
+      <div class="slider-head">
+        <span class="slider-name">DELAY-TIME <span class="domain">[0.05–0.8 s]</span></span>
+        <span class="slider-value" id="v-delaytime">0.180</span>
+      </div>
+      <div class="slider-coupling"><span class="av">A·V</span>audio delay length only</div>
+      <input type="range" id="s-delaytime" min="0.05" max="0.8" step="0.005" value="0.18">
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="group-title"><span>PRESETS</span><span class="bracket">[ × ]</span></div>
+    <div class="presets">
+      <button data-preset="tunnel">TUNNEL</button>
+      <button data-preset="bloom">ECHO BLOOM</button>
+      <button data-preset="lattice">LATTICE</button>
+      <button data-preset="chaos">CHAOS</button>
+      <button data-preset="ghost">SLOW GHOST</button>
+      <button data-preset="kaleido">KALEIDO</button>
+      <button data-preset="zero">ZERO</button>
+    </div>
+  </div>
+
+  <div class="group" style="font-size:10px; color:var(--dim); line-height:1.6;">
+    <div class="group-title"><span>NOTES</span><span class="bracket">[ ? ]</span></div>
+    every parameter is the same operation in two domains. MODULATE is coordinate displacement — visual coord warp, audio modulated-delay (vibrato), both are lookup-at-displaced-coordinate. KALEID folds the signal's coordinate back on itself — visual folds polar angle, audio folds amplitude (wavefold). push feedback past 0.9 with small rotate / scale ≠ 1 for emergent loops.
+  </div>
+
+</aside>
+
+<footer>
+  <div class="stat"><span class="label">STATUS</span><span class="val live" id="stat-status">READY</span></div>
+  <div class="stat"><span class="label">FPS</span><span class="val" id="stat-fps">—</span></div>
+  <div class="stat"><span class="label">AUDIO</span><span class="val" id="stat-audio">—</span></div>
+  <div class="stat"><span class="label">VIDEO</span><span class="val" id="stat-video">—</span></div>
+  <div class="stat" style="margin-left:auto;"><span class="badge blink" style="color:var(--accent);">EXPERIMENTAL</span></div>
+</footer>
+
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────────────────────────
+// SHARED PARAMETER STATE — this is what the entire app is about
+// ─────────────────────────────────────────────────────────────────
+const P = {
+  feedback: 0.85,
+  modulate: 0.35,
+  rotate: 0.04,
+  scale: 1.02,
+  crush: 0.0,
+  shift: 0.0,
+  rate: 0.3,
+  delaytime: 0.18,
+  kaleid: 0.0,
+};
+
+// ─────────────────────────────────────────────────────────────────
+// WEBGL: ping-pong framebuffer feedback shader
+// ─────────────────────────────────────────────────────────────────
+const VSHADER = `#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
+
+const FSHADER = `#version 300 es
+precision highp float;
+
+uniform sampler2D u_video;
+uniform sampler2D u_prev;
+uniform float u_time;
+uniform float u_feedback;
+uniform float u_modulate;
+uniform float u_rotate;
+uniform float u_scale;
+uniform float u_crush;
+uniform float u_shift;
+uniform float u_rate;
+uniform float u_kaleid;
+
+in vec2 v_uv;
+out vec4 fragColor;
+
+mat2 rot(float a) {
+  float c = cos(a), s = sin(a);
+  return mat2(c, -s, s, c);
+}
+
+// kaleidoscope: fold polar angle back into a single segment
+// the angle-mod-and-mirror pattern is the same operator as audio
+// wavefolding (signal exceeds boundary → reflected back)
+vec2 kaleid(vec2 uv, float amount) {
+  if (amount < 0.001) return uv;
+  vec2 p = uv - 0.5;
+  float a = atan(p.y, p.x);
+  float r = length(p);
+  float segments = 1.0 + amount * 11.0; // 1 → 12 segments
+  float seg = 2.0 * 3.14159265 / segments;
+  a = mod(a, seg);
+  a = abs(a - seg * 0.5);
+  return vec2(cos(a), sin(a)) * r + 0.5;
+}
+
+void main() {
+  vec2 uv = kaleid(v_uv, u_kaleid);
+  float t = u_time * u_rate * 6.28318;
+
+  // coordinate modulation (the unified MODULATE operator —
+  // identical to FM in audio: lookup at displaced coord)
+  vec2 mod_offset = vec2(
+    sin(uv.y * 6.28 + t),
+    cos(uv.x * 6.28 + t * 1.3)
+  ) * u_modulate * 0.15;
+  vec2 sampleUv = uv + mod_offset;
+
+  // feedback path: rotated + scaled lookup into previous frame
+  vec2 fb = sampleUv - 0.5;
+  fb = rot(u_rotate) * fb / u_scale;
+  vec2 fbUv = fb + 0.5;
+
+  // chromatic shift on video source
+  vec4 vid;
+  vid.r = texture(u_video, sampleUv + vec2(u_shift, 0.0)).r;
+  vid.g = texture(u_video, sampleUv).g;
+  vid.b = texture(u_video, sampleUv - vec2(u_shift, 0.0)).b;
+  vid.a = 1.0;
+
+  vec4 prev = texture(u_prev, fbUv);
+
+  // additive feedback then clamp — keeps trails alive without saturating to white
+  vec3 mixed = vid.rgb * (1.0 - u_feedback) + prev.rgb * u_feedback;
+  mixed = clamp(mixed, 0.0, 1.0);
+
+  // posterize — same op as audio bitcrush, on color channels
+  if (u_crush > 0.001) {
+    float levels = mix(64.0, 3.0, u_crush);
+    mixed = floor(mixed * levels + 0.5) / levels;
+  }
+
+  fragColor = vec4(mixed, 1.0);
+}`;
+
+const COPY_FSHADER = `#version 300 es
+precision highp float;
+uniform sampler2D u_tex;
+in vec2 v_uv;
+out vec4 fragColor;
+void main() { fragColor = texture(u_tex, v_uv); }`;
+
+// ─────────────────────────────────────────────────────────────────
+let gl, program, copyProgram, quadVAO;
+let videoTex, fboA, fboB, texA, texB;
+let useA = true;
+let fboW = 960, fboH = 540;
+
+const canvas = document.getElementById('output');
+const video = document.getElementById('src-video');
+
+function compileShader(src, type) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error('shader compile:', gl.getShaderInfoLog(s));
+    throw new Error(gl.getShaderInfoLog(s));
+  }
+  return s;
+}
+function linkProgram(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, vs);
+  gl.attachShader(p, fs);
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    console.error('program link:', gl.getProgramInfoLog(p));
+  }
+  return p;
+}
+function makeTexture(w, h) {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+function makeFBO(tex) {
+  const f = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return f;
+}
+
+function initGL() {
+  gl = canvas.getContext('webgl2', { preserveDrawingBuffer: false, antialias: false });
+  if (!gl) {
+    document.getElementById('empty').innerHTML = 'WebGL2 not supported in this browser.';
+    return false;
+  }
+
+  const vs = compileShader(VSHADER, gl.VERTEX_SHADER);
+  const fs = compileShader(FSHADER, gl.FRAGMENT_SHADER);
+  const cfs = compileShader(COPY_FSHADER, gl.FRAGMENT_SHADER);
+
+  program = linkProgram(vs, fs);
+  copyProgram = linkProgram(vs, cfs);
+
+  // full-screen quad
+  quadVAO = gl.createVertexArray();
+  gl.bindVertexArray(quadVAO);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1, -1,  1, -1, -1,  1,
+    -1,  1,  1, -1,  1,  1,
+  ]), gl.STATIC_DRAW);
+  const aPos = gl.getAttribLocation(program, 'a_pos');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+  // copy program shares the same vertex format / location
+  const aPosCopy = gl.getAttribLocation(copyProgram, 'a_pos');
+  gl.enableVertexAttribArray(aPosCopy);
+  gl.vertexAttribPointer(aPosCopy, 2, gl.FLOAT, false, 0, 0);
+
+  videoTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, videoTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+    new Uint8Array([0, 0, 0, 255]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  rebuildFBOs(fboW, fboH);
+  return true;
+}
+
+function rebuildFBOs(w, h) {
+  fboW = w; fboH = h;
+  texA = makeTexture(w, h);
+  texB = makeTexture(w, h);
+  fboA = makeFBO(texA);
+  fboB = makeFBO(texB);
+  // clear both
+  for (const f of [fboA, fboB]) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// AUDIO: ring-mod + delay-feedback + bitcrush + tremolo
+// ─────────────────────────────────────────────────────────────────
+let audioCtx;
+let srcNode, bitcrushNode, foldNode,
+    modDelayNode, modDepthGain, modOsc,
+    delayNode, fbGainNode, delayMixGain, tremoloGain, tremoloOsc,
+    masterGain;
+
+function makeBitcrushCurve(crush) {
+  const samples = 1024;
+  const curve = new Float32Array(samples);
+  const bits = 16 - Math.floor(crush * 12.5);
+  const levels = Math.pow(2, Math.max(2, bits));
+  for (let i = 0; i < samples; i++) {
+    const x = (i - samples / 2) / (samples / 2);
+    curve[i] = Math.round(x * levels) / levels;
+  }
+  return curve;
+}
+
+// wavefolder — the audio analog of kaleid (folds signal back when it
+// crosses ±1, same way kaleid folds polar angle back at segment boundaries)
+function makeFoldCurve(amount) {
+  const samples = 2048;
+  const curve = new Float32Array(samples);
+  const drive = 1 + amount * 7;
+  for (let i = 0; i < samples; i++) {
+    let y = ((i / (samples - 1)) * 2 - 1) * drive;
+    while (y > 1) y = 2 - y;
+    while (y < -1) y = -2 - y;
+    curve[i] = y;
+  }
+  return curve;
+}
+
+function setupAudio() {
+  if (audioCtx) {
+    try { audioCtx.close(); } catch (e) {}
+  }
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  srcNode = audioCtx.createMediaElementSource(video);
+
+  bitcrushNode = audioCtx.createWaveShaper();
+  bitcrushNode.curve = makeBitcrushCurve(P.crush);
+  bitcrushNode.oversample = '2x';
+
+  // wavefolder for KALEID (coupling: spatial fold ↔ amplitude fold)
+  foldNode = audioCtx.createWaveShaper();
+  foldNode.curve = makeFoldCurve(P.kaleid);
+  foldNode.oversample = '4x';
+
+  // MODULATED DELAY — true coupling with visual coord modulation:
+  // both are lookup-at-displaced-coordinate, one in 1D time, one in 2D space
+  modDelayNode = audioCtx.createDelay(0.05);
+  modDelayNode.delayTime.value = 0.008; // 8ms baseline so modulation has room
+  modDepthGain = audioCtx.createGain();
+  modDepthGain.gain.value = P.modulate * 0.007; // depth in seconds (~0–7ms)
+  modOsc = audioCtx.createOscillator();
+  modOsc.type = 'sine';
+  modOsc.frequency.value = P.rate;
+  modOsc.connect(modDepthGain);
+  modDepthGain.connect(modDelayNode.delayTime);
+  modOsc.start();
+
+  // long delay + feedback (separate from the modulated short delay)
+  delayNode = audioCtx.createDelay(2);
+  delayNode.delayTime.value = P.delaytime;
+  fbGainNode = audioCtx.createGain();
+  fbGainNode.gain.value = P.feedback * 0.9;
+  delayMixGain = audioCtx.createGain();
+  delayMixGain.gain.value = 0.6;
+
+  // tremolo (SHIFT)
+  tremoloGain = audioCtx.createGain();
+  tremoloGain.gain.value = 1;
+  tremoloOsc = audioCtx.createOscillator();
+  tremoloOsc.type = 'sine';
+  tremoloOsc.frequency.value = P.rate;
+  const tremDepth = audioCtx.createGain();
+  tremDepth.gain.value = P.shift * 6;
+  tremoloOsc.connect(tremDepth);
+  tremDepth.connect(tremoloGain.gain);
+  tremoloOsc.start();
+
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.8;
+
+  // signal path:
+  // src → bitcrush → fold → modDelay → long delay (with feedback) → tremolo → master
+  srcNode.connect(bitcrushNode);
+  bitcrushNode.connect(foldNode);
+  foldNode.connect(modDelayNode);
+
+  modDelayNode.connect(delayNode);
+  delayNode.connect(fbGainNode);
+  fbGainNode.connect(delayNode);
+  delayNode.connect(delayMixGain);
+
+  modDelayNode.connect(tremoloGain);
+  delayMixGain.connect(tremoloGain);
+
+  tremoloGain.connect(masterGain);
+  masterGain.connect(audioCtx.destination);
+
+  updateAudioParams();
+}
+
+function updateAudioParams() {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const r = 0.02;
+  modDepthGain.gain.setTargetAtTime(P.modulate * 0.007, now, r);
+  modOsc.frequency.setTargetAtTime(0.5 + P.rate * 2.5, now, r);
+  fbGainNode.gain.setTargetAtTime(P.feedback * 0.9, now, r);
+  delayNode.delayTime.setTargetAtTime(P.delaytime, now, r);
+  tremoloOsc.frequency.setTargetAtTime(P.rate, now, r);
+  bitcrushNode.curve = makeBitcrushCurve(P.crush);
+  foldNode.curve = makeFoldCurve(P.kaleid);
+  video.playbackRate = Math.max(0.5, Math.min(1.5, P.scale));
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MAIN LOOP — uploads video frame, runs feedback shader, swaps FBOs
+// ─────────────────────────────────────────────────────────────────
+let raf = null;
+let startT = 0;
+let lastFrameT = performance.now();
+let frameCount = 0;
+let fpsAccum = 0;
+let fpsLastUpdate = 0;
+
+function render(tNow) {
+  raf = requestAnimationFrame(render);
+  const dt = tNow - lastFrameT;
+  lastFrameT = tNow;
+  fpsAccum += dt;
+  frameCount++;
+  if (tNow - fpsLastUpdate > 500) {
+    const fps = 1000 / (fpsAccum / frameCount);
+    document.getElementById('stat-fps').textContent = fps.toFixed(0);
+    fpsAccum = 0; frameCount = 0; fpsLastUpdate = tNow;
+  }
+
+  if (video.readyState < 2 || video.paused) return;
+
+  const time = (tNow - startT) / 1000;
+
+  // upload current video frame to texture
+  gl.bindTexture(gl.TEXTURE_2D, videoTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+
+  // bind opposite FBO as draw target, sample from current
+  const writeFBO = useA ? fboB : fboA;
+  const readTex = useA ? texA : texB;
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, writeFBO);
+  gl.viewport(0, 0, fboW, fboH);
+  gl.useProgram(program);
+  gl.bindVertexArray(quadVAO);
+
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, videoTex);
+  gl.uniform1i(gl.getUniformLocation(program, 'u_video'), 0);
+
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, readTex);
+  gl.uniform1i(gl.getUniformLocation(program, 'u_prev'), 1);
+
+  gl.uniform1f(gl.getUniformLocation(program, 'u_time'), time);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_feedback'), P.feedback);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_modulate'), P.modulate);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_rotate'), P.rotate);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_scale'), P.scale);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_crush'), P.crush);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_shift'), P.shift);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_rate'), P.rate);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_kaleid'), P.kaleid);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  // copy that FBO to canvas
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.useProgram(copyProgram);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, useA ? texB : texA);
+  gl.uniform1i(gl.getUniformLocation(copyProgram, 'u_tex'), 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  useA = !useA;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// UI WIRING
+// ─────────────────────────────────────────────────────────────────
+function bindSlider(id, key, format) {
+  const slider = document.getElementById('s-' + id);
+  const valEl = document.getElementById('v-' + id);
+  slider.addEventListener('input', e => {
+    P[key] = parseFloat(e.target.value);
+    valEl.textContent = format ? format(P[key]) : P[key].toFixed(2);
+    updateAudioParams();
+  });
+  valEl.textContent = format ? format(P[key]) : P[key].toFixed(2);
+}
+
+bindSlider('feedback', 'feedback');
+bindSlider('modulate', 'modulate');
+bindSlider('kaleid', 'kaleid');
+bindSlider('rotate', 'rotate', v => v.toFixed(3));
+bindSlider('scale', 'scale', v => v.toFixed(3));
+bindSlider('crush', 'crush');
+bindSlider('shift', 'shift', v => v.toFixed(3));
+bindSlider('rate', 'rate', v => v.toFixed(2));
+bindSlider('delaytime', 'delaytime', v => v.toFixed(3));
+
+function applyPreset(p) {
+  const presets = {
+    tunnel:   { feedback:0.92, modulate:0.10, kaleid:0.0,  rotate:0.02,  scale:1.05, crush:0.0,  shift:0.0,   rate:0.15, delaytime:0.18 },
+    bloom:    { feedback:0.88, modulate:0.55, kaleid:0.0,  rotate:0.0,   scale:1.0,  crush:0.0,  shift:0.012, rate:1.2,  delaytime:0.32 },
+    lattice:  { feedback:0.78, modulate:0.35, kaleid:0.6,  rotate:0.0,   scale:1.0,  crush:0.6,  shift:0.0,   rate:2.4,  delaytime:0.09 },
+    chaos:    { feedback:0.93, modulate:0.7,  kaleid:0.4,  rotate:0.18,  scale:0.97, crush:0.35, shift:0.025, rate:1.8,  delaytime:0.45 },
+    ghost:    { feedback:0.95, modulate:0.2,  kaleid:0.0,  rotate:-0.01, scale:1.01, crush:0.0,  shift:0.005, rate:0.5,  delaytime:0.62 },
+    kaleido:  { feedback:0.82, modulate:0.25, kaleid:0.75, rotate:0.04,  scale:1.01, crush:0.1,  shift:0.0,   rate:0.8,  delaytime:0.24 },
+    zero:     { feedback:0.0,  modulate:0.0,  kaleid:0.0,  rotate:0.0,   scale:1.0,  crush:0.0,  shift:0.0,   rate:0.3,  delaytime:0.18 },
+  };
+  const v = presets[p];
+  if (!v) return;
+  for (const k of Object.keys(v)) {
+    P[k] = v[k];
+    const slider = document.getElementById('s-' + k);
+    const valEl = document.getElementById('v-' + k);
+    if (slider) slider.value = v[k];
+    if (valEl) {
+      const formatters = {
+        rotate: x => x.toFixed(3),
+        scale: x => x.toFixed(3),
+        shift: x => x.toFixed(3),
+        rate: x => x.toFixed(2),
+        delaytime: x => x.toFixed(3),
+      };
+      valEl.textContent = formatters[k] ? formatters[k](v[k]) : v[k].toFixed(2);
+    }
+  }
+  updateAudioParams();
+}
+document.querySelectorAll('.presets button').forEach(b => {
+  b.addEventListener('click', () => applyPreset(b.dataset.preset));
+});
+
+// file load
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  loadedFile = file;
+
+  // proactive codec check — try the common iPhone codec strings
+  const checks = {
+    'h.264 (baseline)':  'video/mp4; codecs="avc1.42E01E"',
+    'h.264 (high)':      'video/mp4; codecs="avc1.64001F"',
+    'hevc/h.265':        'video/mp4; codecs="hvc1.1.6.L93.B0"',
+  };
+  const supported = Object.entries(checks)
+    .map(([name, mime]) => `${name}: ${video.canPlayType(mime) || 'no'}`)
+    .join(' | ');
+  console.log('[av-hydra] codec support:', supported);
+  console.log('[av-hydra] selected file:', file.name, file.type, file.size, 'bytes');
+
+  const url = URL.createObjectURL(file);
+  video.src = url;
+  video.load();
+  document.getElementById('stat-status').textContent = 'LOADING';
+  document.getElementById('stat-video').textContent = file.name.length > 24 ?
+    file.name.slice(0, 22) + '…' : file.name;
+});
+
+video.addEventListener('loadedmetadata', () => {
+  // size FBOs to match video aspect, capped at 1280
+  const vw = video.videoWidth || 960;
+  const vh = video.videoHeight || 540;
+  const maxW = 1280;
+  const w = Math.min(vw, maxW);
+  const h = Math.round(w * (vh / vw));
+  canvas.width = w;
+  canvas.height = h;
+  rebuildFBOs(w, h);
+  document.getElementById('empty').style.display = 'none';
+  document.getElementById('play-btn').disabled = false;
+  document.getElementById('stop-btn').disabled = false;
+  document.getElementById('stat-status').textContent = 'READY';
+  document.getElementById('stat-video').textContent =
+    vw + '×' + vh + ' · ' + (video.duration||0).toFixed(1) + 's';
+});
+
+document.getElementById('play-btn').addEventListener('click', () => {
+  if (!audioCtx) setupAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  video.play();
+  if (!raf) {
+    startT = performance.now();
+    lastFrameT = startT;
+    raf = requestAnimationFrame(render);
+  }
+  document.getElementById('stat-status').textContent = 'RUNNING';
+  document.getElementById('stat-audio').textContent =
+    audioCtx.sampleRate + 'Hz · ' + audioCtx.state.toUpperCase();
+  document.getElementById('play-btn').classList.add('active');
+});
+
+document.getElementById('stop-btn').addEventListener('click', () => {
+  video.pause();
+  video.currentTime = 0;
+  document.getElementById('stat-status').textContent = 'STOPPED';
+  document.getElementById('play-btn').classList.remove('active');
+});
+
+let loadedFile = null;
+
+video.addEventListener('error', () => {
+  const codes = { 1:'aborted', 2:'network', 3:'decode', 4:'format/codec unsupported' };
+  const code = video.error ? video.error.code : 0;
+  const codeName = codes[code] || 'unknown';
+  document.getElementById('stat-status').textContent = 'ERR: ' + codeName;
+
+  const fileInfo = loadedFile ?
+    `<br><small style="font-size:10px; color:#888;">file: ${loadedFile.name}<br>` +
+    `type: ${loadedFile.type || 'unknown'}<br>` +
+    `size: ${(loadedFile.size/1024/1024).toFixed(1)} MB</small>` : '';
+
+  const advice = code === 4 ?
+    '<br><small style="font-size:10px; color:var(--accent);">most likely cause on iOS:<br>' +
+    'video is HEVC/H.265 inside an .mp4 container.<br>' +
+    'Web Audio rejects HEVC even though Safari plays it.<br><br>' +
+    'fixes:<br>' +
+    '· record with iPhone set to "Most Compatible"<br>' +
+    '&nbsp;&nbsp;(Settings → Camera → Formats)<br>' +
+    '· or convert to H.264 mp4 with handbrake/ffmpeg<br>' +
+    '· or test on desktop browser (much fewer issues)</small>' : '';
+
+  document.getElementById('empty').innerHTML =
+    `video could not load (${codeName})${fileInfo}${advice}`;
+  document.getElementById('empty').style.display = '';
+});
+
+video.addEventListener('ended', () => {
+  document.getElementById('stat-status').textContent = 'ENDED';
+  document.getElementById('play-btn').classList.remove('active');
+});
+
+// init
+initGL();
+</script>
+</body>
+</html>
