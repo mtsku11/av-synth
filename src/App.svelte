@@ -10,6 +10,25 @@
   import type { CouplingContext } from './core/coupling';
   import Slider from './ui/Slider.svelte';
   import Patch from './ui/Patch.svelte';
+  import type { ParamSpec } from './core/params';
+
+  const rateSpec: ParamSpec = {
+    id: 'clock.rate',
+    label: 'rate',
+    range: [0.05, 8],
+    default: 0.3,
+    curve: 'log',
+    unit: 'hz',
+    hint: 'global LFO frequency (clock.rate) — modulate and future LFO-driven ops read this',
+  };
+  const bpmSpec: ParamSpec = {
+    id: 'clock.bpm',
+    label: 'bpm',
+    range: [40, 220],
+    default: 120,
+    curve: 'lin',
+    unit: 'norm',
+  };
 
   let canvasEl: HTMLCanvasElement | undefined = $state();
   let videoEl: HTMLVideoElement | undefined = $state();
@@ -22,6 +41,8 @@
     baseFreq: clock.baseFreq,
     bpm: clock.bpm,
     sampleRate: audio.isInitialised ? audio.ctx.sampleRate : 48000,
+    time: clock.displayTime, // overridden per-frame by renderer; this is the fallback
+    rate: clock.rate,
   });
 
   // Tag each param entry with its instance/key so the UI can render flat.
@@ -151,6 +172,9 @@
   </section>
 
   <section class="controls">
+    <Slider spec={rateSpec} bind:value={clock.rate} />
+    <Slider spec={bpmSpec} bind:value={clock.bpm} />
+    <hr />
     {#each paramRows as row (row.instanceId + '/' + row.paramId)}
       <Slider
         spec={{
@@ -166,7 +190,7 @@
   </section>
 
   <footer>
-    <span class="status">M2 · feedback + posterize ported · remaining 6 ops follow the same template</span>
+    <span class="status">M2 · all 7 prototype operators ported · presets and audio worklets next</span>
   </footer>
 </main>
 
@@ -300,6 +324,12 @@
     padding: 0.75rem 1.5rem;
     display: grid;
     gap: 0.25rem;
+  }
+
+  .controls hr {
+    border: none;
+    border-top: 1px solid var(--line);
+    margin: 0.4rem 0;
   }
 
   .muted {

@@ -63,6 +63,34 @@ This file is project-scoped engineering memory, distinct from Claude's harness m
 
 ---
 
+### 2026-05-16 — `scale` audio is M2 passthrough; pitch-shift worklet is M3
+
+**Decision**: For M2 the `scale` operator's audio side is a literal passthrough Gain. Video does proper UV zoom; audio does nothing.
+
+**Why**: plan.md §2.2 calls for pitch / time scaling on the audio side. Web Audio has no built-in pitch shifter for streaming MediaElement sources. The clean implementation is a varispeed resampler AudioWorklet. Building that worklet is M3 work and would have blown out M2 scope.
+
+**How to apply**: When implementing M3 audio worklets, replace `ScalePassthroughAudioStage` in `src/ops/scale.ts` with a resampler that respects `amount` as the pitch ratio. Update the coupling kind from `'visual-only'` to `'fully-coupled'`.
+
+---
+
+### 2026-05-16 — `rate` lives on `clock`, exposed via CouplingContext
+
+**Decision**: The prototype's global `u_rate` LFO frequency is exposed as `clock.rate` (Svelte $state on the clock store). Operators read it via `CouplingContext.rate`, not by directly importing the clock.
+
+**Why**: Hydra fidelity calls for per-operator rate via the `.fast(n)` array modifier (M3 work). For M2 we have one global rate that every operator can subscribe to, mirroring the prototype. Routing through CouplingContext keeps operators decoupled from the clock module — the renderer and the audio engine both populate the context, so operators never need to know where rate comes from.
+
+**How to apply**: When implementing `.fast(n)` per-operator automation in M3, the per-op rate overrides ctx.rate locally. The clock-level `rate` becomes the fallback / global default.
+
+---
+
+### 2026-05-16 — `time` in CouplingContext sourced from AudioContext.currentTime
+
+**Decision**: `CouplingContext.time` is the same scalar in both domains, set per-frame (video) or per-poll (audio) from `AudioContext.currentTime` when available, falling back to a perf-derived clock otherwise.
+
+**Why**: For LFO-driven visuals to stay phase-locked with their audio counterpart, both domains must read the same time scalar. AudioContext is the master because it's sample-accurate; rAF can drift up to a frame. The fallback exists only because operators are constructed before `audio.init()` and the renderer is already running.
+
+**How to apply**: Operator stages should always read `ctx.time` from setUniforms/setParams — never `performance.now()` or `Date.now()` directly. Tests that depend on time should pass a CouplingContext with a fixed time value.
+
 ## Open mathematical questions
 
 (Mirrored from `plan.md §11` — resolve here as decisions land.)

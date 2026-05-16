@@ -157,6 +157,8 @@ export class AudioEngine {
       baseFreq: clock.baseFreq,
       bpm: clock.bpm,
       sampleRate: this.#ctx.sampleRate,
+      time: this.#ctx.currentTime,
+      rate: clock.rate,
     };
     for (const inst of this.#instances) {
       inst.audioStage?.setParams(inst.params, ctx);

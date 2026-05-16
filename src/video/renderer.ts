@@ -218,6 +218,10 @@ export class VideoRenderer {
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
 
+    // Per-frame ctx — overrides the stored ctx's time with the renderer's
+    // current clock so LFO-driven shaders stay phase-locked with audio.
+    const ctx: CouplingContext = { ...this.#couplingCtx, time: t };
+
     // 1. Render source into pingA.
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.#pingA.fbo);
     gl.viewport(0, 0, this.#pingA.width, this.#pingA.height);
@@ -241,7 +245,7 @@ export class VideoRenderer {
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, this.#prevFrame.tex);
 
-      instance.videoStage.setUniforms(gl, instance.params, this.#couplingCtx);
+      instance.videoStage.setUniforms(gl, instance.params, ctx);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 
       this.#useA = !this.#useA;

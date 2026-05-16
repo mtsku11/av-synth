@@ -6,6 +6,9 @@ class Clock {
   // baseFreq: Hz per "cycle per screen" unit for spatial→temporal frequency
   // mapping. See plan.md §0 and memory.md (decision: 1 Hz/cps default).
   baseFreq = $state(1);
+  // Global LFO frequency in Hz. Operators read this via CouplingContext.rate.
+  // See memory.md (2026-05-16: rate lives on clock).
+  rate = $state(0.3);
   running = $state(false);
   // Mirrored AudioContext currentTime, ticked on rAF for UI display.
   displayTime = $state(0);

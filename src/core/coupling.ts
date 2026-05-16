@@ -14,6 +14,17 @@ export interface CouplingContext {
   bpm: number;
   /** AudioContext.sampleRate, exposed for sample-accurate ops. */
   sampleRate: number;
+  /**
+   * Seconds since transport start. Sourced from AudioContext.currentTime when
+   * available so video and audio stay phase-locked; falls back to perf clock
+   * before the audio engine is initialised.
+   */
+  time: number;
+  /**
+   * Global LFO frequency in Hz. Mirrors the prototype's u_rate. Per-operator
+   * `.fast(n)` overrides (M3) take precedence over this when present.
+   */
+  rate: number;
 }
 
 export interface ParamCoupling {
