@@ -7,47 +7,7 @@
 import frag from '../video/shaders/feedback.frag?raw';
 import type { OperatorDef, VideoStage, AudioStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
-
-const VS_FULLSCREEN = /* glsl */ `#version 300 es
-out vec2 v_uv;
-void main() {
-  vec2 p = vec2((gl_VertexID == 1) ? 3.0 : -1.0,
-                (gl_VertexID == 2) ? 3.0 : -1.0);
-  v_uv = p * 0.5 + 0.5;
-  gl_Position = vec4(p, 0.0, 1.0);
-}
-`;
-
-function compileLink(
-  gl: WebGL2RenderingContext,
-  vsSrc: string,
-  fsSrc: string,
-): WebGLProgram {
-  const vs = gl.createShader(gl.VERTEX_SHADER);
-  const fs = gl.createShader(gl.FRAGMENT_SHADER);
-  if (!vs || !fs) throw new Error('Shader allocation failed');
-  gl.shaderSource(vs, vsSrc);
-  gl.compileShader(vs);
-  if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
-    throw new Error(`feedback VS: ${gl.getShaderInfoLog(vs)}`);
-  }
-  gl.shaderSource(fs, fsSrc);
-  gl.compileShader(fs);
-  if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
-    throw new Error(`feedback FS: ${gl.getShaderInfoLog(fs)}`);
-  }
-  const p = gl.createProgram();
-  if (!p) throw new Error('createProgram returned null');
-  gl.attachShader(p, vs);
-  gl.attachShader(p, fs);
-  gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-    throw new Error(`feedback link: ${gl.getProgramInfoLog(p)}`);
-  }
-  gl.deleteShader(vs);
-  gl.deleteShader(fs);
-  return p;
-}
+import { compileProgram, reqUniform } from '../video/glsl';
 
 class FeedbackVideoStage implements VideoStage {
   readonly op = 'feedback';
@@ -57,14 +17,10 @@ class FeedbackVideoStage implements VideoStage {
   #uFb: WebGLUniformLocation;
 
   constructor(gl: WebGL2RenderingContext) {
-    this.program = compileLink(gl, VS_FULLSCREEN, frag);
-    const uTex = gl.getUniformLocation(this.program, 'u_tex');
-    const uPrev = gl.getUniformLocation(this.program, 'u_prev_frame');
-    const uFb = gl.getUniformLocation(this.program, 'u_feedback');
-    if (!uTex || !uPrev || !uFb) throw new Error('feedback: missing uniforms');
-    this.#uTex = uTex;
-    this.#uPrev = uPrev;
-    this.#uFb = uFb;
+    this.program = compileProgram(gl, frag, 'feedback');
+    this.#uTex = reqUniform(gl, this.program, 'u_tex', 'feedback');
+    this.#uPrev = reqUniform(gl, this.program, 'u_prev_frame', 'feedback');
+    this.#uFb = reqUniform(gl, this.program, 'u_feedback', 'feedback');
   }
 
   setUniforms(

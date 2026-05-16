@@ -7,47 +7,7 @@
 import frag from '../video/shaders/posterize.frag?raw';
 import type { OperatorDef, VideoStage, AudioStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
-
-const VS_FULLSCREEN = /* glsl */ `#version 300 es
-out vec2 v_uv;
-void main() {
-  vec2 p = vec2((gl_VertexID == 1) ? 3.0 : -1.0,
-                (gl_VertexID == 2) ? 3.0 : -1.0);
-  v_uv = p * 0.5 + 0.5;
-  gl_Position = vec4(p, 0.0, 1.0);
-}
-`;
-
-function compileLink(
-  gl: WebGL2RenderingContext,
-  vsSrc: string,
-  fsSrc: string,
-): WebGLProgram {
-  const vs = gl.createShader(gl.VERTEX_SHADER);
-  const fs = gl.createShader(gl.FRAGMENT_SHADER);
-  if (!vs || !fs) throw new Error('Shader allocation failed');
-  gl.shaderSource(vs, vsSrc);
-  gl.compileShader(vs);
-  if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
-    throw new Error(`posterize VS: ${gl.getShaderInfoLog(vs)}`);
-  }
-  gl.shaderSource(fs, fsSrc);
-  gl.compileShader(fs);
-  if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
-    throw new Error(`posterize FS: ${gl.getShaderInfoLog(fs)}`);
-  }
-  const p = gl.createProgram();
-  if (!p) throw new Error('createProgram returned null');
-  gl.attachShader(p, vs);
-  gl.attachShader(p, fs);
-  gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-    throw new Error(`posterize link: ${gl.getProgramInfoLog(p)}`);
-  }
-  gl.deleteShader(vs);
-  gl.deleteShader(fs);
-  return p;
-}
+import { compileProgram, reqUniform } from '../video/glsl';
 
 class PosterizeVideoStage implements VideoStage {
   readonly op = 'posterize';
@@ -57,14 +17,10 @@ class PosterizeVideoStage implements VideoStage {
   #uGamma: WebGLUniformLocation;
 
   constructor(gl: WebGL2RenderingContext) {
-    this.program = compileLink(gl, VS_FULLSCREEN, frag);
-    const uTex = gl.getUniformLocation(this.program, 'u_tex');
-    const uBins = gl.getUniformLocation(this.program, 'u_bins');
-    const uGamma = gl.getUniformLocation(this.program, 'u_gamma');
-    if (!uTex || !uBins || !uGamma) throw new Error('posterize: missing uniforms');
-    this.#uTex = uTex;
-    this.#uBins = uBins;
-    this.#uGamma = uGamma;
+    this.program = compileProgram(gl, frag, 'posterize');
+    this.#uTex = reqUniform(gl, this.program, 'u_tex', 'posterize');
+    this.#uBins = reqUniform(gl, this.program, 'u_bins', 'posterize');
+    this.#uGamma = reqUniform(gl, this.program, 'u_gamma', 'posterize');
   }
 
   setUniforms(

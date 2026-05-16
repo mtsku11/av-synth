@@ -6,6 +6,7 @@
   import { VideoElementSource } from './video/sources';
   import { VideoElementAudioSource } from './audio/sources';
   import { createInstance, type OperatorInstance } from './core/operators';
+  import { DEFAULT_CHAIN } from './ops';
   import type { CouplingContext } from './core/coupling';
   import Slider from './ui/Slider.svelte';
   import Patch from './ui/Patch.svelte';
@@ -49,10 +50,7 @@
     if (!canvasEl) return;
     try {
       renderer = new VideoRenderer(canvasEl, couplingCtx);
-      // Build the chain: feedback first (uses prev-frame), then posterize.
-      const feedback = createInstance('feedback', renderer.gl, { feedback: 0, delayTime: 0.18 });
-      const posterize = createInstance('posterize', renderer.gl, { bins: 64, gamma: 1.0 });
-      instances = [feedback, posterize];
+      instances = DEFAULT_CHAIN.map((op) => createInstance(op, renderer!.gl));
       renderer.setInstances(instances);
       renderer.start();
     } catch (e) {
