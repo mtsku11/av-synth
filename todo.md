@@ -55,7 +55,7 @@ Success: every operator listed in `plan.md` is implemented in both domains, the 
 
 Work in family-batches. Order chosen by mathematical-foundation dependency:
 
-- [ ] **Sources** — `osc` ✅ 2026-05-16, `noise`, `voronoi`, `shape`, `gradient`, `solid`, multi-source `src(oN)`, external `s0..s3` with cam/mic init
+- [ ] **Sources** — `osc` ✅ 2026-05-16, `noise` ✅ 2026-05-16, `voronoi` ✅ 2026-05-16, `shape` ✅ 2026-05-16, `gradient` ✅ 2026-05-16, `solid` ✅ 2026-05-16, multi-source `src(oN)`, external `s0..s3` with cam/mic init
 - [ ] **Geometry** — `pixelate`, `repeat`, `repeatX`, `repeatY`, `scrollX`, `scrollY`
 - [ ] **Color** — `invert`, `contrast`, `brightness`, `luma`, `thresh`, `color`, `saturate`, `hue`, `colorama`, `sum`, channel accessors `.r .g .b .a`
 - [ ] **Blend** — `add`, `sub`, `mult`, `diff`, `layer`, `blend`, `mask`

@@ -93,6 +93,24 @@ This file is project-scoped engineering memory, distinct from Claude's harness m
 
 ---
 
+### 2026-05-16 — Procedural sources: M3.2 audio approximations without worklets
+
+**Decision**: `noise`, `voronoi`, `shape`, `gradient`, `solid` ship in M3 using only built-in Web Audio nodes. AudioWorklet versions are deferred. The pragmatic mappings are:
+
+- `noise`: white-noise buffer → BiquadFilter (lowpass). cutoff = `scale · baseFreq`; `offset` is the cutoff LFO rate.
+- `voronoi`: noise → biquad LP → VCA, with VCA gain driven by a sine LFO at `scale · baseFreq` reshaped through a smoothstep waveshaper (`blending` controls hardness). `speed` is k-rate cutoff wobble — a placeholder for the granular per-grain pitch-jitter called for in `plan.md §1.3`.
+- `shape`: 8 OscillatorNodes at harmonics `k · sides + 1` of `FUNDAMENTAL_REF (110 Hz) · baseFreq`, amp `1/(k+1) · radius`, lowpass cutoff `baseFreq / smoothing`.
+- `gradient`: noise → high-Q bandpass; cutoff log-swept at `speed · baseFreq` updated at the engine's 60Hz k-rate poll.
+- `solid`: 3 OscillatorNodes at `f₀, f₀·1.5, f₀·2` (root + fifth + octave), amps = r/g/b/3, master = a; `f₀ = FUNDAMENTAL_REF · baseFreq`.
+
+**Why**: AudioWorklet-grade implementations (true grain engine for voronoi, bandlimited additive for shape, log-swept biquad with continuous schedule for gradient) are real DSP work that would have blown out the M3 sources milestone. Built-in nodes get the AV-coupling story end-to-end now; worklets refine timbre later.
+
+**How to apply**: When the M3 AudioWorklet pass happens (after sources, geometry, color, blend), replace these audio stages without touching the coupling specs. The control law is canonical — the implementation is the swappable part. `shape`/`solid` carry a `FUNDAMENTAL_REF = 110 Hz` constant that should hook into transport / scale-snap when those arrive.
+
+Cross-ref: [[2026-05-16-source-architecture]].
+
+---
+
 ### 2026-05-16 — Source architecture: separate registry from operators
 
 **Decision**: Procedural sources (Hydra's `osc`, `noise`, `voronoi`, `shape`, `gradient`, `solid`) live in their own registry at `src/core/sources.ts` with `SourceDef` and `SourceInstance` mirroring `OperatorDef` / `OperatorInstance`. Coupling specs go through the same `coupling.ts` registry — sources are coupled operators, just with no upstream input.

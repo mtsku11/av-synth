@@ -4,6 +4,11 @@
 
 import { registerSource } from '../core/sources';
 import { oscDef } from './osc';
+import { noiseDef } from './noise';
+import { voronoiDef } from './voronoi';
+import { shapeDef } from './shape';
+import { gradientDef } from './gradient';
+import { solidDef } from './solid';
 
 let registered = false;
 
@@ -11,6 +16,11 @@ export function registerAllSources(): void {
   if (registered) return;
   registered = true;
   registerSource(oscDef);
+  registerSource(noiseDef);
+  registerSource(voronoiDef);
+  registerSource(shapeDef);
+  registerSource(gradientDef);
+  registerSource(solidDef);
 }
 
 /** Default procedural source on cold boot — paired with no-input "placeholder" external. */
