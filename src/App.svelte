@@ -3,54 +3,72 @@
   import { clock } from './core/clock.svelte';
   import { audio } from './audio/engine';
   import { VideoRenderer } from './video/renderer';
-  import type { ParamSpec } from './core/params';
+  import { VideoElementSource } from './video/sources';
+  import { VideoElementAudioSource } from './audio/sources';
+  import { createInstance, type OperatorInstance } from './core/operators';
+  import type { CouplingContext } from './core/coupling';
   import Slider from './ui/Slider.svelte';
-  import Knob from './ui/Knob.svelte';
   import Patch from './ui/Patch.svelte';
 
   let canvasEl: HTMLCanvasElement | undefined = $state();
+  let videoEl: HTMLVideoElement | undefined = $state();
   let renderer: VideoRenderer | null = null;
   let initError = $state<string | null>(null);
+  let instances = $state<OperatorInstance[]>([]);
+  let sourceLoaded = $state(false);
 
-  // Demo params, just to prove the controls bind correctly. Removed in M2.
-  const feedbackSpec: ParamSpec = {
-    id: 'feedback',
-    label: 'feedback',
-    range: [0, 0.95],
-    default: 0.85,
-    curve: 'lin',
-    unit: 'norm',
-  };
-  const rateSpec: ParamSpec = {
-    id: 'rate',
-    label: 'rate',
-    range: [0.05, 8],
-    default: 0.3,
-    curve: 'log',
-    unit: 'hz',
-  };
-  const bpmSpec: ParamSpec = {
-    id: 'bpm',
-    label: 'bpm',
-    range: [40, 220],
-    default: 120,
-    curve: 'lin',
-    unit: 'norm',
-  };
+  const couplingCtx = $derived<CouplingContext>({
+    baseFreq: clock.baseFreq,
+    bpm: clock.bpm,
+    sampleRate: audio.isInitialised ? audio.ctx.sampleRate : 48000,
+  });
 
-  let feedback = $state(feedbackSpec.default);
-  let rate = $state(rateSpec.default);
-  // Two-way bind bpm directly to the clock store.
-  // (Svelte's bindable accepts a getter-via-prop pattern; we use a derived UI value.)
+  // Tag each param entry with its instance/key so the UI can render flat.
+  interface ParamRow {
+    instanceId: string;
+    paramId: string;
+    label: string;
+    instance: OperatorInstance;
+  }
+
+  const paramRows = $derived<ParamRow[]>(
+    instances.flatMap((inst) =>
+      inst.def.paramOrder.map((paramId) => {
+        const coupling = inst.def.coupling.params[paramId];
+        return {
+          instanceId: inst.id,
+          paramId,
+          label: `${inst.def.op} · ${coupling?.spec.label ?? paramId}`,
+          instance: inst,
+        };
+      }),
+    ),
+  );
 
   onMount(() => {
     if (!canvasEl) return;
     try {
-      renderer = new VideoRenderer(canvasEl);
+      renderer = new VideoRenderer(canvasEl, couplingCtx);
+      // Build the chain: feedback first (uses prev-frame), then posterize.
+      const feedback = createInstance('feedback', renderer.gl, { feedback: 0, delayTime: 0.18 });
+      const posterize = createInstance('posterize', renderer.gl, { bins: 64, gamma: 1.0 });
+      instances = [feedback, posterize];
+      renderer.setInstances(instances);
       renderer.start();
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
     }
+  });
+
+  // Push the latest coupling context into the renderer whenever bpm/baseFreq change.
+  $effect(() => {
+    renderer?.updateCouplingContext(couplingCtx);
+  });
+
+  // Whenever the chain composition changes, hand it to the audio engine too.
+  $effect(() => {
+    if (!audio.isInitialised) return;
+    audio.setInstances(instances);
   });
 
   onDestroy(() => {
@@ -59,22 +77,57 @@
   });
 
   async function onStart() {
-    audio.init(); // must be in a user-gesture handler
+    audio.init();
+    audio.setInstances(instances);
     await clock.start();
   }
 
   async function onStop() {
     await clock.stop();
   }
+
+  async function onFileChange(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !renderer || !videoEl) return;
+    const url = URL.createObjectURL(file);
+    videoEl.src = url;
+    videoEl.loop = true;
+    videoEl.muted = false;
+    try {
+      await videoEl.play();
+    } catch {
+      // Autoplay can fail before user gesture — that's OK; user can click Start.
+    }
+    renderer.setSource(new VideoElementSource(renderer.gl, videoEl));
+    sourceLoaded = true;
+
+    if (audio.isInitialised) {
+      try {
+        const audioSrc = new VideoElementAudioSource(audio.ctx, videoEl);
+        audio.setSource(audioSrc);
+      } catch (e) {
+        // MediaElementAudioSource can only be created once per element; if the
+        // user loads a second file we'd need to recreate the element. M5 work.
+        initError = e instanceof Error ? e.message : String(e);
+      }
+    }
+  }
 </script>
+
+<video bind:this={videoEl} style="display:none" playsinline></video>
 
 <main class="shell">
   <header class="topbar">
     <div class="brand">
       <h1>av-synth</h1>
-      <span class="boot">M1 architectural skeleton</span>
+      <span class="boot">M2 · {instances.length} ops · source: {sourceLoaded ? 'video' : 'placeholder'}</span>
     </div>
     <div class="transport">
+      <label class="file">
+        load video
+        <input type="file" accept="video/*" onchange={onFileChange} />
+      </label>
       {#if clock.running}
         <button onclick={onStop}>■ stop</button>
       {:else}
@@ -92,7 +145,7 @@
   <section class="stage">
     <div class="canvas-wrap">
       {#if initError}
-        <div class="error">video init failed: {initError}</div>
+        <div class="error">init failed: {initError}</div>
       {/if}
       <canvas bind:this={canvasEl} width="1280" height="720"></canvas>
     </div>
@@ -100,19 +153,22 @@
   </section>
 
   <section class="controls">
-    <div class="row">
-      <Slider spec={feedbackSpec} bind:value={feedback} />
-      <Slider spec={rateSpec} bind:value={rate} />
-    </div>
-    <div class="row knobs">
-      <Knob spec={feedbackSpec} bind:value={feedback} />
-      <Knob spec={rateSpec} bind:value={rate} />
-      <Knob spec={bpmSpec} value={clock.bpm} />
-    </div>
+    {#each paramRows as row (row.instanceId + '/' + row.paramId)}
+      <Slider
+        spec={{
+          ...row.instance.def.coupling.params[row.paramId]!.spec,
+          label: row.label,
+        }}
+        bind:value={row.instance.params[row.paramId] as number}
+      />
+    {/each}
+    {#if paramRows.length === 0}
+      <span class="muted">no operators registered — check ops/index.ts</span>
+    {/if}
   </section>
 
   <footer>
-    <span class="status">M1 · skeleton ready · operators land in M2</span>
+    <span class="status">M2 · feedback + posterize ported · remaining 6 ops follow the same template</span>
   </footer>
 </main>
 
@@ -133,6 +189,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 1.5rem;
+    flex-wrap: wrap;
   }
 
   .brand {
@@ -158,9 +215,11 @@
     display: flex;
     align-items: center;
     gap: 1rem;
+    flex-wrap: wrap;
   }
 
-  .transport button {
+  .transport button,
+  .transport .file {
     background: var(--bg);
     color: var(--accent);
     border: 1px solid var(--accent);
@@ -169,10 +228,18 @@
     font-family: var(--font-mono);
     font-size: 0.8rem;
     letter-spacing: 0.05em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
   }
 
-  .transport button:hover {
+  .transport button:hover,
+  .transport .file:hover {
     background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+  }
+
+  .transport .file input {
+    display: none;
   }
 
   .readouts {
@@ -180,6 +247,7 @@
     gap: 1rem;
     font-size: 0.75rem;
     color: var(--fg);
+    flex-wrap: wrap;
   }
 
   .readout {
@@ -233,20 +301,12 @@
     border-top: 1px solid var(--line);
     padding: 0.75rem 1.5rem;
     display: grid;
-    gap: 1rem;
+    gap: 0.25rem;
   }
 
-  .row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
-    gap: 1.5rem;
-    align-items: center;
-  }
-
-  .row.knobs {
-    grid-template-columns: repeat(auto-fit, minmax(6rem, max-content));
-    gap: 2rem;
-    justify-content: start;
+  .muted {
+    color: var(--muted);
+    font-size: 0.75rem;
   }
 
   footer {

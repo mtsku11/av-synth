@@ -1,11 +1,24 @@
-// WebGL2 renderer scaffold.
+// WebGL2 renderer driving an operator chain.
 //
-// Responsibilities at M1:
-//   - Acquire a WebGL2 context.
-//   - Allocate two RGBA16F ping-pong FBOs.
-//   - Compile the trivial copy and clear programs.
-//   - Drive a rAF loop, drawing a placeholder gradient so the canvas is
-//     visibly alive. Operators (the real fragment shaders) bolt on in M2.
+// Per-frame pipeline:
+//   source.render() → pingA
+//   for each instance:
+//     bind read (pingA or pingB) to TEXTURE0 (u_tex)
+//     bind prevFrameTex      to TEXTURE1 (u_prev_frame)
+//     use instance.videoStage.program
+//     instance.videoStage.setUniforms(gl, instance.params, ctx)
+//     draw → write (pingB or pingA)
+//     swap
+//   copy final read → canvas
+//   copy final read → prevFrameTex (for the next frame's feedback stage)
+//
+// With zero instances the source renders directly into pingA and the copy
+// step blits it. The prev-frame texture is always allocated so feedback can
+// be inserted anywhere in the chain.
+
+import type { OperatorInstance } from '../core/operators';
+import type { CouplingContext } from '../core/coupling';
+import { PlaceholderSource, type VideoSourceStage } from './sources';
 
 const VS_FULLSCREEN = /* glsl */ `#version 300 es
 out vec2 v_uv;
@@ -23,23 +36,6 @@ in vec2 v_uv;
 out vec4 o_color;
 uniform sampler2D u_tex;
 void main() { o_color = texture(u_tex, v_uv); }
-`;
-
-// Placeholder M1 fragment: a slow plasma so we can see the loop is running.
-// Replaced by real operators in M2.
-const FS_PLACEHOLDER = /* glsl */ `#version 300 es
-precision highp float;
-in vec2 v_uv;
-out vec4 o_color;
-uniform float u_time;
-void main() {
-  vec2 p = v_uv * 2.0 - 1.0;
-  float r = length(p);
-  float a = atan(p.y, p.x);
-  float v = 0.5 + 0.5 * sin(r * 6.0 - u_time * 0.5 + a * 2.0);
-  vec3 col = mix(vec3(0.02, 0.06, 0.10), vec3(0.40, 0.85, 1.0), v * v);
-  o_color = vec4(col, 1.0);
-}
 `;
 
 function compile(gl: WebGL2RenderingContext, type: GLenum, src: string): WebGLShader {
@@ -69,25 +65,27 @@ function link(gl: WebGL2RenderingContext, vs: WebGLShader, fs: WebGLShader): Web
   return p;
 }
 
-interface PingPong {
+interface OffscreenTarget {
   fbo: WebGLFramebuffer;
   tex: WebGLTexture;
   width: number;
   height: number;
 }
 
-function createPingPong(
+function createTarget(
   gl: WebGL2RenderingContext,
   width: number,
   height: number,
   internalFormat: GLenum,
-): PingPong {
+): OffscreenTarget {
   const tex = gl.createTexture();
   const fbo = gl.createFramebuffer();
   if (!tex || !fbo) throw new Error('Failed to allocate FBO/texture');
 
+  const type = internalFormat === gl.RGBA16F ? gl.FLOAT : gl.UNSIGNED_BYTE;
+
   gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, width, height, 0, gl.RGBA, gl.FLOAT, null);
+  gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, width, height, 0, gl.RGBA, type, null);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -109,20 +107,24 @@ export class VideoRenderer {
 
   #vao: WebGLVertexArrayObject;
   #copyProgram: WebGLProgram;
-  #placeholderProgram: WebGLProgram;
-  #u_tex: WebGLUniformLocation;
-  #u_time: WebGLUniformLocation;
+  #uCopyTex: WebGLUniformLocation;
 
-  #pingA: PingPong;
-  #pingB: PingPong;
+  #pingA: OffscreenTarget;
+  #pingB: OffscreenTarget;
+  #prevFrame: OffscreenTarget;
   #useA = true;
+
+  #source: VideoSourceStage;
+  #instances: readonly OperatorInstance[] = [];
+  #couplingCtx: CouplingContext;
 
   #running = false;
   #rafId = 0;
   #startMs = 0;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, couplingCtx: CouplingContext) {
     this.canvas = canvas;
+    this.#couplingCtx = couplingCtx;
     const gl = canvas.getContext('webgl2', {
       antialias: false,
       alpha: false,
@@ -133,51 +135,45 @@ export class VideoRenderer {
     if (!gl) throw new Error('WebGL2 not available in this browser');
     this.gl = gl;
 
-    // HDR-ish offscreen targets. EXT_color_buffer_float is core in WebGL2.
     const ext = gl.getExtension('EXT_color_buffer_float');
     const internalFormat = ext ? gl.RGBA16F : gl.RGBA8;
 
     const w = canvas.width;
     const h = canvas.height;
-    this.#pingA = createPingPong(gl, w, h, internalFormat);
-    this.#pingB = createPingPong(gl, w, h, internalFormat);
+    this.#pingA = createTarget(gl, w, h, internalFormat);
+    this.#pingB = createTarget(gl, w, h, internalFormat);
+    this.#prevFrame = createTarget(gl, w, h, internalFormat);
 
-    // Programs.
     const vs = compile(gl, gl.VERTEX_SHADER, VS_FULLSCREEN);
     const fsCopy = compile(gl, gl.FRAGMENT_SHADER, FS_COPY);
-    const fsPlaceholder = compile(gl, gl.FRAGMENT_SHADER, FS_PLACEHOLDER);
     this.#copyProgram = link(gl, vs, fsCopy);
-    this.#placeholderProgram = link(gl, vs, fsPlaceholder);
     gl.deleteShader(vs);
     gl.deleteShader(fsCopy);
-    gl.deleteShader(fsPlaceholder);
 
     const uTex = gl.getUniformLocation(this.#copyProgram, 'u_tex');
-    const uTime = gl.getUniformLocation(this.#placeholderProgram, 'u_time');
-    if (!uTex || !uTime) throw new Error('Required uniform locations missing');
-    this.#u_tex = uTex;
-    this.#u_time = uTime;
+    if (!uTex) throw new Error('copy program missing u_tex');
+    this.#uCopyTex = uTex;
 
-    // VAO for the fullscreen triangle. No actual attributes — gl_VertexID-driven.
     const vao = gl.createVertexArray();
     if (!vao) throw new Error('createVertexArray returned null');
     this.#vao = vao;
+    gl.bindVertexArray(this.#vao);
+
+    this.#source = new PlaceholderSource(gl);
   }
 
-  resize(width: number, height: number): void {
-    if (width === this.#pingA.width && height === this.#pingA.height) return;
-    this.canvas.width = width;
-    this.canvas.height = height;
-    // Reallocate ping-pong targets at new size.
-    const gl = this.gl;
-    const ext = gl.getExtension('EXT_color_buffer_float');
-    const internalFormat = ext ? gl.RGBA16F : gl.RGBA8;
-    gl.deleteFramebuffer(this.#pingA.fbo);
-    gl.deleteFramebuffer(this.#pingB.fbo);
-    gl.deleteTexture(this.#pingA.tex);
-    gl.deleteTexture(this.#pingB.tex);
-    this.#pingA = createPingPong(gl, width, height, internalFormat);
-    this.#pingB = createPingPong(gl, width, height, internalFormat);
+  updateCouplingContext(ctx: CouplingContext): void {
+    this.#couplingCtx = ctx;
+  }
+
+  setSource(source: VideoSourceStage): void {
+    const old = this.#source;
+    this.#source = source;
+    old.dispose(this.gl);
+  }
+
+  setInstances(instances: readonly OperatorInstance[]): void {
+    this.#instances = instances;
   }
 
   start(): void {
@@ -198,12 +194,14 @@ export class VideoRenderer {
   dispose(): void {
     this.stop();
     const gl = this.gl;
+    this.#source.dispose(gl);
     gl.deleteFramebuffer(this.#pingA.fbo);
     gl.deleteFramebuffer(this.#pingB.fbo);
+    gl.deleteFramebuffer(this.#prevFrame.fbo);
     gl.deleteTexture(this.#pingA.tex);
     gl.deleteTexture(this.#pingB.tex);
+    gl.deleteTexture(this.#prevFrame.tex);
     gl.deleteProgram(this.#copyProgram);
-    gl.deleteProgram(this.#placeholderProgram);
     gl.deleteVertexArray(this.#vao);
   }
 
@@ -216,25 +214,57 @@ export class VideoRenderer {
 
   #renderFrame(t: number): void {
     const gl = this.gl;
-    const write = this.#useA ? this.#pingB : this.#pingA;
-
-    // 1. Run placeholder operator into the write FBO.
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.useProgram(this.#placeholderProgram);
-    gl.uniform1f(this.#u_time, t);
     gl.bindVertexArray(this.#vao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.disable(gl.DEPTH_TEST);
+    gl.disable(gl.BLEND);
 
-    // 2. Copy write FBO to the default framebuffer (canvas).
+    // 1. Render source into pingA.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.#pingA.fbo);
+    gl.viewport(0, 0, this.#pingA.width, this.#pingA.height);
+    this.#source.render(gl, t);
+    this.#useA = true; // pingA now holds the upstream value
+
+    // 2. Walk the chain.
+    for (const instance of this.#instances) {
+      const write = this.#useA ? this.#pingB : this.#pingA;
+      const read = this.#useA ? this.#pingA : this.#pingB;
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+      gl.viewport(0, 0, write.width, write.height);
+      gl.useProgram(instance.videoStage.program);
+
+      // Bind read texture → TEXTURE0 (u_tex).
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, read.tex);
+
+      // Bind previous-frame final → TEXTURE1 (u_prev_frame).
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, this.#prevFrame.tex);
+
+      instance.videoStage.setUniforms(gl, instance.params, this.#couplingCtx);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+      this.#useA = !this.#useA;
+    }
+
+    // 3. Blit final read → canvas.
+    const final = this.#useA ? this.#pingA : this.#pingB;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.useProgram(this.#copyProgram);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, write.tex);
-    gl.uniform1i(this.#u_tex, 0);
+    gl.bindTexture(gl.TEXTURE_2D, final.tex);
+    gl.uniform1i(this.#uCopyTex, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-    this.#useA = !this.#useA;
+    // 4. Copy final → prevFrame texture, so the next frame's feedback stages
+    // can sample it.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.#prevFrame.fbo);
+    gl.viewport(0, 0, this.#prevFrame.width, this.#prevFrame.height);
+    gl.useProgram(this.#copyProgram);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, final.tex);
+    gl.uniform1i(this.#uCopyTex, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 }
