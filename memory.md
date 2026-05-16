@@ -93,6 +93,27 @@ This file is project-scoped engineering memory, distinct from Claude's harness m
 
 ---
 
+### 2026-05-16 — Geometry family: M3.3 built-in-Web-Audio approximations
+
+**Decision**: `pixelate`, `repeat`, `repeatX`, `repeatY`, `scrollX`, `scrollY` ship with audio analogues built from BiquadFilter / DelayNode / StereoPanner / ChannelSplitter+Merger only. AudioWorklet upgrades deferred (cross-ref [[2026-05-16-procedural-sources-m3-2]]).
+
+- `pixelate(pixelX, pixelY)`: per-channel lowpass at SR/(2·N). Frequency-domain proxy for decimation. The aliasing component requires a true decimating worklet — deferred.
+- `repeat(repeatX, repeatY, offsetX, offsetY)`: IIR feedback comb per channel, delay = (60/bpm) / reps, feedback fixed at 0.6. Offset shifts tap phase within one period. Plan §2.4 calls for a *multi-tap* comb but a feedback comb produces taps at every integer multiple of d, which is the same spectral structure.
+- `repeatX(reps, offset)`: feedforward comb on L only (X = FF axis per plan §2.5).
+- `repeatY(reps, offset)`: feedback comb on R only (Y = FB axis per plan §2.5).
+- `scrollX(amount, speed)`: DelayNode with delayTime = amount · 0.5s, modulated at |speed| Hz, sign of speed selects LFO phase direction. Mono.
+- `scrollY(amount, speed)`: StereoPannerNode with pan = 2·amount − 1, modulated at |speed| Hz.
+
+**Identity defaults** (not Hydra invocation defaults): chain ops must default to a no-op so they can sit in the always-on DEFAULT_CHAIN without distorting a fresh-load preset. This matches the convention established by rotate (angle=0), modulate (amount=0), scale (amount=1.0), posterize (bins=64). Hydra invocation defaults (e.g. `pixelate(20, 20)`) come into play in M4 when the live-code API is implemented.
+
+**How to apply**: When the AudioWorklet pass replaces these stages, change ONLY the audio sub-graph internals — `OperatorDef.createAudioStage` remains the seam. Coupling specs and param IDs are canonical. `repeat` will gain a true multi-tap implementation (e.g. 8 staggered taps with per-tap allpass). `scrollX` is the most likely candidate for a true varispeed read-head scrub.
+
+The chain ordering in DEFAULT_CHAIN places geometry between scale/rotate (continuous transforms) and kaleid (polar fold), with `pixelate` last in the geometry block so other geometric ops see the pre-quantised UV grid.
+
+Cross-ref: [[2026-05-16-source-architecture]], [[2026-05-16-procedural-sources-m3-2]].
+
+---
+
 ### 2026-05-16 — Procedural sources: M3.2 audio approximations without worklets
 
 **Decision**: `noise`, `voronoi`, `shape`, `gradient`, `solid` ship in M3 using only built-in Web Audio nodes. AudioWorklet versions are deferred. The pragmatic mappings are:
