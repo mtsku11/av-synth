@@ -1,0 +1,90 @@
+{
+  "id": "audit-repeatX-osc-sweep",
+  "title": "RepeatX sweep on osc source",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-repeatX-osc-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "repeatx-osc-1-hold",
+        "to": "repeatx-osc-6-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": "<",
+        "delta": -0.05,
+        "description": "raising RepeatX reps should materially compress the oscillator field into a denser horizontal tile pattern"
+      },
+      {
+        "from": "repeatx-osc-1-hold",
+        "to": "repeatx-osc-6-hold",
+        "domain": "audio",
+        "metric": "leftMinusRightRmsLevelDb",
+        "op": "<",
+        "delta": -0.75,
+        "source": "exported-audio",
+        "segmentPaddingMs": 220,
+        "description": "raising RepeatX reps should materially deepen left-channel comb asymmetry on the rendered mix"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "repeatX",
+    "kind": "sweep",
+    "expectedVideo": [
+      "raising RepeatX reps should create denser horizontal tiling without broken seams",
+      "the stronger state should stay visually coherent"
+    ],
+    "expectedAudio": [
+      "the same move should strengthen the left-channel feedforward comb treatment",
+      "the rendered mix should remain stable with no clicks or mute state"
+    ],
+    "manualChecks": [
+      "Does RepeatX clearly feel left-channel-treated in audio while reading as horizontal repetition in video?",
+      "Is the stronger setting still aesthetically useful?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "repeatx-osc-frequency-110"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeatX",
+      "paramId": "reps",
+      "value": 1,
+      "screenshot": "repeatx-osc-1"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeatX",
+      "paramId": "offset",
+      "value": 0,
+      "screenshot": "repeatx-osc-offset-0"
+    },
+    {
+      "type": "wait",
+      "ms": 320,
+      "screenshot": "repeatx-osc-1-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeatX",
+      "paramId": "reps",
+      "value": 6,
+      "screenshot": "repeatx-osc-6"
+    },
+    {
+      "type": "wait",
+      "ms": 520,
+      "screenshot": "repeatx-osc-6-hold"
+    }
+  ]
+}

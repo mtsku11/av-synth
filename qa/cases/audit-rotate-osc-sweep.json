@@ -1,0 +1,83 @@
+{
+  "id": "audit-rotate-osc-sweep",
+  "title": "Rotate sweep on osc source",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-rotate-osc-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "rotate-osc-000-hold",
+        "to": "rotate-osc-110-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": "<",
+        "delta": -0.01,
+        "description": "raising rotate away from zero should materially reorganize the oscillator frame, not leave the image effectively unchanged"
+      },
+      {
+        "from": "rotate-osc-000-hold",
+        "to": "rotate-osc-110-hold",
+        "domain": "audio",
+        "metric": "leftMinusRightRmsLevelDb",
+        "op": "<",
+        "delta": -6,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "positive rotation should materially bias the rendered stereo field toward the right channel"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "rotate",
+    "kind": "sweep",
+    "expectedVideo": [
+      "raising rotate should turn the oscillator frame cleanly without tearing or blank wedges",
+      "the rotated image should stay coherent rather than showing unstable edge shimmer"
+    ],
+    "expectedAudio": [
+      "positive rotation should move the rendered stereo image toward the right channel",
+      "the sweep should preserve signal continuity with no clicks or dropouts"
+    ],
+    "manualChecks": [
+      "Does the visual turn feel coupled to the stereo-field movement rather than arbitrary?",
+      "Does the stronger rotation stay usable instead of sounding lopsided or phase-broken?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "rotate-osc-frequency-110"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "rotate",
+      "paramId": "angle",
+      "value": 0,
+      "screenshot": "rotate-osc-000"
+    },
+    {
+      "type": "wait",
+      "ms": 320,
+      "screenshot": "rotate-osc-000-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "rotate",
+      "paramId": "angle",
+      "value": 1.1,
+      "screenshot": "rotate-osc-110"
+    },
+    {
+      "type": "wait",
+      "ms": 420,
+      "screenshot": "rotate-osc-110-hold"
+    }
+  ]
+}

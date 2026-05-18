@@ -4,3 +4,6 @@ dist
 package-lock.json
 *.md
 public/presets/*.json
+prototype.html
+qa/results
+qa/qa/results

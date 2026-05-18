@@ -1,0 +1,64 @@
+{
+  "id": "audit-saturate-video-sweep",
+  "title": "Saturate sweep on decoded media",
+  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "transport": { "start": true, "settleMs": 1500 },
+  "recording": { "filename": "audit-saturate-video-sweep", "tailMs": 850 },
+  "expectations": {
+    "sourceKind": "video",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "saturate-000-hold",
+        "to": "saturate-220-hold",
+        "domain": "video",
+        "metric": "meanSaturation",
+        "op": ">",
+        "delta": 0.08,
+        "description": "raising saturate should materially increase average color saturation"
+      }
+    ]
+  },
+  "audit": {
+    "family": "color-tonal",
+    "operator": "saturate",
+    "kind": "sweep",
+    "expectedVideo": [
+      "higher saturate should visibly increase color intensity without posterizing the frame"
+    ],
+    "expectedAudio": [
+      "higher saturate should widen the stereo image without destabilizing the mix"
+    ],
+    "manualChecks": [
+      "Does the stereo widening feel related to the color intensity increase?",
+      "Does the high-saturation setting remain professional rather than gimmicky?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "saturate",
+      "paramId": "amount",
+      "value": 0,
+      "screenshot": "saturate-000"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "saturate-000-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "saturate",
+      "paramId": "amount",
+      "value": 2.2,
+      "screenshot": "saturate-220"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "saturate-220-hold"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "id": "audit-source-noise-sweep",
+  "title": "Noise source sweep",
+  "source": { "kind": "noise" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-source-noise-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "noise",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": []
+  },
+  "audit": {
+    "family": "sources",
+    "operator": "noise",
+    "kind": "sweep",
+    "expectedVideo": [
+      "higher scale should produce visibly denser noise detail",
+      "the noise field should keep moving rather than freezing or banding"
+    ],
+    "expectedAudio": [
+      "higher scale should materially alter the rendered noise spectrum through the low-pass mapping",
+      "the rendered noise should stay full-range rather than collapsing or clipping"
+    ],
+    "manualChecks": [
+      "Does the denser noise field feel like the same move as the rendered timbral change?",
+      "Does the rendered noise stay usable rather than turning dull or broken at the high setting?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "scale",
+      "value": 2,
+      "screenshot": "noise-scale-2"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "noise-scale-2-hold"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "scale",
+      "value": 80,
+      "screenshot": "noise-scale-80"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "noise-scale-80-hold"
+    }
+  ]
+}

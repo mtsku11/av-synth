@@ -1,0 +1,86 @@
+{
+  "id": "audit-scrollX-osc-sweep",
+  "title": "ScrollX sweep on osc source",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-scrollX-osc-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "scrollx-osc-static-hold",
+        "to": "scrollx-osc-moving-hold",
+        "domain": "video",
+        "metric": "temporalDiff",
+        "op": ">",
+        "delta": 0.03,
+        "description": "adding X-scroll motion should materially increase frame-to-frame movement on the oscillator source"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "scrollX",
+    "kind": "sweep",
+    "expectedVideo": [
+      "raising X amount and speed should produce clear horizontal drift rather than a frozen frame",
+      "the moving state should remain smooth and free of visible stepping"
+    ],
+    "expectedAudio": [
+      "the same move should introduce an audible delay-scrub/vibrato effect on the rendered mix",
+      "the stronger setting should stay stable without zippering or silence"
+    ],
+    "manualChecks": [
+      "Does the visual horizontal drift feel coupled to the audio scrub rather than unrelated?",
+      "Does the moving state still sound intentional at this strength?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "scrollx-osc-frequency-110"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scrollX",
+      "paramId": "amount",
+      "value": 0.08,
+      "screenshot": "scrollx-osc-static-amount"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scrollX",
+      "paramId": "speed",
+      "value": 0,
+      "screenshot": "scrollx-osc-static-speed"
+    },
+    {
+      "type": "wait",
+      "ms": 320,
+      "screenshot": "scrollx-osc-static-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scrollX",
+      "paramId": "amount",
+      "value": 0.68,
+      "screenshot": "scrollx-osc-moving-amount"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scrollX",
+      "paramId": "speed",
+      "value": 1.8,
+      "screenshot": "scrollx-osc-moving-speed"
+    },
+    {
+      "type": "wait",
+      "ms": 520,
+      "screenshot": "scrollx-osc-moving-hold"
+    }
+  ]
+}

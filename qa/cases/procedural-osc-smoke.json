@@ -1,0 +1,33 @@
+{
+  "id": "procedural-osc-smoke",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "procedural-osc-smoke", "tailMs": 500 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "osc-frequency-110"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "modulate",
+      "paramId": "amount",
+      "value": 0.35,
+      "screenshot": "osc-modulate-035"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scale",
+      "paramId": "amount",
+      "value": 1.5,
+      "screenshot": "osc-scale-150"
+    }
+  ]
+}

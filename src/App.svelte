@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { clock } from './core/clock.svelte';
   import { audio } from './audio/engine';
   import { VideoRenderer } from './video/renderer';
@@ -9,7 +9,7 @@
   import {
     createSourceInstance,
     attachSourceAudio,
-    disposeSourceInstance,
+    disposeSourceAudio,
     listSources,
     type SourceInstance,
   } from './core/sources';
@@ -93,6 +93,307 @@
     instance: SourceInstance;
   }
 
+  interface QaBridge {
+    getState(): {
+      sourceKind: string;
+      clockRunning: boolean;
+      audioInitialised: boolean;
+      video: {
+        currentTime: number;
+        paused: boolean;
+        readyState: number;
+        duration: number;
+      } | null;
+    };
+    getFftSnapshot(count?: number): number[] | null;
+    sampleMetrics(durationMs?: number): Promise<{
+      video: {
+        meanLuma: number;
+        meanR: number;
+        meanG: number;
+        meanB: number;
+        meanSaturation: number;
+        spatialStd: number;
+        temporalDiff: number;
+      } | null;
+      audio: {
+        meanDb: number;
+        spectralCentroidHz: number;
+        spectralSpreadHz: number;
+        activeBins: number;
+      } | null;
+      samples: number;
+      timing: {
+        sampleDurationMs: number;
+        audioStartSeconds: number | null;
+        audioEndSeconds: number | null;
+        captureStartSeconds: number | null;
+        captureEndSeconds: number | null;
+      };
+    } | null>;
+    getCaptureState(): {
+      status: 'idle' | 'recording' | 'ready';
+      bytes: number;
+      filename: string | null;
+      mimeType: string | null;
+    };
+    setSourceKind(kind: string): Promise<boolean>;
+    setOperatorParam(
+      op: string,
+      paramId: string,
+      value: number,
+      opIndex?: number,
+    ): Promise<boolean>;
+    setSourceParam(paramId: string, value: number): Promise<boolean>;
+    startCapture(filenameStem?: string): Promise<boolean>;
+    stopCapture(): Promise<{
+      bytes: number;
+      filename: string;
+      mimeType: string;
+    } | null>;
+    exportLastCapture(): Promise<boolean>;
+  }
+
+  type CaptureStatus = 'idle' | 'recording' | 'ready';
+
+  interface CaptureArtifact {
+    blob: Blob;
+    bytes: number;
+    filename: string;
+    mimeType: string;
+    url: string;
+  }
+
+  let captureStatus = $state<CaptureStatus>('idle');
+  let latestCapture = $state<CaptureArtifact | null>(null);
+  let captureRecorder: MediaRecorder | null = null;
+  let captureStream: MediaStream | null = null;
+  let captureFilename = '';
+  let captureChunks: Blob[] = [];
+  let captureStartedAtAudioTime: number | null = null;
+  let captureStartedAtPerfMs: number | null = null;
+
+  function analyseCanvasFrame(frame: Uint8ClampedArray): {
+    meanLuma: number;
+    meanR: number;
+    meanG: number;
+    meanB: number;
+    meanSaturation: number;
+    spatialStd: number;
+    lumas: Float32Array<ArrayBuffer>;
+  } {
+    const count = frame.length / 4;
+    const lumas = new Float32Array(count);
+    let sum = 0;
+    let sumR = 0;
+    let sumG = 0;
+    let sumB = 0;
+    let saturationSum = 0;
+    for (let index = 0, pixel = 0; index < frame.length; index += 4, pixel += 1) {
+      const r = frame[index] ?? 0;
+      const g = frame[index + 1] ?? 0;
+      const b = frame[index + 2] ?? 0;
+      const rNorm = r / 255;
+      const gNorm = g / 255;
+      const bNorm = b / 255;
+      const maxChannel = Math.max(rNorm, gNorm, bNorm);
+      const minChannel = Math.min(rNorm, gNorm, bNorm);
+      const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      lumas[pixel] = luma;
+      sum += luma;
+      sumR += rNorm;
+      sumG += gNorm;
+      sumB += bNorm;
+      saturationSum += maxChannel > 0 ? (maxChannel - minChannel) / maxChannel : 0;
+    }
+    const meanLuma = sum / count;
+    let variance = 0;
+    for (let pixel = 0; pixel < lumas.length; pixel += 1) {
+      const centered = (lumas[pixel] ?? 0) - meanLuma;
+      variance += centered * centered;
+    }
+    return {
+      meanLuma,
+      meanR: sumR / count,
+      meanG: sumG / count,
+      meanB: sumB / count,
+      meanSaturation: saturationSum / count,
+      spatialStd: Math.sqrt(variance / count),
+      lumas,
+    };
+  }
+
+  function analyseFft(
+    fft: Float32Array,
+    sampleRate: number,
+  ): {
+    meanDb: number;
+    spectralCentroidHz: number;
+    spectralSpreadHz: number;
+    activeBins: number;
+  } {
+    const nyquist = sampleRate / 2;
+    const binHz = nyquist / fft.length;
+    let dbSum = 0;
+    let weightSum = 0;
+    let centroidNumerator = 0;
+    let activeBins = 0;
+
+    for (let index = 0; index < fft.length; index += 1) {
+      const db = fft[index] ?? -120;
+      dbSum += db;
+      if (db > -80) activeBins += 1;
+      const amplitude = Number.isFinite(db) ? 10 ** (db / 20) : 0;
+      const hz = (index + 0.5) * binHz;
+      weightSum += amplitude;
+      centroidNumerator += hz * amplitude;
+    }
+
+    const spectralCentroidHz = weightSum > 0 ? centroidNumerator / weightSum : 0;
+    let spreadNumerator = 0;
+    for (let index = 0; index < fft.length; index += 1) {
+      const db = fft[index] ?? -120;
+      const amplitude = Number.isFinite(db) ? 10 ** (db / 20) : 0;
+      const hz = (index + 0.5) * binHz;
+      const delta = hz - spectralCentroidHz;
+      spreadNumerator += delta * delta * amplitude;
+    }
+
+    return {
+      meanDb: dbSum / fft.length,
+      spectralCentroidHz,
+      spectralSpreadHz: weightSum > 0 ? Math.sqrt(spreadNumerator / weightSum) : 0,
+      activeBins,
+    };
+  }
+
+  async function sampleMetrics(durationMs = 240): Promise<{
+    video: {
+      meanLuma: number;
+      meanR: number;
+      meanG: number;
+      meanB: number;
+      meanSaturation: number;
+      spatialStd: number;
+      temporalDiff: number;
+    } | null;
+    audio: {
+      meanDb: number;
+      spectralCentroidHz: number;
+      spectralSpreadHz: number;
+      activeBins: number;
+    } | null;
+    samples: number;
+    timing: {
+      sampleDurationMs: number;
+      audioStartSeconds: number | null;
+      audioEndSeconds: number | null;
+      captureStartSeconds: number | null;
+      captureEndSeconds: number | null;
+    };
+  } | null> {
+    if (!canvasEl) return null;
+    const probeCanvas = document.createElement('canvas');
+    probeCanvas.width = 64;
+    probeCanvas.height = 64;
+    const probeCtx = probeCanvas.getContext('2d', { willReadFrequently: true });
+    if (!probeCtx) return null;
+
+    const audioStartSeconds = audio.isInitialised ? audio.ctx.currentTime : null;
+    const perfStartMs = performance.now();
+    let samples = 0;
+    let videoMeanLuma = 0;
+    let videoMeanR = 0;
+    let videoMeanG = 0;
+    let videoMeanB = 0;
+    let videoMeanSaturation = 0;
+    let videoSpatialStd = 0;
+    let videoTemporalDiff = 0;
+    let audioMeanDb = 0;
+    let audioCentroidHz = 0;
+    let audioSpreadHz = 0;
+    let audioActiveBins = 0;
+    let prevLumas: Float32Array<ArrayBuffer> | null = null;
+    const deadline = performance.now() + durationMs;
+
+    while (performance.now() < deadline) {
+      probeCtx.drawImage(canvasEl, 0, 0, probeCanvas.width, probeCanvas.height);
+      const image = probeCtx.getImageData(0, 0, probeCanvas.width, probeCanvas.height);
+      const frame = analyseCanvasFrame(image.data);
+      videoMeanLuma += frame.meanLuma;
+      videoMeanR += frame.meanR;
+      videoMeanG += frame.meanG;
+      videoMeanB += frame.meanB;
+      videoMeanSaturation += frame.meanSaturation;
+      videoSpatialStd += frame.spatialStd;
+
+      if (prevLumas) {
+        let diffSum = 0;
+        for (let index = 0; index < frame.lumas.length; index += 1) {
+          diffSum += Math.abs((frame.lumas[index] ?? 0) - (prevLumas[index] ?? 0));
+        }
+        videoTemporalDiff += diffSum / frame.lumas.length;
+      }
+      prevLumas = frame.lumas;
+
+      const fft = audio.getFftMagnitudes();
+      if (fft) {
+        const snapshot = analyseFft(fft, audio.ctx.sampleRate);
+        audioMeanDb += snapshot.meanDb;
+        audioCentroidHz += snapshot.spectralCentroidHz;
+        audioSpreadHz += snapshot.spectralSpreadHz;
+        audioActiveBins += snapshot.activeBins;
+      }
+
+      samples += 1;
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
+
+    if (!samples) return null;
+    const temporalSamples = Math.max(samples - 1, 1);
+    const audioEndSeconds = audio.isInitialised ? audio.ctx.currentTime : null;
+    const perfEndMs = performance.now();
+    const captureStartSeconds =
+      audioStartSeconds !== null && captureStartedAtAudioTime !== null
+        ? Math.max(0, audioStartSeconds - captureStartedAtAudioTime)
+        : captureStartedAtPerfMs !== null
+          ? Math.max(0, (perfStartMs - captureStartedAtPerfMs) / 1000)
+          : null;
+    const captureEndSeconds =
+      audioEndSeconds !== null && captureStartedAtAudioTime !== null
+        ? Math.max(0, audioEndSeconds - captureStartedAtAudioTime)
+        : captureStartedAtPerfMs !== null
+          ? Math.max(0, (perfEndMs - captureStartedAtPerfMs) / 1000)
+          : null;
+    return {
+      video: {
+        meanLuma: videoMeanLuma / samples,
+        meanR: videoMeanR / samples,
+        meanG: videoMeanG / samples,
+        meanB: videoMeanB / samples,
+        meanSaturation: videoMeanSaturation / samples,
+        spatialStd: videoSpatialStd / samples,
+        temporalDiff: videoTemporalDiff / temporalSamples,
+      },
+      audio: audio.isInitialised
+        ? {
+            meanDb: audioMeanDb / samples,
+            spectralCentroidHz: audioCentroidHz / samples,
+            spectralSpreadHz: audioSpreadHz / samples,
+            activeBins: audioActiveBins / samples,
+          }
+        : null,
+      samples,
+      timing: {
+        sampleDurationMs: durationMs,
+        audioStartSeconds,
+        audioEndSeconds,
+        captureStartSeconds,
+        captureEndSeconds,
+      },
+    };
+  }
+
   const sourceParamRows = $derived<SourceParamRow[]>(
     sourceInstance
       ? sourceInstance.def.paramOrder.map((paramId) => ({
@@ -102,6 +403,234 @@
         }))
       : [],
   );
+
+  function installQaBridge(): void {
+    if (typeof window === 'undefined') return;
+    const qaWindow = window as Window & { __AV_SYNTH_QA__?: QaBridge };
+    qaWindow.__AV_SYNTH_QA__ = {
+      getState: () => ({
+        sourceKind,
+        clockRunning: clock.running,
+        audioInitialised: audio.isInitialised,
+        video: videoEl
+          ? {
+              currentTime: videoEl.currentTime,
+              paused: videoEl.paused,
+              readyState: videoEl.readyState,
+              duration: videoEl.duration,
+            }
+          : null,
+      }),
+      getFftSnapshot: (count = 32) => {
+        const fft = audio.getFftMagnitudes();
+        if (!fft) return null;
+        return Array.from(fft.slice(0, count));
+      },
+      sampleMetrics: async (durationMs = 240) => sampleMetrics(durationMs),
+      getCaptureState: () => ({
+        status: captureStatus,
+        bytes: latestCapture?.bytes ?? 0,
+        filename: latestCapture?.filename ?? null,
+        mimeType: latestCapture?.mimeType ?? null,
+      }),
+      setSourceKind: async (kind) => {
+        if (!renderer) return false;
+        setSourceKind(kind);
+        await tick();
+        return true;
+      },
+      setOperatorParam: async (op, paramId, value, opIndex = 0) => {
+        if (!renderer) return false;
+        let matchIndex = -1;
+        let seen = 0;
+        for (let index = 0; index < instances.length; index += 1) {
+          if (instances[index]?.def.op !== op) continue;
+          if (seen === opIndex) {
+            matchIndex = index;
+            break;
+          }
+          seen += 1;
+        }
+        if (matchIndex < 0) return false;
+        const match = instances[matchIndex]!;
+        const nextParams = { ...match.params, [paramId]: value };
+        const nextInstances = [...instances];
+        nextInstances[matchIndex] = { ...match, params: nextParams };
+        instances = nextInstances;
+        renderer.setInstances(nextInstances);
+        if (audio.isInitialised) audio.setInstances(nextInstances);
+        await tick();
+        return true;
+      },
+      setSourceParam: async (paramId, value) => {
+        if (!renderer || !sourceInstance) return false;
+        const nextParams = { ...sourceInstance.params, [paramId]: value };
+        sourceInstance = { ...sourceInstance, params: nextParams };
+        renderer.setSourceParams(nextParams);
+        if (audio.isInitialised && sourceInstance.audioStage) {
+          audio.setSourceParams(nextParams);
+        }
+        await tick();
+        return true;
+      },
+      startCapture: async (filenameStem) => startCapture(filenameStem),
+      stopCapture: async () => stopCapture(),
+      exportLastCapture: async () => exportLastCapture(),
+    };
+  }
+
+  function sanitiseCaptureStem(filenameStem?: string): string {
+    const stem = (filenameStem ?? `av-synth-${sourceKind}`).trim().toLowerCase();
+    const safe = stem.replace(/[^a-z0-9-_]+/g, '-').replace(/^-+|-+$/g, '');
+    return safe || 'av-synth-capture';
+  }
+
+  function chooseCaptureMimeType(): string {
+    const candidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+    for (const candidate of candidates) {
+      if (MediaRecorder.isTypeSupported(candidate)) return candidate;
+    }
+    return '';
+  }
+
+  function clearLatestCapture(): void {
+    if (latestCapture) {
+      URL.revokeObjectURL(latestCapture.url);
+      latestCapture = null;
+    }
+  }
+
+  function createCaptureStream(): MediaStream | null {
+    if (!canvasEl || !audio.isInitialised) return null;
+    const canvasStream = canvasEl.captureStream(60);
+    const audioStream = audio.getCaptureStream();
+    if (!audioStream) return null;
+    const stream = new MediaStream();
+    for (const track of canvasStream.getVideoTracks()) stream.addTrack(track);
+    for (const track of audioStream.getAudioTracks()) stream.addTrack(track);
+    return stream;
+  }
+
+  async function startCapture(filenameStem?: string): Promise<boolean> {
+    if (captureRecorder || captureStatus === 'recording') return false;
+    const stream = createCaptureStream();
+    if (!stream) return false;
+
+    clearLatestCapture();
+    initError = null;
+
+    const mimeType = chooseCaptureMimeType();
+    captureFilename = `${sanitiseCaptureStem(filenameStem)}.webm`;
+    captureChunks = [];
+    captureStream = stream;
+
+    await new Promise<void>((resolve, reject) => {
+      try {
+        captureRecorder = mimeType
+          ? new MediaRecorder(stream, { mimeType })
+          : new MediaRecorder(stream);
+      } catch (error) {
+        stream.getTracks().forEach((track) => track.stop());
+        captureStream = null;
+        reject(error);
+        return;
+      }
+
+      const recorder = captureRecorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) captureChunks.push(event.data);
+      };
+      recorder.onerror = () => {
+        reject(new Error('MediaRecorder failed'));
+      };
+      recorder.onstart = () => {
+        captureStartedAtAudioTime = audio.isInitialised ? audio.ctx.currentTime : null;
+        captureStartedAtPerfMs = performance.now();
+        captureStatus = 'recording';
+        resolve();
+      };
+      recorder.start(250);
+    }).catch((error) => {
+      captureRecorder = null;
+      captureStatus = 'idle';
+      initError = error instanceof Error ? error.message : String(error);
+      return Promise.reject(error);
+    });
+
+    return true;
+  }
+
+  async function stopCapture(): Promise<{
+    bytes: number;
+    filename: string;
+    mimeType: string;
+  } | null> {
+    if (!captureRecorder) {
+      return latestCapture
+        ? {
+            bytes: latestCapture.bytes,
+            filename: latestCapture.filename,
+            mimeType: latestCapture.mimeType,
+          }
+        : null;
+    }
+    const recorder = captureRecorder;
+    captureRecorder = null;
+
+    const result = await new Promise<CaptureArtifact>((resolve, reject) => {
+      recorder.onerror = () => {
+        reject(new Error('MediaRecorder stop failed'));
+      };
+      recorder.onstop = () => {
+        const mimeType = recorder.mimeType || 'video/webm';
+        const blob = new Blob(captureChunks, { type: mimeType });
+        resolve({
+          blob,
+          bytes: blob.size,
+          filename: captureFilename,
+          mimeType,
+          url: URL.createObjectURL(blob),
+        });
+      };
+      recorder.stop();
+    }).catch((error) => {
+      captureStatus = 'idle';
+      initError = error instanceof Error ? error.message : String(error);
+      return null;
+    });
+
+    captureStream?.getTracks().forEach((track) => track.stop());
+    captureStream = null;
+    captureStartedAtAudioTime = null;
+    captureStartedAtPerfMs = null;
+
+    if (!result) {
+      captureRecorder = null;
+      return null;
+    }
+
+    clearLatestCapture();
+    latestCapture = result;
+    captureStatus = 'ready';
+    captureChunks = [];
+    return {
+      bytes: result.bytes,
+      filename: result.filename,
+      mimeType: result.mimeType,
+    };
+  }
+
+  async function exportLastCapture(): Promise<boolean> {
+    if (!latestCapture || typeof document === 'undefined') return false;
+    const link = document.createElement('a');
+    link.href = latestCapture.url;
+    link.download = latestCapture.filename;
+    link.style.display = 'none';
+    document.body.append(link);
+    link.click();
+    link.remove();
+    return true;
+  }
 
   onMount(async () => {
     if (!canvasEl) return;
@@ -122,6 +651,7 @@
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
     }
+    installQaBridge();
   });
 
   function setSourceKind(kind: SourceKind): void {
@@ -130,7 +660,7 @@
 
     // Tear down any current procedural source instance.
     if (sourceInstance) {
-      disposeSourceInstance(sourceInstance, renderer.gl);
+      disposeSourceAudio(sourceInstance);
       sourceInstance = null;
     }
 
@@ -165,10 +695,10 @@
     // Procedural source from the registry.
     const inst = createSourceInstance(kind, renderer.gl);
     sourceInstance = inst;
-    renderer.setSource(inst.videoStage, inst.params);
+    renderer.setSource(inst.videoStage, inst.params, inst.def.coupling);
     if (audio.isInitialised) {
       attachSourceAudio(inst, audio.ctx);
-      if (inst.audioStage) audio.setSource(inst.audioStage, inst.params);
+      if (inst.audioStage) audio.setSource(inst.audioStage, inst.params, inst.def.coupling);
     }
     sourceLoaded = false;
   }
@@ -194,12 +724,17 @@
   });
 
   onDestroy(() => {
+    captureStream?.getTracks().forEach((track) => track.stop());
+    clearLatestCapture();
+    if (typeof window !== 'undefined') {
+      delete (window as Window & { __AV_SYNTH_QA__?: QaBridge }).__AV_SYNTH_QA__;
+    }
     renderer?.dispose();
     renderer = null;
   });
 
   async function onStart() {
-    audio.init();
+    await audio.init();
     audio.setInstances(instances);
 
     // Audio side of the active source needs the AudioContext, so wire it now
@@ -208,7 +743,11 @@
     if (sourceInstance) {
       attachSourceAudio(sourceInstance, audio.ctx);
       if (sourceInstance.audioStage) {
-        audio.setSource(sourceInstance.audioStage, sourceInstance.params);
+        audio.setSource(
+          sourceInstance.audioStage,
+          sourceInstance.params,
+          sourceInstance.def.coupling,
+        );
       }
     } else if (sourceKind === 'video' && videoEl && videoEl.src) {
       try {
@@ -222,6 +761,7 @@
   }
 
   async function onStop() {
+    if (captureStatus === 'recording') await stopCapture();
     await clock.stop();
   }
 
@@ -261,11 +801,33 @@
       {:else}
         <button onclick={onStart}>▶ start</button>
       {/if}
+      {#if captureStatus === 'recording'}
+        <button class="recording" onclick={stopCapture}>● stop rec</button>
+      {:else}
+        <button
+          onclick={() => void startCapture()}
+          disabled={!clock.running || !audio.isInitialised}
+        >
+          ● record
+        </button>
+      {/if}
+      <button onclick={() => void exportLastCapture()} disabled={!latestCapture}
+        >download capture</button
+      >
       <div class="readouts">
         <span class="readout"><span class="rl">bpm</span>{clock.bpm.toFixed(0)}</span>
-        <span class="readout"><span class="rl">baseFreq</span>{clock.baseFreq.toFixed(2)} Hz/cps</span>
+        <span class="readout"
+          ><span class="rl">baseFreq</span>{clock.baseFreq.toFixed(2)} Hz/cps</span
+        >
         <span class="readout"><span class="rl">t</span>{clock.displayTime.toFixed(3)} s</span>
-        <span class="readout"><span class="rl">audio</span>{audio.isInitialised ? 'on' : 'off'}</span>
+        <span class="readout"
+          ><span class="rl">audio</span>{audio.isInitialised ? 'on' : 'off'}</span
+        >
+        <span class="readout"
+          ><span class="rl">capture</span>{captureStatus === 'ready'
+            ? `${(latestCapture!.bytes / 1024).toFixed(0)} KB`
+            : captureStatus}</span
+        >
       </div>
     </div>
   </header>
@@ -345,7 +907,9 @@
   </section>
 
   <footer>
-    <span class="status">M2 · all 7 prototype operators ported · presets and audio worklets next</span>
+    <span class="status"
+      >M3.4 · first color family landed · AudioWorklet DSP upgraded for scale/pixelate/modulate</span
+    >
   </footer>
 </main>
 

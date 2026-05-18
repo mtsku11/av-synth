@@ -12,7 +12,7 @@ This file is the contract Claude reads on every session in this repo. It overrid
 
 The reference is Hydra (https://hydra.ojack.xyz). The novel contribution is: every Hydra video primitive has a defined, derivable audio analogue, and the coupling is the product, not an afterthought.
 
-Current state: single 999-line HTML prototype (`av-hydra-preview (1).html`). Target: a professional, productisable multi-file web app.
+Current state: the modular app is the active implementation, with hardened QA/audit coverage for the implemented operator subset. Staging deploys are allowed for real-world manual testing, but public/professional deployment is blocked until the remaining essential `M3` work lands: the unfinished Color operators and the full Blend family.
 
 ---
 
@@ -28,6 +28,18 @@ Always read these *as files* — never reconstruct their contents from chat hist
 | `av-hydra-preview (1).html` | The working prototype. Source of truth for currently-implemented behaviour. | When porting an existing feature to the modular codebase. |
 
 The harness also has a separate per-session memory dir at `~/.claude/projects/-Users-marcscully-Projects-av-synth/memory/`. That holds cross-session preferences and feedback. The project-level `memory.md` is the human-readable engineering log — distinct from harness memory.
+
+### Release policy (do not drift)
+
+- A **staging/private deploy** is allowed once the current QA/audit gate is green enough for manual environment testing.
+- A **public/professional deploy** is **not** allowed just because the currently implemented subset passes QA.
+- Public/professional deploy stays blocked until all three are true:
+  1. the final human audible sign-off in `qa/reviews/` is complete,
+  2. the remaining essential `M3` Color work is implemented (`invert`, `luma`, `thresh`, `hue`, `colorama`, `sum`, `.r .g .b .a`),
+  3. the Blend family is implemented (`add`, `sub`, `mult`, `diff`, `layer`, `blend`, `mask`).
+- If you are choosing between “deploy now” and “finish the missing families,” the correct interpretation is:
+  - staging/manual-test deploy: yes, allowed
+  - public/professional release: no, blocked until the essential unfinished `M3` work above is done
 
 ---
 
@@ -107,6 +119,14 @@ Renderers do not read raw slider values. They read mapped values from the coupli
 - **No new abstractions until a third concrete caller appears.** Rule of three.
 - **No comments explaining what the code does.** Only comments for non-obvious *why* — hidden constraints, perf workarounds, browser quirks.
 - **Surface assumptions, declare the choice, proceed.** Don't ask permission for default-shaped decisions. See `~/.claude/CLAUDE.md`.
+- **Documentation sync is mandatory.** If implementation changes project state, update the relevant Markdown files in the same task before stopping:
+  - `todo.md` when milestone status, backlog, blockers, or next steps change
+  - `plan.md` when operator scope, release policy, acceptance criteria, or QA/deploy gates change
+  - `memory.md` when a non-obvious decision, reversal, or design tension appears
+  - `CLAUDE.md` when repo operating rules, handoff rules, or anti-drift instructions change
+- **Do not leave repo docs stale on purpose.** If code and docs disagree, treat the code as truth and update the docs immediately.
+- **Git writes require explicit user approval.** Do not `git commit`, `git push`, amend commits, rebase, or rewrite history unless the user explicitly asks for that action after review.
+- **Default stopping point:** implement, update docs, run verification, and stop for review. Do not decide on your own that work should be committed or pushed.
 
 ### Hydra-fidelity rules
 
@@ -183,4 +203,6 @@ If a fact contradicts between chat history and a file, the file wins.
 1. Read `memory.md` for outstanding decisions and questions.
 2. Read `todo.md` for the active milestone.
 3. If the user is asking about behaviour: skim `plan.md` for the operator spec before guessing.
-4. State the assumed task in one sentence, declare any assumption, then go.
+4. Check whether the task is for **staging/manual testing** or **public/professional release**; do not conflate them.
+5. Before ending the session, sync any affected Markdown files (`todo.md`, `plan.md`, `memory.md`, `CLAUDE.md`) to match the implementation and policy state.
+6. State the assumed task in one sentence, declare any assumption, then go.

@@ -1,0 +1,74 @@
+{
+  "id": "audit-brightness-video-sweep",
+  "title": "Brightness sweep on decoded media",
+  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "transport": { "start": true, "settleMs": 1500 },
+  "recording": { "filename": "audit-brightness-video-sweep", "tailMs": 850 },
+  "expectations": {
+    "sourceKind": "video",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "brightness-neg-035-hold",
+        "to": "brightness-pos-035-hold",
+        "domain": "video",
+        "metric": "meanLuma",
+        "op": ">",
+        "delta": 0.08,
+        "description": "raising brightness should materially lift image luma"
+      },
+      {
+        "from": "brightness-neg-035-hold",
+        "to": "brightness-pos-035-hold",
+        "domain": "audio",
+        "metric": "meanVolumeDb",
+        "op": ">",
+        "delta": 4,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "raising brightness should materially raise rendered level"
+      }
+    ]
+  },
+  "audit": {
+    "family": "color-tonal",
+    "operator": "brightness",
+    "kind": "sweep",
+    "expectedVideo": [
+      "higher brightness should visibly lift the full image without flattening it completely"
+    ],
+    "expectedAudio": [
+      "higher brightness should sound louder but remain usable, not limiter-smeared"
+    ],
+    "manualChecks": [
+      "Does the gain mapping still feel musical enough for professional use at the top end?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "brightness",
+      "paramId": "amount",
+      "value": -0.35,
+      "screenshot": "brightness-neg-035"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "brightness-neg-035-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "brightness",
+      "paramId": "amount",
+      "value": 0.35,
+      "screenshot": "brightness-pos-035"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "brightness-pos-035-hold"
+    }
+  ]
+}

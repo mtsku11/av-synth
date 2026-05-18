@@ -395,14 +395,139 @@ For honesty: the prototype has `feedback` as a top-level parameter (frame-blend 
 | Audio I/O | 5 | 0 | 0 | 5 |
 | **Total** | **55** | **1** | **8** | **46** |
 
-Roughly 16% of the full Hydra surface area is wired up in the prototype, none of it with rigorous audio coupling. The work ahead is mostly green-field; see `todo.md`.
+A meaningful slice of the Hydra surface area is wired up now. The current code evaluates implemented source/operator params through `src/core/coupling.ts`, shares `AudioContext` time across domains when audio is live, bypasses neutral operators in the default chain, ships the first Color operators (`brightness`, `contrast`, `color`, `saturate`), and upgrades `scale` / `pixelate` / `modulate` to AudioWorklet-backed DSP. The work ahead is still substantial, especially for the rest of Color, Blend, buses, and live-coding. Release intent is therefore split: staging/private deployment is acceptable for real-world manual testing of the implemented subset, but public/professional deployment remains blocked on the final audible sign-off plus the remaining essential `M3` Color and Blend work.
+
+---
+
+## 10.5 QA stack (active)
+
+Professional QA for this project splits into five layers:
+
+1. **Playwright** for live app/runtime behavior: boot, source load, transport, controls, console/runtime errors.
+2. **`mcp-music-analysis`** for audio behavior: onset timing, beat/tempo checks, MFCC and spectral movement, and comparison across operator sweeps.
+3. **`ffmpeg-quality-metrics`** as the authoritative full-reference visual metrics backend: PSNR / SSIM immediately, plus VMAF whenever the configured `ffmpeg` build exposes `libvmaf`.
+4. **`video-quality-mcp`** for metadata, GOP/frame structure, artifact summaries, and secondary visual context around reference-vs-current render comparisons.
+5. **`ffmpeg-mcp`** (or equivalent FFmpeg MCP) as the structured preprocessing/helper layer for probing, trimming, thumbnails, and future audio extraction from rendered captures.
+6. **Manual audible/visual review** for the operator-family cases that still intentionally stay outside hard metric gates.
+
+The repo-facing build step for this stack is:
+
+- a manifest-driven Playwright harness under `qa/` for live smoke/regression
+- a stable artifact layout under `qa/results/`
+- MCP config templates/documentation so humans or future CI jobs can hand artifacts to the analyzers
+
+Current limitation: the QA harness now exports authoritative rendered `.webm` captures from the app itself, extracts `.wav`, probes both media files, writes `analysis.json` summaries, persists live checkpoint metrics from Playwright, evaluates exported-WAV segment assertions across every implemented family, has committed `qa/references/` baselines, and routes analyzer calls through repo-local wrappers for `mcp-music-analysis`, `ffmpeg-quality-metrics`, and `video-quality-mcp`. On this machine the default Homebrew `ffmpeg` does not expose `libvmaf`, so the authoritative wrapper currently hardens PSNR / SSIM immediately while leaving VMAF unavailable until `AV_SYNTH_FFMPEG_QUALITY_METRICS_FFMPEG_PATH` points at a compatible build. `mcp-video-analyzer` remains in-repo as a reference wrapper only, not part of the active stack. The remaining QA gap before deploy is final human audible sign-off on the explicitly manual cases.
+
+---
+
+## 10.6 Pre-deploy operator-family audit gate
+
+Before `M6 — Deploy`, the repo needs a deliberate AV audit across every **implemented** operator family. Current smoke coverage proves the harness works; it does **not** prove that every operator is professionally shippable in both domains.
+
+### Scope
+
+The audit gate applies to the currently implemented runtime surface:
+
+- **Sources**: `osc`, `noise`, `voronoi`, `shape`, `gradient`, `solid`, committed `video` fixture
+- **Feedback / composition**: `feedback`, `modulate`
+- **Geometry / spatial transforms**: `scale`, `rotate`, `scrollX`, `scrollY`, `repeat`, `repeatX`, `repeatY`, `pixelate`, `kaleid`
+- **Color / tonal transforms**: `brightness`, `contrast`, `color`, `saturate`, `posterize`, `chromaShift`
+
+Unimplemented Hydra families stay out of the gate until they exist in code.
+
+### Required case coverage
+
+Each implemented operator must have at least one dedicated manifest-driven QA case, and higher-risk operators should have more than one:
+
+- **Baseline case**: neutral/default operator values on a stable source
+- **Sweep case**: low / mid / high settings for the operator under test
+- **Edge case**: the highest-risk or most failure-prone regime for that operator
+- **Cross-source spot check**: at minimum, one procedural source and one video source for each family
+
+The audit matrix now spans every implemented family: `qa/cases/audit-source-*`, `qa/cases/audit-feedback-*`, `qa/cases/audit-modulate-*`, `qa/cases/audit-scale-*`, `qa/cases/audit-pixelate-*`, `qa/cases/audit-kaleid-*`, `qa/cases/audit-rotate-*`, `qa/cases/audit-scrollX-*`, `qa/cases/audit-scrollY-*`, `qa/cases/audit-repeat-*`, `qa/cases/audit-repeatX-*`, `qa/cases/audit-repeatY-*`, plus the color-family cases `audit-brightness-video-sweep`, `audit-contrast-osc-sweep`, `audit-color-solid-band-sweep`, `audit-saturate-video-sweep`, `audit-posterize-video-sweep`, and `audit-chromaShift-video-sweep`. The hardened automated assertions now span both domains: live Playwright checkpoint metrics gate the stable visual deltas, and exported-WAV segment assertions gate the stable audio side, with explicit manual-review exceptions recorded where the current fixture/metric pair is not stable enough to trust as a release gate. Current manual exceptions are:
+
+- `audit-feedback-video-cross-source` on the decoded-video visual side
+- `audit-modulate-osc-sweep` on the exported-audio timbre side
+- `audit-kaleid-osc-sweep`, `audit-pixelate-osc-sweep`, and `audit-pixelate-video-cross-source` on the visual side
+- `audit-scrollY-osc-sweep` and `audit-repeatY-osc-sweep` on the visual side
+- `audit-scrollX-osc-sweep` on the exported-audio side
+- `audit-source-noise-sweep`, `audit-source-shape-sweep`, and `audit-source-gradient-sweep` on the audio-judgment side
+- `audit-color-solid-band-sweep`, `audit-saturate-video-sweep`, `audit-posterize-video-sweep`, and `audit-chromaShift-video-sweep` as intentionally more manual-heavy audio reviews
+
+### Automated checks per case
+
+Every audit case must:
+
+- boot, load source, start transport, and export `.webm` / `.wav` successfully
+- produce zero unexpected console/runtime errors
+- write `analysis.json` with media probe data and analyzer outputs where configured
+- include screenshots and an exported capture for later review
+
+Video checks:
+
+- expected visible response at low / mid / high values
+- no blank frames, NaNs, severe banding, obvious tearing, or accidental freeze
+- `ffmpeg-quality-metrics` comparison against the committed reference capture in `qa/references/` for authoritative PSNR / SSIM / VMAF when available
+- `video-quality-mcp` comparison against the committed reference capture in `qa/references/` for metadata / GOP / artifact summaries
+
+Audio checks:
+
+- non-silent output unless silence is the intended behavior
+- no accidental clipping, DC-like failure, or obvious broken channel routing
+- expected movement in loudness / spectral envelope / pitch / stereo image according to the coupling law
+- `mcp-music-analysis` output captured where the local audit machine has the server installed/configured
+
+### Manual review per family
+
+Metrics are necessary but insufficient. Each family also needs a short human review pass against exported captures:
+
+- Does the audio feel correctly coupled to the visual change?
+- Does the operator remain usable through the full intended range?
+- Are there professional-use problems that metrics miss: harshness, pumping, brittle transients, ugly quantisation, distracting artifacts, or unstable feel?
+
+### Fix loop discipline
+
+For every family:
+
+1. Add or refine the QA cases.
+2. Run `qa:audit:ci` plus any locally available analyzer servers.
+3. Review exported captures and summaries.
+4. Fix defects in the operator implementation or coupling law.
+5. Re-run until the family is green.
+
+### Deploy gate
+
+Public/professional `M6 — Deploy` stays blocked until all of the following are true:
+
+- every implemented operator has explicit audit coverage in `qa/cases/`
+- reference captures exist for stable audited cases
+- analyzer summaries are populated for the audit environment
+- manual review notes are complete for every implemented family
+- all discovered AV-coupling, quality, or stability defects are fixed or consciously deferred in writing
+- final human audible sign-off is complete for the explicit manual cases in `qa/reviews/`
+- remaining essential `M3` Color work is implemented: `invert`, `luma`, `thresh`, `hue`, `colorama`, `sum`, `.r .g .b .a`
+- Blend family is implemented: `add`, `sub`, `mult`, `diff`, `layer`, `blend`, `mask`
+
+### Release checklist
+
+For a fresh session handoff, the completion sequence is now:
+
+1. Finish the remaining manual audible sign-off cases listed in `qa/reviews/`.
+2. If that pass finds issues, fix them and rerun `qa:audit:ci` plus the locally available analyzers.
+3. Once the audible pass is clean, a staging/private deploy is allowed with Cloudflare Pages as the default host unless the user explicitly chooses another target.
+4. Use that staging deploy for real-world manual testing, environment validation, and live-only bug discovery. Do not describe it as the professional/public release.
+5. Before public release, finish the remaining essential `M3` work: the unfinished Color operators and the full Blend family.
+6. Rerun QA/audit and update `qa/reviews/` for the newly implemented families.
+7. Configure deploy CI with the existing audited QA gate still blocking release.
+8. Deploy the public build, record the canonical public URL in the repo docs, and run a post-deploy Playwright smoke pass against that URL.
+9. Only then mark the project complete.
 
 ---
 
 ## 11. Open mathematical questions (parked)
 
 - **Spatial-frequency unit for sources**. Default chosen: `osc(N)` → `N Hz`. Alternative: `N cycles per screen-width × baseFreq`. Decision in `memory.md`.
-- **3-band crossover frequencies for `color()`**. Default: 300 Hz / 3 kHz. Should be configurable per-preset.
+- **3-band crossover frequencies for `color()`**. Landed as `COLOR_BAND_CROSSOVERS_HZ = { lowMid: 300, midHigh: 3000 }` in `src/core/coupling.ts`; future question is whether presets should override it.
 - **`hue` pitch-shift law**. `2^amount` (octaves) vs `1200 · amount` cents — choose unit-of-presentation in UI without changing the math.
 - **`scrollX` vs `scrollY` audio asymmetry**. Treating X as time-domain delay and Y as stereo pan is a design choice — alternative is the opposite. Decision in `memory.md`.
 - **`colorama` chaotic-map choice**. Hénon, logistic, or per-bin scramble. Pick one, document why.

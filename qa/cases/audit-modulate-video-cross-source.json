@@ -1,0 +1,78 @@
+{
+  "id": "audit-modulate-video-cross-source",
+  "title": "Modulate cross-source spot check on committed video fixture",
+  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "transport": { "start": true, "settleMs": 1500 },
+  "recording": { "filename": "audit-modulate-video-cross-source", "tailMs": 850 },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "modulate-video-024-hold",
+        "to": "modulate-video-068",
+        "domain": "video",
+        "metric": "temporalDiff",
+        "op": ">",
+        "delta": 0.002,
+        "description": "higher modulate depth should drive more visible frame-to-frame warp on the decoded fixture"
+      },
+      {
+        "from": "modulate-video-024-hold",
+        "to": "modulate-video-068-hold",
+        "domain": "audio",
+        "metric": "spectralCentroidHz",
+        "op": "<",
+        "delta": -15,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "the stronger modulate setting should materially move the exported fixture spectrum rather than leaving the audio static"
+      }
+    ]
+  },
+  "audit": {
+    "family": "feedback-composition",
+    "operator": "modulate",
+    "kind": "cross-source",
+    "expectedVideo": [
+      "video fixture should remain decodable while UV warp deepens on non-procedural content",
+      "higher modulate depth should distort motion coherently, not freeze or explode the frame"
+    ],
+    "expectedAudio": [
+      "fixture audio should pick up phase-warp motion without dropping out or clipping",
+      "the cross-source case should still track the same depth law heard on osc"
+    ],
+    "manualChecks": [
+      "Does modulate remain coupled and usable on decoded media, not only oscillator content?",
+      "At the stronger setting, does the output still read as intentional rather than unstable?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "modulate",
+      "paramId": "amount",
+      "value": 0.24,
+      "screenshot": "modulate-video-024"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "modulate-video-024-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "modulate",
+      "paramId": "amount",
+      "value": 0.68,
+      "screenshot": "modulate-video-068"
+    },
+    {
+      "type": "wait",
+      "ms": 550,
+      "screenshot": "modulate-video-068-hold"
+    }
+  ]
+}

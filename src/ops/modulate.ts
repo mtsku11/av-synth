@@ -6,10 +6,10 @@
 // visual UV jitter and the audio delay-time jitter share their characteristic
 // frequency exactly.
 //
-// Audio side is modulated-delay PM: an Oscillator at ctx.rate drives a Gain
-// whose output offsets a DelayNode's delayTime. For sub-audio rates this is
-// vibrato; for audio-rate rates it would be FM proper — which needs a worklet
-// to do cleanly (M3).
+// Audio side is a sample-accurate delay-read phase modulator in an
+// AudioWorklet. It still uses the global LFO rate because the graph does not
+// yet route a second signal as the modulator source, but the modulation itself
+// is no longer k-rate DelayNode automation.
 
 import frag from '../video/shaders/modulate.frag?raw';
 import type { OperatorDef, VideoStage, AudioStage } from '../core/operators';
@@ -52,63 +52,36 @@ class ModulateAudioStage implements AudioStage {
   readonly op = 'modulate';
   readonly input: GainNode;
   readonly output: GainNode;
-  readonly #delay: DelayNode;
-  readonly #lfo: OscillatorNode;
-  readonly #depth: GainNode;
-  readonly #baseDelay: ConstantSourceNode;
-
-  // Base ~5ms delay so the modulated delayTime stays positive.
-  static readonly BASE_DELAY = 0.005;
-  static readonly MAX_DEPTH = 0.004;
+  readonly #worklet: AudioWorkletNode;
+  readonly #amount: AudioParam;
+  readonly #rate: AudioParam;
 
   constructor(ctx: AudioContext) {
     this.input = ctx.createGain();
     this.output = ctx.createGain();
-    this.#delay = ctx.createDelay(0.05);
-    this.#delay.delayTime.value = ModulateAudioStage.BASE_DELAY;
-    this.#lfo = ctx.createOscillator();
-    this.#lfo.frequency.value = 0.3; // overwritten by setParams via ctx.rate
-    this.#depth = ctx.createGain();
-    this.#depth.gain.value = 0;
-
-    // Use a ConstantSource to centre the LFO around BASE_DELAY:
-    //   delayTime = baseDelay + depth · sin(2π·rate·t)
-    this.#baseDelay = ctx.createConstantSource();
-    this.#baseDelay.offset.value = ModulateAudioStage.BASE_DELAY;
-    this.#baseDelay.start();
-
-    this.input.connect(this.#delay);
-    this.#delay.connect(this.output);
-    this.#lfo.connect(this.#depth);
-    this.#depth.connect(this.#delay.delayTime);
-    this.#baseDelay.connect(this.#delay.delayTime);
-    this.#lfo.start();
+    this.#worklet = new AudioWorkletNode(ctx, 'phase-modulator', {
+      parameterData: { amount: 0, rate: 0.3 },
+    });
+    const amount = this.#worklet.parameters.get('amount');
+    const rate = this.#worklet.parameters.get('rate');
+    if (!amount || !rate) throw new Error('modulate: missing worklet params');
+    this.#amount = amount;
+    this.#rate = rate;
+    this.input.connect(this.#worklet);
+    this.#worklet.connect(this.output);
   }
 
   setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
     const amount = Math.max(0, Math.min(1, params['amount'] ?? 0));
     const rate = Math.max(0.01, ctx.rate);
-    const now = this.#lfo.context.currentTime;
-    this.#lfo.frequency.setTargetAtTime(rate, now, 0.05);
-    this.#depth.gain.setTargetAtTime(amount * ModulateAudioStage.MAX_DEPTH, now, 0.05);
+    const now = this.input.context.currentTime;
+    this.#amount.setTargetAtTime(amount, now, 0.02);
+    this.#rate.setTargetAtTime(rate, now, 0.02);
   }
 
   dispose(): void {
-    try {
-      this.#lfo.stop();
-    } catch {
-      // already stopped
-    }
-    try {
-      this.#baseDelay.stop();
-    } catch {
-      // already stopped
-    }
     this.input.disconnect();
-    this.#delay.disconnect();
-    this.#depth.disconnect();
-    this.#lfo.disconnect();
-    this.#baseDelay.disconnect();
+    this.#worklet.disconnect();
     this.output.disconnect();
   }
 }

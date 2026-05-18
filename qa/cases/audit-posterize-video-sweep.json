@@ -1,0 +1,56 @@
+{
+  "id": "audit-posterize-video-sweep",
+  "title": "Posterize sweep on decoded media",
+  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "transport": { "start": true, "settleMs": 1500 },
+  "recording": { "filename": "audit-posterize-video-sweep", "tailMs": 850 },
+  "expectations": {
+    "sourceKind": "video",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "audit": {
+    "family": "color-tonal",
+    "operator": "posterize",
+    "kind": "sweep",
+    "expectedVideo": ["lower bins should visibly reduce tonal resolution into deliberate steps"],
+    "expectedAudio": ["lower bins should sound more stepped and gritty without dropping out"],
+    "manualChecks": [
+      "Does the posterization read as intentional rather than broken compression?",
+      "Does the audio stepping feel like the same operator family as the image stepping?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "posterize",
+      "paramId": "bins",
+      "value": 64,
+      "screenshot": "posterize-bins-64"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "posterize-bins-64-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "posterize",
+      "paramId": "bins",
+      "value": 6,
+      "screenshot": "posterize-bins-6"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "posterize",
+      "paramId": "gamma",
+      "value": 1.3,
+      "screenshot": "posterize-gamma-130"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "posterize-bins-6-hold"
+    }
+  ]
+}

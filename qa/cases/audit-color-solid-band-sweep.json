@@ -1,0 +1,99 @@
+{
+  "id": "audit-color-solid-band-sweep",
+  "title": "Color band sweep on solid source",
+  "source": { "kind": "solid" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-color-solid-band-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "solid",
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "color-red-boost-hold",
+        "to": "color-blue-boost-hold",
+        "domain": "video",
+        "metric": "meanB",
+        "op": ">",
+        "delta": 0.15,
+        "description": "switching from red emphasis to blue emphasis should materially increase mean blue energy"
+      }
+    ]
+  },
+  "audit": {
+    "family": "color-tonal",
+    "operator": "color",
+    "kind": "sweep",
+    "expectedVideo": ["changing channel emphasis should shift the rendered color balance clearly"],
+    "expectedAudio": [
+      "changing from red/low to blue/high emphasis should brighten the rendered audio balance"
+    ],
+    "manualChecks": [
+      "Does the picture-to-spectrum mapping feel intuitive rather than arbitrary?",
+      "Does the high-band emphasis sound brighter in a musically believable way on the current solid fixture?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "r",
+      "value": 0.45,
+      "screenshot": "color-solid-r-045"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "g",
+      "value": 0.45,
+      "screenshot": "color-solid-g-045"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "b",
+      "value": 0.45,
+      "screenshot": "color-solid-b-045"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "a",
+      "value": 1,
+      "screenshot": "color-solid-a-100"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "color",
+      "paramId": "r",
+      "value": 1.8,
+      "screenshot": "color-red-boost"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "color",
+      "paramId": "b",
+      "value": 1,
+      "screenshot": "color-blue-reset"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "color-red-boost-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "color",
+      "paramId": "r",
+      "value": 1,
+      "screenshot": "color-red-reset"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "color",
+      "paramId": "b",
+      "value": 1.8,
+      "screenshot": "color-blue-boost"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "color-blue-boost-hold"
+    }
+  ]
+}

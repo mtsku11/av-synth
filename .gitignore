@@ -36,3 +36,10 @@ scratch/
 # Playwright local screenshots
 .playwright-mcp/
 m[0-9]*-*.png
+
+# QA artifacts
+playwright-report
+test-results
+qa/results/*
+!qa/results/.gitkeep
+qa/qa/results/

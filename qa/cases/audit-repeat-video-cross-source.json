@@ -1,0 +1,92 @@
+{
+  "id": "audit-repeat-video-cross-source",
+  "title": "Repeat cross-source spot check on committed video fixture",
+  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "transport": { "start": true, "settleMs": 1500 },
+  "recording": { "filename": "audit-repeat-video-cross-source", "tailMs": 850 },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "repeat-video-1x1-hold",
+        "to": "repeat-video-6x5-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": "<",
+        "delta": -0.005,
+        "description": "raising repeat counts should materially compress decoded-media structure into a denser tiled pattern"
+      },
+      {
+        "from": "repeat-video-1x1-hold",
+        "to": "repeat-video-6x5-hold",
+        "domain": "audio",
+        "metric": "rmsLevelDb",
+        "op": ">",
+        "delta": 0.5,
+        "source": "exported-audio",
+        "segmentPaddingMs": 220,
+        "description": "raising repeat counts should materially lift rendered decoded-media comb energy"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "repeat",
+    "kind": "cross-source",
+    "expectedVideo": [
+      "the decoded fixture should tile more densely as repeat counts rise without seam corruption",
+      "the stronger setting should remain visually legible on committed footage"
+    ],
+    "expectedAudio": [
+      "fixture audio should pick up the same dual-channel comb behavior as the osc case",
+      "the rendered mix should stay stable with no runaway or mute state"
+    ],
+    "manualChecks": [
+      "Does Repeat remain useful on decoded media rather than becoming visual mush?",
+      "Does the stronger setting still feel like one AV operator across sight and sound?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatX",
+      "value": 1,
+      "screenshot": "repeat-video-1x1-x"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatY",
+      "value": 1,
+      "screenshot": "repeat-video-1x1-y"
+    },
+    {
+      "type": "wait",
+      "ms": 320,
+      "screenshot": "repeat-video-1x1-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatX",
+      "value": 6,
+      "screenshot": "repeat-video-6x5-x"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatY",
+      "value": 5,
+      "screenshot": "repeat-video-6x5-y"
+    },
+    {
+      "type": "wait",
+      "ms": 620,
+      "screenshot": "repeat-video-6x5-hold"
+    }
+  ]
+}

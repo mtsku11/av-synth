@@ -5,6 +5,11 @@
 
 import type { CouplingContext } from '../core/coupling';
 
+const mediaSourceCache = new WeakMap<
+  AudioContext,
+  WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>
+>();
+
 export interface AudioSourceStage {
   readonly kind: string;
   readonly output: AudioNode;
@@ -13,10 +18,7 @@ export interface AudioSourceStage {
    * coupling context here. Input sources (silent, video element) have no
    * params and can omit this. Called from the audio engine's poll.
    */
-  setParams?(
-    params: Readonly<Record<string, number>>,
-    ctx: CouplingContext,
-  ): void;
+  setParams?(params: Readonly<Record<string, number>>, ctx: CouplingContext): void;
   dispose(): void;
 }
 
@@ -39,7 +41,18 @@ export class VideoElementAudioSource implements AudioSourceStage {
   readonly output: MediaElementAudioSourceNode;
 
   constructor(ctx: AudioContext, video: HTMLVideoElement) {
+    let ctxCache = mediaSourceCache.get(ctx);
+    if (!ctxCache) {
+      ctxCache = new WeakMap();
+      mediaSourceCache.set(ctx, ctxCache);
+    }
+    const cached = ctxCache.get(video);
+    if (cached) {
+      this.output = cached;
+      return;
+    }
     this.output = ctx.createMediaElementSource(video);
+    ctxCache.set(video, this.output);
   }
 
   dispose(): void {

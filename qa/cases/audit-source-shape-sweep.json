@@ -1,0 +1,56 @@
+{
+  "id": "audit-source-shape-sweep",
+  "title": "Shape source sweep",
+  "source": { "kind": "shape" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-source-shape-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "shape",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": []
+  },
+  "audit": {
+    "family": "sources",
+    "operator": "shape",
+    "kind": "sweep",
+    "expectedVideo": ["lower smoothing should visibly sharpen the polygon edges"],
+    "expectedAudio": [
+      "lower smoothing should materially change the rendered timbre through the cutoff mapping"
+    ],
+    "manualChecks": [
+      "Does the sharper picture correspond to a timbral change that still feels coupled?",
+      "Does the low-smoothing setting stay usable rather than turning papery or thin?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "radius",
+      "value": 0.42,
+      "screenshot": "shape-radius-042"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "smoothing",
+      "value": 0.35,
+      "screenshot": "shape-smoothing-035"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "shape-smoothing-035-hold"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "smoothing",
+      "value": 0.01,
+      "screenshot": "shape-smoothing-001"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "shape-smoothing-001-hold"
+    }
+  ]
+}

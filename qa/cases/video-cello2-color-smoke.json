@@ -1,0 +1,42 @@
+{
+  "id": "video-cello2-color-smoke",
+  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "transport": { "start": true, "settleMs": 1500 },
+  "recording": { "filename": "video-cello2-color-smoke", "tailMs": 750 },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "brightness",
+      "paramId": "amount",
+      "value": 1,
+      "screenshot": "brightness-max"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "contrast",
+      "paramId": "amount",
+      "value": 2.2,
+      "screenshot": "contrast-220"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "color",
+      "paramId": "r",
+      "value": 1.5,
+      "screenshot": "color-red-low-150"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "saturate",
+      "paramId": "amount",
+      "value": 2,
+      "screenshot": "saturate-200"
+    }
+  ]
+}

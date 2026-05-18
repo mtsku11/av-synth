@@ -76,10 +76,7 @@ class SolidAudioStage implements AudioSourceStage {
     this.#gains = [g0, g1, g2];
   }
 
-  setParams(
-    params: Readonly<Record<string, number>>,
-    ctx: CouplingContext,
-  ): void {
+  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
     const channels: [number, number, number] = [
       Math.max(0, params['r'] ?? 0),
       Math.max(0, params['g'] ?? 0),
@@ -116,22 +113,54 @@ const coupling: OperatorCoupling = {
   kind: 'fully-coupled',
   params: {
     r: {
-      spec: { id: 'r', label: 'r', range: [0, 1], default: 0, curve: 'lin', unit: 'norm', hint: 'red ↔ root amplitude' },
+      spec: {
+        id: 'r',
+        label: 'r',
+        range: [0, 1],
+        default: 0,
+        curve: 'lin',
+        unit: 'norm',
+        hint: 'red ↔ root amplitude',
+      },
       toVideo: (v) => v,
       toAudio: (v) => v,
     },
     g: {
-      spec: { id: 'g', label: 'g', range: [0, 1], default: 0, curve: 'lin', unit: 'norm', hint: 'green ↔ fifth amplitude' },
+      spec: {
+        id: 'g',
+        label: 'g',
+        range: [0, 1],
+        default: 0,
+        curve: 'lin',
+        unit: 'norm',
+        hint: 'green ↔ fifth amplitude',
+      },
       toVideo: (v) => v,
       toAudio: (v) => v,
     },
     b: {
-      spec: { id: 'b', label: 'b', range: [0, 1], default: 0, curve: 'lin', unit: 'norm', hint: 'blue ↔ octave amplitude' },
+      spec: {
+        id: 'b',
+        label: 'b',
+        range: [0, 1],
+        default: 0,
+        curve: 'lin',
+        unit: 'norm',
+        hint: 'blue ↔ octave amplitude',
+      },
       toVideo: (v) => v,
       toAudio: (v) => v,
     },
     a: {
-      spec: { id: 'a', label: 'a', range: [0, 1], default: 1, curve: 'lin', unit: 'norm', hint: 'alpha ↔ master amplitude' },
+      spec: {
+        id: 'a',
+        label: 'a',
+        range: [0, 1],
+        default: 1,
+        curve: 'lin',
+        unit: 'norm',
+        hint: 'alpha ↔ master amplitude',
+      },
       toVideo: (v) => v,
       toAudio: (v) => v,
     },

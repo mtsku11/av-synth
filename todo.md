@@ -4,6 +4,10 @@ Staged from "single 999-line HTML" to "professional, productisable web app." Che
 
 Success criterion for each milestone is listed; do not declare it done until the criterion is met.
 
+## Current next step
+
+Complete the final human audible sign-off in `qa/reviews/` on a normal local machine with speakers/headphones. After that, a staging/private deploy is allowed for real-world manual testing, but public/professional deployment remains blocked until the essential unfinished `M3` surface area lands: the remaining Color operators and the full Blend family.
+
 ---
 
 ## M0 — Repo & tooling bootstrap
@@ -41,9 +45,9 @@ Each operator below has both a video shader and an audio sub-graph, both registe
 
 - [ ] `feedback` (port from prototype — `u_feedback` shader + delay-feedback audio gain)
 - [ ] `kaleid` (port — `u_kaleid` shader + waveshaper wavefolder, now mathematically coupled per `plan.md §2.6`)
-- [ ] `modulate` (port — `u_modulate` shader + delay-LFO PM, coupled per `plan.md §5.1`)
+- [x] `modulate` (port — `u_modulate` shader + AudioWorklet phase modulation, coupled per `plan.md §5.1`) ✅ 2026-05-16
 - [ ] `rotate` (port — `u_rotate` shader + M/S rotation matrix node, coupled per `plan.md §2.1`)
-- [ ] `scale` (port — `u_scale` shader + varispeed/pitch node, coupled per `plan.md §2.2`)
+- [x] `scale` (port — `u_scale` shader + AudioWorklet pitch shifter, coupled per `plan.md §2.2`) ✅ 2026-05-16
 - [ ] `posterize` (port — `u_crush` shader + bitcrush worklet, coupled per `plan.md §3.1`; add the missing `gamma` parameter)
 - [ ] `shift` (port — `u_shift` shader; audio-side SSB per-band is `todo` for M3, scaffold the param now)
 - [ ] global `rate` LFO source (port — shared `u_rate`-driven LFO + audio LFO at same frequency)
@@ -53,11 +57,15 @@ Each operator below has both a video shader and an audio sub-graph, both registe
 
 Success: every operator listed in `plan.md` is implemented in both domains, the coupling spec is enforced, each operator has a unit test (audio worklet correctness + GLSL shader compile check), and the chainable API works end-to-end.
 
+Release note: not every open `M3` item blocks a staging/manual-test deploy, but the remaining **Color** work and the full **Blend** family are considered essential blockers for a public/professional release.
+
 Work in family-batches. Order chosen by mathematical-foundation dependency:
 
 - [ ] **Sources** — `osc` ✅ 2026-05-16, `noise` ✅ 2026-05-16, `voronoi` ✅ 2026-05-16, `shape` ✅ 2026-05-16, `gradient` ✅ 2026-05-16, `solid` ✅ 2026-05-16, multi-source `src(oN)`, external `s0..s3` with cam/mic init
 - [ ] **Geometry** — `pixelate` ✅ 2026-05-16, `repeat` ✅ 2026-05-16, `repeatX` ✅ 2026-05-16, `repeatY` ✅ 2026-05-16, `scrollX` ✅ 2026-05-16, `scrollY` ✅ 2026-05-16
-- [ ] **Color** — `invert`, `contrast`, `brightness`, `luma`, `thresh`, `color`, `saturate`, `hue`, `colorama`, `sum`, channel accessors `.r .g .b .a`
+- [x] **Runtime hardening** — coupling evaluation is live in renderer/audio engine, neutral ops bypass by default, video clock follows audio when present, procedural/video source switching no longer double-disposes, media-element audio nodes are reused, and check/test/lint/build are green ✅ 2026-05-16
+- [x] **Worklet DSP pass** — `scale` pitch shift, `pixelate` true decimation, and `modulate` sample-accurate phase modulation are AudioWorklet-backed ✅ 2026-05-16
+- [ ] **Color** — `brightness` ✅ 2026-05-16, `contrast` ✅ 2026-05-16, `color` ✅ 2026-05-16, `saturate` ✅ 2026-05-16, `invert`, `luma`, `thresh`, `hue`, `colorama`, `sum`, channel accessors `.r .g .b .a`
 - [ ] **Blend** — `add`, `sub`, `mult`, `diff`, `layer`, `blend`, `mask`
 - [ ] **Modulate (full family)** — `modulateRotate`, `modulateScale`, `modulatePixelate`, `modulateRepeat`, `modulateScrollX`, `modulateScrollY`, `modulateKaleid`, `modulateHue`
 - [ ] **Output/buses** — full 4-bus `o0..o3` routing in both domains
@@ -84,19 +92,60 @@ Success: the app looks and feels like a product, not a prototype. Could ship to 
 - [ ] Oscilloscope + spectrum analyser components on the bottom rail
 - [ ] Preset browser with thumbnails (auto-captured), tagging, save/load
 - [ ] Save/share: serialise graph + presets to a shareable URL hash (or a paste service)
-- [ ] Recording: capture canvas + audio as a `.webm` via `MediaRecorder`
+- [x] Recording: capture canvas + audio as a `.webm` via `MediaRecorder` ✅ 2026-05-17
 - [ ] Mobile / touch-input considerations (knobs are hard on touch; consider list-of-sliders fallback)
 - [ ] Performance budget: 60 fps at 1080p, <10 ms audio block CPU on a mid-range laptop
 - [ ] Accessibility: keyboard nav for all controls, ARIA labels, focus-visible everywhere
 
+## M5.5 — QA & Regression Harness
+
+Success: the repo can run a repeatable live-browser QA pass locally, save artifacts to a stable layout, and feed those artifacts into the recommended MCP analyzers.
+
+- [x] Define the QA stack: Playwright for live behavior, `mcp-music-analysis` for audio behavior, `ffmpeg-quality-metrics` as the authoritative visual metrics backend, `video-quality-mcp` for metadata/GOP/artifact summaries, `ffmpeg-mcp` as a pipeline helper, and explicit manual audible/visual review for the remaining exception-heavy cases ✅ 2026-05-17; hardened 2026-05-18
+- [x] Add a `qa/` subtree with fixtures/results layout, manifest-driven case definitions, and MCP config templates ✅ 2026-05-17
+- [x] Add Playwright-based smoke/regression coverage for source upload, transport start, video clock advance, audio activity, and color/worklet operator sweeps ✅ 2026-05-17
+- [x] Add app-side capture/export so analyzer input comes from rendered AV output, not only browser video artifacts ✅ 2026-05-17
+- [x] Wire analyzer outputs into a machine-readable regression summary (`qa/results/.../analysis.json`) ✅ 2026-05-17
+- [x] Add CI entrypoint for the local QA pipeline (`.github/workflows/qa.yml`) ✅ 2026-05-17
+
+## M5.6 — Pre-deploy operator-family audit
+
+Success: every implemented operator family has passed both automated and manual AV QA on committed fixtures, regressions are fixed, and deploy is blocked until the audit matrix is green.
+
+- [x] Define the operator audit matrix in `qa/cases/`: one or more cases per implemented family, with low/mid/high parameter sweeps and explicit audio+video expectations ✅ 2026-05-17
+- [x] **Sources audit** — `osc`, `noise`, `voronoi`, `shape`, `gradient`, `solid`, plus `video` input: verify source load/start/export, expected visual motion/content, and expected audio activity/spectral shape. Source-family cases now live in `qa/cases/audit-source-*`; current explicit manual-audio exceptions are `audit-source-noise-sweep`, `audit-source-shape-sweep`, and `audit-source-gradient-sweep` because the current descriptors are not robust enough to hard-gate their intended timbral laws ✅ 2026-05-17
+- [x] **Feedback / composition audit** — `feedback`, `modulate`: verify no runaway instability at intended ranges, expected visual persistence/warp, and expected audio feedback/phase behavior. Cases live in `qa/cases/audit-feedback-*` and `qa/cases/audit-modulate-*`; current explicit caveats remain `audit-feedback-video-cross-source` on the decoded-video visual side and `audit-modulate-osc-sweep` on the exported-audio timbre side ✅ 2026-05-17
+- [x] **Geometry audit** — `scale`, `rotate`, `scrollX`, `scrollY`, `repeat`, `repeatX`, `repeatY`, `pixelate`, `kaleid`: verify visual transform intent, exported-video continuity, and audio-domain analogue behavior from the coupling law. The matrix now spans every implemented geometry operator. Current explicit caveats: `audit-kaleid-osc-sweep`, `audit-pixelate-osc-sweep`, `audit-pixelate-video-cross-source`, `audit-scrollY-osc-sweep`, and `audit-repeatY-osc-sweep` keep manual visual review, and `audit-scrollX-osc-sweep` keeps manual exported-audio review ✅ 2026-05-17
+- [x] **Color audit** — `brightness`, `contrast`, `color`, `saturate`, `posterize`, `chromaShift`: verify visual tonal/spectral changes and corresponding audio amplitude/timbral/stereo changes. Color-family cases now live in `qa/cases/audit-brightness-video-sweep.json`, `audit-contrast-osc-sweep.json`, `audit-color-solid-band-sweep.json`, `audit-saturate-video-sweep.json`, `audit-posterize-video-sweep.json`, and `audit-chromaShift-video-sweep.json`; `color`, `saturate`, `posterize`, and `chromaShift` keep more manual-heavy audio review by design ✅ 2026-05-17
+- [x] Add committed reference videos for stable cases so `video-quality-mcp` comparisons stop being skipped on audited operators. `qa/references/` now holds committed `.webm` baselines for all current `audit-*` cases, and `npm run qa:references:sync` refreshes them from a green audit run ✅ 2026-05-17
+- [x] Add configured analyzer adapters for the active external stack on the audit machine, then persist their outputs in `analysis.json`. `qa/analyzers.config.json` now points at repo-local wrappers for `mcp-music-analysis`, `ffmpeg-quality-metrics`, and `video-quality-mcp` in `qa/adapters/`, and `qa:analyze` writes sidecar analyzer JSON plus embeds their status/output in `analysis.json`. `mcp-video-analyzer` is retained as a reference-only wrapper, not part of the active audit path ✅ 2026-05-17; hardened 2026-05-18
+- [ ] Complete final human audible sign-off on the explicitly manual-heavy cases in `qa/reviews/` on a normal local machine with speakers/headphones
+- [x] Add segmented exported-WAV assertions for audited audio behavior; live analyser checkpoint metrics remain inspection-only while exported segments back the hard audio gate on seeded audit cases ✅ 2026-05-17
+- [x] Add manual review notes per family: audible coupling correctness, clipping/harshness, visual artifacts, and any “professional use” issues that metrics will miss. Notes now live in `qa/reviews/` ✅ 2026-05-17
+- [x] Fix every issue found by the audit before opening M6 deploy work. This cycle fixed the QA-bridge duplicate-instance targeting gap and the source-param propagation bug exposed by the `solid` cases ✅ 2026-05-17
+- [x] Freeze the audited matrix as the pre-deploy regression gate in CI. `.github/workflows/qa.yml` now runs `npm run qa:audit:ci` and `qa:analyze` supports audit-only filtering ✅ 2026-05-17
+
 ## M6 — Deploy
 
-Success: live URL serves the app; `mcp__playwright__browser_navigate` to it returns a working synth.
+Success: staging URL serves the app for real-world manual testing, or public URL serves the app once the public-release blockers are cleared; in both cases `mcp__playwright__browser_navigate` to the target URL returns a working synth.
 
-- [ ] Choose hosting (Cloudflare Pages preferred per personal global rules)
-- [ ] Configure deployment GitHub Action — delegate workflow file to `deepseek-write`
-- [ ] Custom domain (deferred unless decided)
-- [ ] Post-deploy Playwright smoke test in CI
+- [ ] Confirm the final human audible sign-off item above is complete: final human audible sign-off is finished and any issues found there are either fixed or consciously deferred in writing
+- [ ] Use Cloudflare Pages as the default deployment target unless the user explicitly overrides that decision
+- [ ] Treat the first deploy as **staging/private** unless the user explicitly asks for a public release
+- [ ] Document the production deployment inputs before changing CI:
+  - build command: `npm run build`
+  - output directory: `dist`
+  - required env vars / secrets for the chosen host and GitHub Action
+  - production branch / trigger branch
+- [ ] Configure deployment GitHub Action for the chosen host and keep the audited QA gate in front of deploy
+- [ ] Deploy a first staging build and record the canonical staging URL in repo docs
+- [ ] Run a post-deploy Playwright smoke pass against the staging URL and fix any live-only regressions
+- [ ] Before any public/professional release, complete these additional blockers:
+  - remaining Color operators: `invert`, `luma`, `thresh`, `hue`, `colorama`, `sum`, channel accessors `.r .g .b .a`
+  - Blend family: `add`, `sub`, `mult`, `diff`, `layer`, `blend`, `mask`
+  - rerun QA/audit for the newly implemented families and update `qa/reviews/`
+- [ ] Only after the blockers above are closed: deploy the public/professional build, record the canonical public URL in repo docs, and rerun the post-deploy Playwright smoke pass against that public URL
+- [ ] Custom domain (deferred unless explicitly decided)
 
 ---
 

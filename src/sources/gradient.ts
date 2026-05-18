@@ -76,12 +76,9 @@ class GradientAudioStage implements AudioSourceStage {
     this.#noise.start();
   }
 
-  setParams(
-    params: Readonly<Record<string, number>>,
-    ctx: CouplingContext,
-  ): void {
+  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
     const speed = params['speed'] ?? 0;
-    const lfo = speed * ctx.baseFreq;
+    const lfo = speed;
     // f_c(t) = F_LOW · (F_HIGH/F_LOW)^((sin(2π·lfo·t)+1)/2)  — log sweep.
     const phase = (Math.sin(2 * Math.PI * lfo * ctx.time) + 1) / 2;
     const cutoff = F_LOW * Math.pow(F_HIGH / F_LOW, phase);

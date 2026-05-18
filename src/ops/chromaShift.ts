@@ -104,8 +104,8 @@ export const chromaShiftDef: OperatorDef = {
           unit: 'norm',
           hint: 'RGB spatial offset (video) / L-channel micro-delay (audio)',
         },
-        toVideo: (c01) => c01 * 0.08,
-        toAudio: (c01) => c01 * 0.08, // mapped to ms inside the stage
+        toVideo: (raw) => raw,
+        toAudio: (raw) => raw,
       },
     },
   },

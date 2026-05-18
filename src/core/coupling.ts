@@ -1,11 +1,17 @@
 // Coupling registry — the executable form of plan.md.
 //
-// Every operator registers a CouplingSpec here mapping a normalised control
-// value (c ∈ [0,1]) to its effective video-domain parameter and effective
-// audio-domain parameter. Renderers MUST read mapped values from this layer,
-// never raw slider values. See CLAUDE.md §3 "Coupling principle".
+// Every operator registers a CouplingSpec here mapping a raw control value
+// (the UI-visible value within ParamSpec.range) to its effective video-domain
+// parameter and effective audio-domain parameter. Renderers MUST read mapped
+// values from this layer, never raw slider values. See CLAUDE.md §3
+// "Coupling principle".
 
 import type { ParamSpec } from './params';
+
+export const COLOR_BAND_CROSSOVERS_HZ = {
+  lowMid: 300,
+  midHigh: 3000,
+} as const;
 
 export interface CouplingContext {
   /** Hz per cycle-per-screen, per plan.md §0. Default 1. */
@@ -29,13 +35,13 @@ export interface CouplingContext {
 
 export interface ParamCoupling {
   readonly spec: ParamSpec;
-  /** Map normalised control to the value the video shader / op consumes. */
-  readonly toVideo: (c01: number, ctx: CouplingContext) => number;
+  /** Map raw control value to the value the video shader / op consumes. */
+  readonly toVideo: (raw: number, ctx: CouplingContext) => number;
   /**
-   * Map normalised control to the value the audio worklet / node consumes,
+   * Map raw control value to the value the audio worklet / node consumes,
    * or return null for visual-only operators.
    */
-  readonly toAudio: (c01: number, ctx: CouplingContext) => number | null;
+  readonly toAudio: (raw: number, ctx: CouplingContext) => number | null;
 }
 
 export type CouplingKind = 'fully-coupled' | 'visual-only' | 'audio-only';
@@ -61,6 +67,37 @@ export function getOperator(op: string): OperatorCoupling | undefined {
 
 export function listOperators(): readonly string[] {
   return [...registry.keys()];
+}
+
+function evaluateParams(
+  spec: OperatorCoupling,
+  rawParams: Readonly<Record<string, number>>,
+  ctx: CouplingContext,
+  domain: 'video' | 'audio',
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [paramId, coupling] of Object.entries(spec.params)) {
+    const raw = rawParams[paramId] ?? coupling.spec.default;
+    const value = domain === 'video' ? coupling.toVideo(raw, ctx) : coupling.toAudio(raw, ctx);
+    if (value !== null) out[paramId] = value;
+  }
+  return out;
+}
+
+export function evaluateVideoParams(
+  spec: OperatorCoupling,
+  rawParams: Readonly<Record<string, number>>,
+  ctx: CouplingContext,
+): Record<string, number> {
+  return evaluateParams(spec, rawParams, ctx, 'video');
+}
+
+export function evaluateAudioParams(
+  spec: OperatorCoupling,
+  rawParams: Readonly<Record<string, number>>,
+  ctx: CouplingContext,
+): Record<string, number> {
+  return evaluateParams(spec, rawParams, ctx, 'audio');
 }
 
 /** Test-only escape hatch — never call from production code. */

@@ -39,11 +39,7 @@ class PosterizeVideoStage implements VideoStage {
 }
 
 // Build the bitcrush waveshaper curve once for given bin count + gamma.
-function makeBitcrushCurve(
-  bins: number,
-  gamma: number,
-  samples = 1024,
-): Float32Array<ArrayBuffer> {
+function makeBitcrushCurve(bins: number, gamma: number, samples = 1024): Float32Array<ArrayBuffer> {
   const curve = new Float32Array(samples);
   const b = Math.max(1, bins);
   for (let i = 0; i < samples; i++) {
@@ -112,8 +108,8 @@ export const posterizeDef: OperatorDef = {
           unit: 'sides',
           hint: 'quantisation levels per channel (video) / amplitude steps (audio)',
         },
-        toVideo: (c01) => Math.max(2, Math.round(2 + (64 - 2) * (1 - c01))), // c=0 -> 64 (clean), c=1 -> 2 (crushed)
-        toAudio: (c01) => Math.max(2, Math.round(2 + (64 - 2) * (1 - c01))),
+        toVideo: (raw) => raw,
+        toAudio: (raw) => raw,
       },
       gamma: {
         spec: {
@@ -125,8 +121,8 @@ export const posterizeDef: OperatorDef = {
           unit: 'ratio',
           hint: 'companding curve before quantisation',
         },
-        toVideo: (c01) => 0.3 + c01 * (2.5 - 0.3),
-        toAudio: (c01) => 0.3 + c01 * (2.5 - 0.3),
+        toVideo: (raw) => raw,
+        toAudio: (raw) => raw,
       },
     },
   },

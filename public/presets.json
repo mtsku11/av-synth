@@ -3,7 +3,7 @@
     "clock.rate": 0.15,
     "feedback.feedback": 0.92,
     "feedback.delayTime": 0.18,
-    "modulate.amount": 0.10,
+    "modulate.amount": 0.1,
     "scale.amount": 1.05,
     "rotate.angle": 0.02,
     "kaleid.nSides": 1,

@@ -1,0 +1,64 @@
+{
+  "id": "audit-chromaShift-video-sweep",
+  "title": "ChromaShift sweep on decoded media",
+  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "transport": { "start": true, "settleMs": 1500 },
+  "recording": { "filename": "audit-chromaShift-video-sweep", "tailMs": 850 },
+  "expectations": {
+    "sourceKind": "video",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "chroma-000-hold",
+        "to": "chroma-050-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": ">",
+        "delta": 0.005,
+        "description": "raising chromaShift should increase edge complexity from channel separation"
+      }
+    ]
+  },
+  "audit": {
+    "family": "color-tonal",
+    "operator": "chromaShift",
+    "kind": "sweep",
+    "expectedVideo": [
+      "higher chroma shift should visibly split channel edges without blanking the frame"
+    ],
+    "expectedAudio": [
+      "higher chroma shift should make the left-channel micro-delay audible without sounding broken"
+    ],
+    "manualChecks": [
+      "Does the channel split still feel tasteful enough for professional use?",
+      "Does the audio image move in a way that matches the visible channel offset?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "chromaShift",
+      "paramId": "amount",
+      "value": 0,
+      "screenshot": "chroma-000"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "chroma-000-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "chromaShift",
+      "paramId": "amount",
+      "value": 0.05,
+      "screenshot": "chroma-050"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "chroma-050-hold"
+    }
+  ]
+}

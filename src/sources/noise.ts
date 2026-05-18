@@ -77,13 +77,10 @@ class NoiseAudioStage implements AudioSourceStage {
     this.#source.start();
   }
 
-  setParams(
-    params: Readonly<Record<string, number>>,
-    ctx: CouplingContext,
-  ): void {
+  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
     const scale = Math.max(0, params['scale'] ?? 10);
     const offset = params['offset'] ?? 0.1;
-    const baseCutoff = scale * ctx.baseFreq;
+    const baseCutoff = scale;
     const lfo = 1 + LFO_DEPTH * Math.sin(2 * Math.PI * offset * ctx.time);
     const cutoff = Math.min(this.#nyquist - 1, Math.max(1, baseCutoff * lfo));
     this.#filter.frequency.setTargetAtTime(cutoff, ctx.time, 0.02);

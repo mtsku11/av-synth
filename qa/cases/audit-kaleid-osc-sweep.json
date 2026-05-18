@@ -1,0 +1,74 @@
+{
+  "id": "audit-kaleid-osc-sweep",
+  "title": "Kaleid sweep on osc source",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-kaleid-osc-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "kaleid-3-hold",
+        "to": "kaleid-8-hold",
+        "domain": "audio",
+        "metric": "spectralCentroidHz",
+        "op": ">",
+        "delta": 500,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "higher kaleid fold counts should add a much brighter harmonic profile to the exported oscillator audio"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "kaleid",
+    "kind": "sweep",
+    "expectedVideo": [
+      "raising nSides should introduce stronger polar symmetry without blank wedges or unstable seams",
+      "the oscillator field should stay phase-coherent as the fold count rises"
+    ],
+    "expectedAudio": [
+      "raising nSides should increase wavefolding complexity and harmonic content on the rendered mix",
+      "the stronger setting should remain controlled with no clipping or collapse"
+    ],
+    "manualChecks": [
+      "Does the extra symmetry read as the same structural increase as the added audio harmonics?",
+      "Does the higher fold count stay professionally usable instead of turning brittle?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "kaleid-sweep-frequency-110"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "kaleid",
+      "paramId": "nSides",
+      "value": 3,
+      "screenshot": "kaleid-3"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "kaleid-3-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "kaleid",
+      "paramId": "nSides",
+      "value": 8,
+      "screenshot": "kaleid-8"
+    },
+    {
+      "type": "wait",
+      "ms": 450,
+      "screenshot": "kaleid-8-hold"
+    }
+  ]
+}

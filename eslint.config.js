@@ -14,6 +14,16 @@ export default ts.config(
         ...globals.node,
       },
     },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
+    },
   },
   {
     files: ['**/*.svelte'],
@@ -24,6 +34,14 @@ export default ts.config(
     },
   },
   {
-    ignores: ['dist/', '.vite/', 'node_modules/', 'prototype.html'],
+    ignores: [
+      'dist/',
+      '.vite/',
+      'node_modules/',
+      'prototype.html',
+      'playwright-report/',
+      'test-results/',
+      'qa/results/',
+    ],
   },
 );

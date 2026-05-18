@@ -88,13 +88,10 @@ class ShapeAudioStage implements AudioSourceStage {
     }
   }
 
-  setParams(
-    params: Readonly<Record<string, number>>,
-    ctx: CouplingContext,
-  ): void {
+  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
     const sides = Math.max(3, params['sides'] ?? 3);
     const radius = Math.max(0, params['radius'] ?? 0.3);
-    const smoothing = Math.max(1e-4, params['smoothing'] ?? 0.01);
+    const smoothingCutoff = Math.max(20, params['smoothing'] ?? 100);
 
     const fundamental = FUNDAMENTAL_REF * ctx.baseFreq;
     for (let k = 0; k < HARMONIC_COUNT; k++) {
@@ -103,7 +100,7 @@ class ShapeAudioStage implements AudioSourceStage {
       this.#oscs[k]!.frequency.setTargetAtTime(clamped, ctx.time, 0.02);
     }
 
-    const cutoff = Math.min(this.#nyquist - 1, Math.max(20, ctx.baseFreq / smoothing));
+    const cutoff = Math.min(this.#nyquist - 1, smoothingCutoff);
     this.#filter.frequency.setTargetAtTime(cutoff, ctx.time, 0.02);
     this.output.gain.setTargetAtTime(radius, ctx.time, 0.02);
   }

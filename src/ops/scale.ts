@@ -1,11 +1,8 @@
-// scale — UV zoom around centre (video) + audio passthrough (M2 stub).
+// scale — UV zoom around centre (video) + AudioWorklet pitch shift (audio).
 //
-// plan.md §2.2 places the audio analogue at varispeed/pitch-shift on the
-// source signal. Web Audio has no built-in pitch shift on streaming
-// MediaElement sources; the proper implementation is an AudioWorklet
-// resampler (tracked in todo.md M3). For M2 we route audio through
-// unchanged so the operator can be in the chain without breaking it,
-// and flag the gap in memory.md.
+// plan.md §2.2 maps video scale to time/pitch scaling on the audio side.
+// The worklet implements a delay-read pitch shifter with overlapping read
+// heads so the ratio can move continuously without zipper noise.
 
 import frag from '../video/shaders/scale.frag?raw';
 import type { OperatorDef, VideoStage, AudioStage } from '../core/operators';
@@ -38,22 +35,35 @@ class ScaleVideoStage implements VideoStage {
   }
 }
 
-class ScalePassthroughAudioStage implements AudioStage {
+class ScalePitchAudioStage implements AudioStage {
   readonly op = 'scale';
   readonly input: GainNode;
   readonly output: GainNode;
+  readonly #worklet: AudioWorkletNode;
+  readonly #ratio: AudioParam;
 
   constructor(ctx: AudioContext) {
     this.input = ctx.createGain();
-    this.output = this.input; // truly passthrough; same node both ends
+    this.#worklet = new AudioWorkletNode(ctx, 'pitch-shifter', {
+      parameterData: { ratio: 1 },
+    });
+    const ratio = this.#worklet.parameters.get('ratio');
+    if (!ratio) throw new Error('scale: missing worklet ratio param');
+    this.#ratio = ratio;
+    this.output = ctx.createGain();
+    this.input.connect(this.#worklet);
+    this.#worklet.connect(this.output);
   }
 
-  setParams(_params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {
-    // M2 stub — see file header.
+  setParams(params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {
+    const ratio = Math.max(0.5, Math.min(2, params['amount'] ?? 1.0));
+    this.#ratio.setTargetAtTime(ratio, this.input.context.currentTime, 0.02);
   }
 
   dispose(): void {
     this.input.disconnect();
+    this.#worklet.disconnect();
+    this.output.disconnect();
   }
 }
 
@@ -63,7 +73,7 @@ export const scaleDef: OperatorDef = {
   defaults: { amount: 1.0 },
   coupling: {
     op: 'scale',
-    kind: 'visual-only', // audio side is M3 work (see file header)
+    kind: 'fully-coupled',
     params: {
       amount: {
         spec: {
@@ -73,10 +83,10 @@ export const scaleDef: OperatorDef = {
           default: 1.0,
           curve: 'log',
           unit: 'ratio',
-          hint: 'UV zoom around centre (audio pitch-shift is M3)',
+          hint: 'UV zoom around centre / audio pitch ratio',
         },
-        toVideo: (c01) => 0.5 * Math.pow(2.0 / 0.5, c01),
-        toAudio: () => 1.0, // identity, passthrough
+        toVideo: (raw) => raw,
+        toAudio: (raw) => raw,
       },
     },
   },
@@ -84,6 +94,6 @@ export const scaleDef: OperatorDef = {
     return new ScaleVideoStage(gl);
   },
   createAudioStage(ctx) {
-    return new ScalePassthroughAudioStage(ctx);
+    return new ScalePitchAudioStage(ctx);
   },
 };

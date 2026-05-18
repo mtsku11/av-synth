@@ -1,0 +1,25 @@
+{
+  "id": "audit-source-video-baseline",
+  "title": "Committed video fixture baseline",
+  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "transport": { "start": true, "settleMs": 1500 },
+  "recording": { "filename": "audit-source-video-baseline", "tailMs": 850 },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "audit": {
+    "family": "sources",
+    "operator": "video",
+    "kind": "baseline",
+    "expectedVideo": [
+      "the committed fixture should decode, advance, and export without blank or frozen frames"
+    ],
+    "expectedAudio": [
+      "the committed fixture audio should remain present through the full capture path"
+    ],
+    "manualChecks": ["Does the fixture still look and sound like the intended stable CI reference?"]
+  }
+}

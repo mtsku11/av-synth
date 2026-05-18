@@ -17,7 +17,8 @@
 // be inserted anywhere in the chain.
 
 import type { OperatorInstance } from '../core/operators';
-import type { CouplingContext } from '../core/coupling';
+import { isNeutralInstance } from '../core/operators';
+import { evaluateVideoParams, type CouplingContext, type OperatorCoupling } from '../core/coupling';
 import { PlaceholderSource, type VideoSourceStage } from './sources';
 
 const VS_FULLSCREEN = /* glsl */ `#version 300 es
@@ -112,10 +113,12 @@ export class VideoRenderer {
   #pingA: OffscreenTarget;
   #pingB: OffscreenTarget;
   #prevFrame: OffscreenTarget;
+  #internalFormat: GLenum;
   #useA = true;
 
   #source: VideoSourceStage;
   #sourceParams: Readonly<Record<string, number>> = {};
+  #sourceCoupling: OperatorCoupling | null = null;
   #instances: readonly OperatorInstance[] = [];
   #couplingCtx: CouplingContext;
 
@@ -138,6 +141,7 @@ export class VideoRenderer {
 
     const ext = gl.getExtension('EXT_color_buffer_float');
     const internalFormat = ext ? gl.RGBA16F : gl.RGBA8;
+    this.#internalFormat = internalFormat;
 
     const w = canvas.width;
     const h = canvas.height;
@@ -167,10 +171,15 @@ export class VideoRenderer {
     this.#couplingCtx = ctx;
   }
 
-  setSource(source: VideoSourceStage, params?: Readonly<Record<string, number>>): void {
+  setSource(
+    source: VideoSourceStage,
+    params?: Readonly<Record<string, number>>,
+    coupling?: OperatorCoupling,
+  ): void {
     const old = this.#source;
     this.#source = source;
     this.#sourceParams = params ?? {};
+    this.#sourceCoupling = coupling ?? null;
     old.dispose(this.gl);
   }
 
@@ -202,12 +211,9 @@ export class VideoRenderer {
     this.stop();
     const gl = this.gl;
     this.#source.dispose(gl);
-    gl.deleteFramebuffer(this.#pingA.fbo);
-    gl.deleteFramebuffer(this.#pingB.fbo);
-    gl.deleteFramebuffer(this.#prevFrame.fbo);
-    gl.deleteTexture(this.#pingA.tex);
-    gl.deleteTexture(this.#pingB.tex);
-    gl.deleteTexture(this.#prevFrame.tex);
+    this.#deleteTarget(this.#pingA);
+    this.#deleteTarget(this.#pingB);
+    this.#deleteTarget(this.#prevFrame);
     gl.deleteProgram(this.#copyProgram);
     gl.deleteVertexArray(this.#vao);
   }
@@ -221,22 +227,26 @@ export class VideoRenderer {
 
   #renderFrame(t: number): void {
     const gl = this.gl;
+    this.#ensureCanvasSize();
     gl.bindVertexArray(this.#vao);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
 
-    // Per-frame ctx — overrides the stored ctx's time with the renderer's
-    // current clock so LFO-driven shaders stay phase-locked with audio.
-    const ctx: CouplingContext = { ...this.#couplingCtx, time: t };
+    const ctxTime = this.#couplingCtx.time > 0 ? this.#couplingCtx.time : t;
+    const ctx: CouplingContext = { ...this.#couplingCtx, time: ctxTime };
+    const sourceParams = this.#sourceCoupling
+      ? evaluateVideoParams(this.#sourceCoupling, this.#sourceParams, ctx)
+      : this.#sourceParams;
 
     // 1. Render source into pingA.
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.#pingA.fbo);
     gl.viewport(0, 0, this.#pingA.width, this.#pingA.height);
-    this.#source.render(gl, this.#sourceParams, ctx);
+    this.#source.render(gl, sourceParams, ctx);
     this.#useA = true; // pingA now holds the upstream value
 
     // 2. Walk the chain.
     for (const instance of this.#instances) {
+      if (isNeutralInstance(instance)) continue;
       const write = this.#useA ? this.#pingB : this.#pingA;
       const read = this.#useA ? this.#pingA : this.#pingB;
 
@@ -252,7 +262,8 @@ export class VideoRenderer {
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, this.#prevFrame.tex);
 
-      instance.videoStage.setUniforms(gl, instance.params, ctx);
+      const params = evaluateVideoParams(instance.def.coupling, instance.params, ctx);
+      instance.videoStage.setUniforms(gl, params, ctx);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 
       this.#useA = !this.#useA;
@@ -277,5 +288,26 @@ export class VideoRenderer {
     gl.bindTexture(gl.TEXTURE_2D, final.tex);
     gl.uniform1i(this.#uCopyTex, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  #deleteTarget(target: OffscreenTarget): void {
+    const gl = this.gl;
+    gl.deleteFramebuffer(target.fbo);
+    gl.deleteTexture(target.tex);
+  }
+
+  #ensureCanvasSize(): void {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const width = Math.max(1, Math.round(this.canvas.clientWidth * dpr));
+    const height = Math.max(1, Math.round(this.canvas.clientHeight * dpr));
+    if (width === this.canvas.width && height === this.canvas.height) return;
+    this.canvas.width = width;
+    this.canvas.height = height;
+    this.#deleteTarget(this.#pingA);
+    this.#deleteTarget(this.#pingB);
+    this.#deleteTarget(this.#prevFrame);
+    this.#pingA = createTarget(this.gl, width, height, this.#internalFormat);
+    this.#pingB = createTarget(this.gl, width, height, this.#internalFormat);
+    this.#prevFrame = createTarget(this.gl, width, height, this.#internalFormat);
   }
 }

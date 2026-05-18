@@ -107,8 +107,8 @@ export const feedbackDef: OperatorDef = {
           unit: 'norm',
           hint: 'frame mix with previous output (video) / delay feedback gain (audio)',
         },
-        toVideo: (c01) => c01 * 0.95,
-        toAudio: (c01) => c01 * 0.95,
+        toVideo: (raw) => raw,
+        toAudio: (raw) => raw,
       },
       delayTime: {
         spec: {
@@ -121,7 +121,7 @@ export const feedbackDef: OperatorDef = {
           hint: 'audio delay time (no direct video analogue — uncoupled)',
         },
         toVideo: () => 0, // unused in video
-        toAudio: (c01) => 0.05 * Math.pow(0.8 / 0.05, c01),
+        toAudio: (raw) => raw,
       },
     },
   },

@@ -1,0 +1,36 @@
+{
+  "musicAnalysis": {
+    "command": "node",
+    "args": [
+      "qa/adapters/music-analysis-wrapper.mjs",
+      "--input",
+      "{wav}",
+      "--output",
+      "{caseDir}/music-analysis.json"
+    ]
+  },
+  "videoQuality": {
+    "command": "node",
+    "args": [
+      "qa/adapters/video-quality-wrapper.mjs",
+      "--input",
+      "{webm}",
+      "--reference",
+      "{referenceVideo}",
+      "--output",
+      "{caseDir}/video-quality.json"
+    ]
+  },
+  "ffmpegQualityMetrics": {
+    "command": "node",
+    "args": [
+      "qa/adapters/ffmpeg-quality-metrics-wrapper.mjs",
+      "--input",
+      "{webm}",
+      "--reference",
+      "{referenceVideo}",
+      "--output",
+      "{caseDir}/ffmpeg-quality-metrics.json"
+    ]
+  }
+}

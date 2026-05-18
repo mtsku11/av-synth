@@ -1,0 +1,82 @@
+{
+  "id": "audit-repeatY-osc-sweep",
+  "title": "RepeatY sweep on osc source",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-repeatY-osc-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "repeaty-osc-1-hold",
+        "to": "repeaty-osc-6-hold",
+        "domain": "audio",
+        "metric": "leftMinusRightRmsLevelDb",
+        "op": "<",
+        "delta": -2,
+        "source": "exported-audio",
+        "segmentPaddingMs": 220,
+        "description": "raising RepeatY reps should materially bias the rendered mix toward the right-channel feedback comb"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "repeatY",
+    "kind": "sweep",
+    "expectedVideo": [
+      "raising RepeatY reps should create denser vertical tiling without broken seams",
+      "the stronger state should stay visually coherent"
+    ],
+    "expectedAudio": [
+      "the same move should strengthen the right-channel feedback comb color",
+      "the rendered mix should remain stable without runaway feedback"
+    ],
+    "manualChecks": [
+      "Does RepeatY clearly feel right-biased in audio while reading as vertical repetition in video?",
+      "Is the stronger setting still aesthetically usable?",
+      "Does the oscillator source actually show a visible vertical-repeat change by eye, given that the current live visual metric is too weak to hard-gate this case?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "repeaty-osc-frequency-110"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeatY",
+      "paramId": "reps",
+      "value": 1,
+      "screenshot": "repeaty-osc-1"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeatY",
+      "paramId": "offset",
+      "value": 0,
+      "screenshot": "repeaty-osc-offset-0"
+    },
+    {
+      "type": "wait",
+      "ms": 320,
+      "screenshot": "repeaty-osc-1-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeatY",
+      "paramId": "reps",
+      "value": 6,
+      "screenshot": "repeaty-osc-6"
+    },
+    {
+      "type": "wait",
+      "ms": 520,
+      "screenshot": "repeaty-osc-6-hold"
+    }
+  ]
+}

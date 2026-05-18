@@ -1,0 +1,81 @@
+{
+  "id": "audit-scrollY-osc-sweep",
+  "title": "ScrollY sweep on osc source",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-scrollY-osc-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "scrolly-osc-low-hold",
+        "to": "scrolly-osc-high-hold",
+        "domain": "audio",
+        "metric": "leftMinusRightMeanVolumeDb",
+        "op": "<",
+        "delta": -10,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "moving ScrollY from low to high should swing the rendered stereo balance from left-heavy toward right-heavy"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "scrollY",
+    "kind": "sweep",
+    "expectedVideo": [
+      "raising Y amount should shift the oscillator frame vertically without tearing",
+      "the high setting should visibly reframe the motion rather than leaving the image unchanged"
+    ],
+    "expectedAudio": [
+      "the same move should swing the rendered stereo field from left to right",
+      "the pan should stay smooth and not introduce audible glitches"
+    ],
+    "manualChecks": [
+      "Does the vertical shift feel meaningfully paired with the stereo move?",
+      "Does the stronger setting remain usable rather than gimmicky or disorienting?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "scrolly-osc-frequency-110"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scrollY",
+      "paramId": "amount",
+      "value": 0.12,
+      "screenshot": "scrolly-osc-low"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scrollY",
+      "paramId": "speed",
+      "value": 0,
+      "screenshot": "scrolly-osc-speed-0"
+    },
+    {
+      "type": "wait",
+      "ms": 320,
+      "screenshot": "scrolly-osc-low-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scrollY",
+      "paramId": "amount",
+      "value": 0.88,
+      "screenshot": "scrolly-osc-high"
+    },
+    {
+      "type": "wait",
+      "ms": 420,
+      "screenshot": "scrolly-osc-high-hold"
+    }
+  ]
+}

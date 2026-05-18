@@ -1,0 +1,88 @@
+{
+  "id": "audit-pixelate-osc-sweep",
+  "title": "Pixelate sweep on osc source",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-pixelate-osc-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "pixelate-028-hold",
+        "to": "pixelate-180-hold",
+        "domain": "audio",
+        "metric": "spectralCentroidHz",
+        "op": ">",
+        "delta": 800,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "the higher decimation factor should push the exported oscillator spectrum much harder than the lighter setting"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "pixelate",
+    "kind": "sweep",
+    "expectedVideo": [
+      "lower pixel counts should visibly block up the oscillator field without freezing motion",
+      "the stronger pixelation setting should reduce fine detail, not introduce NaNs or black frames"
+    ],
+    "expectedAudio": [
+      "changing pixel counts should alter decimation texture on the rendered mix",
+      "the audio should stay continuous with audible sample-hold character rather than dropping out"
+    ],
+    "manualChecks": [
+      "Does stronger visual blockiness feel meaningfully coupled to the audio texture change?",
+      "Does the most extreme setting still sound like intentional decimation rather than a broken buffer?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "pixelate-sweep-frequency-110"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "pixelate",
+      "paramId": "pixelX",
+      "value": 180,
+      "screenshot": "pixelate-180x"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "pixelate",
+      "paramId": "pixelY",
+      "value": 180,
+      "screenshot": "pixelate-180"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "pixelate-180-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "pixelate",
+      "paramId": "pixelX",
+      "value": 28,
+      "screenshot": "pixelate-028x"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "pixelate",
+      "paramId": "pixelY",
+      "value": 28,
+      "screenshot": "pixelate-028"
+    },
+    {
+      "type": "wait",
+      "ms": 450,
+      "screenshot": "pixelate-028-hold"
+    }
+  ]
+}

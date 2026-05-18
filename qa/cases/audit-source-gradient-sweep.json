@@ -1,0 +1,50 @@
+{
+  "id": "audit-source-gradient-sweep",
+  "title": "Gradient source sweep",
+  "source": { "kind": "gradient" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-source-gradient-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "gradient",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": []
+  },
+  "audit": {
+    "family": "sources",
+    "operator": "gradient",
+    "kind": "sweep",
+    "expectedVideo": ["higher speed should produce clearly faster gradient movement"],
+    "expectedAudio": [
+      "higher speed should make the filter movement more obvious without breaking the output"
+    ],
+    "manualChecks": [
+      "Does the faster gradient still feel smooth rather than twitchy?",
+      "Does the audio movement feel related to the visual sweep?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "speed",
+      "value": 0,
+      "screenshot": "gradient-speed-000"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "gradient-speed-000-hold"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "speed",
+      "value": 3.5,
+      "screenshot": "gradient-speed-350"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "gradient-speed-350-hold"
+    }
+  ]
+}

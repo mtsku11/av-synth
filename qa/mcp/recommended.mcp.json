@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "music-analysis": {
+      "command": "uvx",
+      "args": ["mcp-music-analysis"]
+    },
+    "video-quality": {
+      "command": "/Users/marcscully/Projects/video-quality-mcp/.venv/bin/python",
+      "args": ["/Users/marcscully/Projects/video-quality-mcp/main.py"]
+    }
+  }
+}

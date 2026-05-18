@@ -1,0 +1,92 @@
+{
+  "id": "audit-scrollX-video-cross-source",
+  "title": "ScrollX cross-source spot check on committed video fixture",
+  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "transport": { "start": true, "settleMs": 1500 },
+  "recording": { "filename": "audit-scrollX-video-cross-source", "tailMs": 850 },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "scrollx-video-static-hold",
+        "to": "scrollx-video-moving-hold",
+        "domain": "video",
+        "metric": "temporalDiff",
+        "op": ">",
+        "delta": 0.01,
+        "description": "adding X-scroll motion should materially increase decoded-media frame movement"
+      },
+      {
+        "from": "scrollx-video-static-hold",
+        "to": "scrollx-video-moving-hold",
+        "domain": "audio",
+        "metric": "spectralFlux",
+        "op": ">",
+        "delta": 0.0015,
+        "source": "exported-audio",
+        "segmentPaddingMs": 220,
+        "description": "introducing delay-line scrub should materially increase rendered decoded-media spectral movement"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "scrollX",
+    "kind": "cross-source",
+    "expectedVideo": [
+      "the decoded fixture should drift horizontally without freezing or exposing undefined edges",
+      "the moving state should visibly differ from the static state on the committed clip"
+    ],
+    "expectedAudio": [
+      "fixture audio should pick up the same delay-scrub/vibrato behavior as the osc case",
+      "the rendered mix should stay continuous with no collapse or silence"
+    ],
+    "manualChecks": [
+      "Does ScrollX remain legible and coupled on decoded media?",
+      "Does the moving state feel like one AV gesture rather than separate audio and video artifacts?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "scrollX",
+      "paramId": "amount",
+      "value": 0.08,
+      "screenshot": "scrollx-video-static-amount"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scrollX",
+      "paramId": "speed",
+      "value": 0,
+      "screenshot": "scrollx-video-static-speed"
+    },
+    {
+      "type": "wait",
+      "ms": 320,
+      "screenshot": "scrollx-video-static-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scrollX",
+      "paramId": "amount",
+      "value": 0.68,
+      "screenshot": "scrollx-video-moving-amount"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scrollX",
+      "paramId": "speed",
+      "value": 1.8,
+      "screenshot": "scrollx-video-moving-speed"
+    },
+    {
+      "type": "wait",
+      "ms": 620,
+      "screenshot": "scrollx-video-moving-hold"
+    }
+  ]
+}

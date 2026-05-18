@@ -1,0 +1,78 @@
+{
+  "id": "audit-scale-video-cross-source",
+  "title": "Scale cross-source spot check on committed video fixture",
+  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "transport": { "start": true, "settleMs": 1500 },
+  "recording": { "filename": "audit-scale-video-cross-source", "tailMs": 850 },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "scale-video-078-hold",
+        "to": "scale-video-152-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": ">",
+        "delta": 0.015,
+        "description": "the stronger scale setting should materially change framing/detail on decoded media"
+      },
+      {
+        "from": "scale-video-078-hold",
+        "to": "scale-video-152-hold",
+        "domain": "audio",
+        "metric": "zeroCrossingRate",
+        "op": ">",
+        "delta": 0.004,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "the same scale sweep should materially increase exported decoded-media crossing density on the rendered mix"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "scale",
+    "kind": "cross-source",
+    "expectedVideo": [
+      "the decoded fixture should zoom cleanly without freezing or exposing undefined edges",
+      "larger scale values should materially change framing on the committed clip"
+    ],
+    "expectedAudio": [
+      "fixture audio should pitch-shift with the same scale law as the osc case",
+      "the rendered mix should stay stable with no silence or obvious glitching"
+    ],
+    "manualChecks": [
+      "Does scale remain coupled and usable on decoded media as well as procedural osc?",
+      "Does the stronger setting still read as deliberate zoom plus pitch shift rather than codec damage?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "scale",
+      "paramId": "amount",
+      "value": 0.78,
+      "screenshot": "scale-video-078"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "scale-video-078-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scale",
+      "paramId": "amount",
+      "value": 1.52,
+      "screenshot": "scale-video-152"
+    },
+    {
+      "type": "wait",
+      "ms": 550,
+      "screenshot": "scale-video-152-hold"
+    }
+  ]
+}

@@ -116,7 +116,17 @@ export class VideoElementSource implements VideoSourceStage {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     // Allocate a 1×1 placeholder so the texture is sampleable before the
     // first frame upload.
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      1,
+      1,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      new Uint8Array([0, 0, 0, 255]),
+    );
 
     const u = gl.getUniformLocation(this.#program, 'u_videoTex');
     if (!u) throw new Error('video source missing u_videoTex');

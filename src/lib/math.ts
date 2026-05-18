@@ -3,8 +3,7 @@
 
 export const TAU = Math.PI * 2;
 
-export const clamp = (x: number, lo: number, hi: number): number =>
-  x < lo ? lo : x > hi ? hi : x;
+export const clamp = (x: number, lo: number, hi: number): number => (x < lo ? lo : x > hi ? hi : x);
 
 export const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
 
@@ -28,8 +27,7 @@ export const smoothstep = (edge0: number, edge1: number, x: number): number => {
 
 // dB <-> linear amplitude
 export const dbToLinear = (db: number): number => Math.pow(10, db / 20);
-export const linearToDb = (lin: number): number =>
-  lin <= 0 ? -Infinity : 20 * Math.log10(lin);
+export const linearToDb = (lin: number): number => (lin <= 0 ? -Infinity : 20 * Math.log10(lin));
 
 // ---- Parameter curves ------------------------------------------------------
 // Map a normalised control c ∈ [0,1] into a target range with a chosen curve.

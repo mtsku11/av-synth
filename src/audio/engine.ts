@@ -4,22 +4,27 @@
 
 import { clock } from '../core/clock.svelte';
 import type { OperatorInstance } from '../core/operators';
-import { attachAudio } from '../core/operators';
+import { attachAudio, isNeutralInstance } from '../core/operators';
 import { SilentSource, type AudioSourceStage } from './sources';
-import type { CouplingContext } from '../core/coupling';
+import { ensureAudioWorklets } from './worklets';
+import { evaluateAudioParams, type CouplingContext, type OperatorCoupling } from '../core/coupling';
 
 const PARAM_POLL_MS = 16; // ~60Hz; setTargetAtTime smooths the audible jumps.
 
 export class AudioEngine {
   #ctx: AudioContext | null = null;
+  #initPromise: Promise<void> | null = null;
   #master: GainNode | null = null;
   #analyser: AnalyserNode | null = null;
+  #capture: MediaStreamAudioDestinationNode | null = null;
   #fftMagnitudes: Float32Array<ArrayBuffer> | null = null;
 
   #source: AudioSourceStage | null = null;
   #sourceParams: Readonly<Record<string, number>> = {};
+  #sourceCoupling: OperatorCoupling | null = null;
   #instances: OperatorInstance[] = [];
   #paramTimer = 0;
+  #activeSignature = '';
 
   get ctx(): AudioContext {
     if (!this.#ctx) throw new Error('AudioEngine not initialised — call init() first');
@@ -30,49 +35,65 @@ export class AudioEngine {
     return this.#ctx !== null;
   }
 
-  init(): void {
-    if (this.#ctx) return;
+  init(): Promise<void> {
+    if (this.#initPromise) return this.#initPromise;
+    if (this.#ctx) return Promise.resolve();
 
-    const ctx = new AudioContext({ latencyHint: 'interactive' });
+    this.#initPromise = (async () => {
+      const ctx = new AudioContext({ latencyHint: 'interactive' });
+      await ensureAudioWorklets(ctx);
 
-    const master = ctx.createGain();
-    master.gain.value = 0.7;
+      const master = ctx.createGain();
+      master.gain.value = 0.7;
 
-    const limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -1;
-    limiter.knee.value = 0;
-    limiter.ratio.value = 20;
-    limiter.attack.value = 0.001;
-    limiter.release.value = 0.05;
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -1;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.001;
+      limiter.release.value = 0.05;
 
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 1024;
-    analyser.smoothingTimeConstant = 0.7;
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.7;
+      const capture = ctx.createMediaStreamDestination();
 
-    master.connect(limiter);
-    limiter.connect(analyser);
-    analyser.connect(ctx.destination);
+      master.connect(limiter);
+      limiter.connect(analyser);
+      limiter.connect(capture);
+      analyser.connect(ctx.destination);
 
-    this.#ctx = ctx;
-    this.#master = master;
-    this.#analyser = analyser;
-    this.#fftMagnitudes = new Float32Array(analyser.frequencyBinCount);
-    this.#source = new SilentSource(ctx);
+      this.#ctx = ctx;
+      this.#master = master;
+      this.#analyser = analyser;
+      this.#capture = capture;
+      this.#fftMagnitudes = new Float32Array(analyser.frequencyBinCount);
+      this.#source = new SilentSource(ctx);
+      for (const inst of this.#instances) attachAudio(inst, ctx);
 
-    clock.bindAudioContext(ctx);
-    this.#rewire();
-    this.#startParamPoll();
+      clock.bindAudioContext(ctx);
+      this.#rewire();
+      this.#startParamPoll();
+    })();
+
+    return this.#initPromise;
   }
 
   /**
    * Replace the audio source. Disconnects the old; reconnects the chain.
    * Cannot be called before init().
    */
-  setSource(source: AudioSourceStage, params?: Readonly<Record<string, number>>): void {
+  setSource(
+    source: AudioSourceStage,
+    params?: Readonly<Record<string, number>>,
+    coupling?: OperatorCoupling,
+  ): void {
     if (!this.#ctx) throw new Error('AudioEngine.setSource called before init()');
     const old = this.#source;
+    old?.output.disconnect();
     this.#source = source;
     this.#sourceParams = params ?? {};
+    this.#sourceCoupling = coupling ?? null;
     this.#rewire();
     old?.dispose();
   }
@@ -105,7 +126,6 @@ export class AudioEngine {
     this.#source.output.disconnect();
     for (const inst of this.#instances) {
       if (inst.audioStage) {
-        inst.audioStage.input.disconnect();
         inst.audioStage.output.disconnect();
       }
     }
@@ -113,11 +133,13 @@ export class AudioEngine {
     // Rebuild: source → instances in order → master.
     let prev: AudioNode = this.#source.output;
     for (const inst of this.#instances) {
+      if (isNeutralInstance(inst)) continue;
       if (!inst.audioStage) continue; // skip un-attached
       prev.connect(inst.audioStage.input);
       prev = inst.audioStage.output;
     }
     prev.connect(this.#master);
+    this.#activeSignature = this.#computeActiveSignature();
   }
 
   setMasterGain(linear: number): void {
@@ -129,6 +151,10 @@ export class AudioEngine {
     if (!this.#analyser || !this.#fftMagnitudes) return null;
     this.#analyser.getFloatFrequencyData(this.#fftMagnitudes);
     return this.#fftMagnitudes;
+  }
+
+  getCaptureStream(): MediaStream | null {
+    return this.#capture?.stream ?? null;
   }
 
   async dispose(): Promise<void> {
@@ -143,8 +169,10 @@ export class AudioEngine {
     this.#ctx = null;
     this.#master = null;
     this.#analyser = null;
+    this.#capture = null;
     this.#fftMagnitudes = null;
     this.#source = null;
+    this.#initPromise = null;
   }
 
   #startParamPoll(): void {
@@ -167,10 +195,23 @@ export class AudioEngine {
       time: this.#ctx.currentTime,
       rate: clock.rate,
     };
-    this.#source?.setParams?.(this.#sourceParams, ctx);
+    const activeSignature = this.#computeActiveSignature();
+    if (activeSignature !== this.#activeSignature) this.#rewire();
+    const sourceParams = this.#sourceCoupling
+      ? evaluateAudioParams(this.#sourceCoupling, this.#sourceParams, ctx)
+      : this.#sourceParams;
+    this.#source?.setParams?.(sourceParams, ctx);
     for (const inst of this.#instances) {
-      inst.audioStage?.setParams(inst.params, ctx);
+      const params = evaluateAudioParams(inst.def.coupling, inst.params, ctx);
+      inst.audioStage?.setParams(params, ctx);
     }
+  }
+
+  #computeActiveSignature(): string {
+    return this.#instances
+      .filter((inst) => !isNeutralInstance(inst))
+      .map((inst) => inst.id)
+      .join('|');
   }
 }
 

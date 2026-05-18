@@ -1,0 +1,37 @@
+{
+  "id": "audit-modulate-osc-baseline",
+  "title": "Modulate baseline on osc source",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-modulate-osc-baseline", "tailMs": 600 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "audit": {
+    "family": "feedback-composition",
+    "operator": "modulate",
+    "kind": "baseline",
+    "expectedVideo": [
+      "osc source should render with no UV warp at the neutral modulate default",
+      "capture should establish the clean spatial reference before PM depth is added"
+    ],
+    "expectedAudio": [
+      "tone should stay stable with no added phase modulation sidebands",
+      "baseline export should anchor later modulate sweep comparisons"
+    ],
+    "manualChecks": [
+      "Confirm neutral modulate is visually clean and not already wobbling",
+      "Confirm baseline tone is steady and not phase-warped"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "modulate-baseline-frequency-110"
+    }
+  ]
+}

@@ -118,11 +118,17 @@ export function attachAudio(instance: OperatorInstance, audioCtx: AudioContext):
   instance.audioStage = instance.def.createAudioStage(audioCtx);
 }
 
-export function disposeInstance(
-  instance: OperatorInstance,
-  gl: WebGL2RenderingContext,
-): void {
+export function disposeInstance(instance: OperatorInstance, gl: WebGL2RenderingContext): void {
   instance.videoStage.dispose(gl);
   instance.audioStage?.dispose();
   instance.audioStage = null;
+}
+
+export function isNeutralInstance(instance: OperatorInstance): boolean {
+  for (const paramId of instance.def.paramOrder) {
+    const fallback = instance.def.defaults[paramId] ?? 0;
+    const value = instance.params[paramId] ?? fallback;
+    if (Math.abs(value - fallback) > 1e-6) return false;
+  }
+  return true;
 }

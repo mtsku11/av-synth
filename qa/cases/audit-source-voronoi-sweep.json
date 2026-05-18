@@ -1,0 +1,64 @@
+{
+  "id": "audit-source-voronoi-sweep",
+  "title": "Voronoi source sweep",
+  "source": { "kind": "voronoi" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-source-voronoi-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "voronoi",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "voronoi-scale-3-hold",
+        "to": "voronoi-scale-18-hold",
+        "domain": "audio",
+        "metric": "spectralCentroidHz",
+        "op": ">",
+        "delta": 80,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "raising voronoi scale should brighten the rendered audio through the grain-density mapping"
+      }
+    ]
+  },
+  "audit": {
+    "family": "sources",
+    "operator": "voronoi",
+    "kind": "sweep",
+    "expectedVideo": [
+      "higher scale should create denser cells without tearing or flicker collapse"
+    ],
+    "expectedAudio": [
+      "higher scale should sound denser and brighter through the grain-density mapping"
+    ],
+    "manualChecks": [
+      "Does the cell-density change feel coupled to the audio density change?",
+      "Does the rendered voronoi audio stay intentional rather than noisy in a broken way?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "scale",
+      "value": 3,
+      "screenshot": "voronoi-scale-3"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "voronoi-scale-3-hold"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "scale",
+      "value": 18,
+      "screenshot": "voronoi-scale-18"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "voronoi-scale-18-hold"
+    }
+  ]
+}

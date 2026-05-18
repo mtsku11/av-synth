@@ -1,0 +1,83 @@
+{
+  "id": "audit-scale-osc-sweep",
+  "title": "Scale sweep on osc source",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-scale-osc-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "scale-072-hold",
+        "to": "scale-165-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": ">",
+        "delta": 0.03,
+        "description": "the stronger scale setting should restore significantly more spatial detail than the zoomed-in low setting"
+      },
+      {
+        "from": "scale-072-hold",
+        "to": "scale-165-hold",
+        "domain": "audio",
+        "metric": "zeroCrossingRate",
+        "op": ">",
+        "delta": 0.003,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "raising scale should materially increase exported oscillator crossing density, not leave pitch behavior unchanged"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "scale",
+    "kind": "sweep",
+    "expectedVideo": [
+      "changing scale should zoom the oscillator field without blank frames or tearing",
+      "larger scale values should keep the motion coherent rather than introducing random jitter"
+    ],
+    "expectedAudio": [
+      "raising scale should shift the oscillator pitch upward on the rendered mix",
+      "the sweep should stay smooth with no zippering or dropout from the pitch shifter"
+    ],
+    "manualChecks": [
+      "Does the visual zoom feel proportional to the pitch movement?",
+      "Does the high-scale setting still sound intentional rather than phasey or broken?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "scale-sweep-frequency-110"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scale",
+      "paramId": "amount",
+      "value": 0.72,
+      "screenshot": "scale-072"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "scale-072-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scale",
+      "paramId": "amount",
+      "value": 1.65,
+      "screenshot": "scale-165"
+    },
+    {
+      "type": "wait",
+      "ms": 450,
+      "screenshot": "scale-165-hold"
+    }
+  ]
+}

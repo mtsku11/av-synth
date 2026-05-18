@@ -1,0 +1,78 @@
+{
+  "id": "audit-kaleid-video-cross-source",
+  "title": "Kaleid cross-source spot check on committed video fixture",
+  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "transport": { "start": true, "settleMs": 1500 },
+  "recording": { "filename": "audit-kaleid-video-cross-source", "tailMs": 850 },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "kaleid-video-3-hold",
+        "to": "kaleid-video-8-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": "<",
+        "delta": -0.01,
+        "description": "higher kaleid fold counts should materially reorganize decoded-media structure into a tighter symmetric pattern"
+      },
+      {
+        "from": "kaleid-video-3-hold",
+        "to": "kaleid-video-8-hold",
+        "domain": "audio",
+        "metric": "rmsLevelDb",
+        "op": ">",
+        "delta": 4,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "higher kaleid fold counts should materially raise rendered decoded-media energy, not leave the audio static"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "kaleid",
+    "kind": "cross-source",
+    "expectedVideo": [
+      "the decoded fixture should gain stronger radial symmetry as nSides rises",
+      "higher fold counts should stay decodable and intentional rather than producing broken seams"
+    ],
+    "expectedAudio": [
+      "fixture audio should pick up the same increased fold complexity heard on the osc case",
+      "the rendered mix should stay stable and free of runaway clipping"
+    ],
+    "manualChecks": [
+      "Does kaleid remain aesthetically usable on decoded footage, not just procedural osc?",
+      "Does the stronger setting still feel like one coherent operator across sight and sound?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "kaleid",
+      "paramId": "nSides",
+      "value": 3,
+      "screenshot": "kaleid-video-3"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "kaleid-video-3-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "kaleid",
+      "paramId": "nSides",
+      "value": 8,
+      "screenshot": "kaleid-video-8"
+    },
+    {
+      "type": "wait",
+      "ms": 550,
+      "screenshot": "kaleid-video-8-hold"
+    }
+  ]
+}

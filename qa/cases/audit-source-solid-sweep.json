@@ -1,0 +1,103 @@
+{
+  "id": "audit-source-solid-sweep",
+  "title": "Solid source sweep",
+  "source": { "kind": "solid" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-source-solid-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "solid",
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "solid-dim-hold",
+        "to": "solid-bright-hold",
+        "domain": "video",
+        "metric": "meanLuma",
+        "op": ">",
+        "delta": 0.4,
+        "description": "raising solid RGB/alpha should materially brighten the frame"
+      },
+      {
+        "from": "solid-dim-hold",
+        "to": "solid-bright-hold",
+        "domain": "audio",
+        "metric": "meanVolumeDb",
+        "op": ">",
+        "delta": 6,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "raising solid RGB/alpha should materially increase rendered level"
+      }
+    ]
+  },
+  "audit": {
+    "family": "sources",
+    "operator": "solid",
+    "kind": "sweep",
+    "expectedVideo": ["higher channel values should clearly brighten the flat source"],
+    "expectedAudio": [
+      "higher channel values should raise the rendered chord amplitudes and master level"
+    ],
+    "manualChecks": ["Does the louder solid source still sound usable, not just clipped?"]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "r",
+      "value": 0.08,
+      "screenshot": "solid-r-008"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "g",
+      "value": 0.08,
+      "screenshot": "solid-g-008"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "b",
+      "value": 0.08,
+      "screenshot": "solid-b-008"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "a",
+      "value": 0.2,
+      "screenshot": "solid-dim"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "solid-dim-hold"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "r",
+      "value": 0.9,
+      "screenshot": "solid-r-090"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "g",
+      "value": 0.9,
+      "screenshot": "solid-g-090"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "b",
+      "value": 0.9,
+      "screenshot": "solid-b-090"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "a",
+      "value": 1,
+      "screenshot": "solid-bright"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "solid-bright-hold"
+    }
+  ]
+}

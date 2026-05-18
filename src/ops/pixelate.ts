@@ -1,9 +1,6 @@
-// pixelate — UV quantisation (video) + per-channel decimation-proxy lowpass
-// (audio). Per plan.md §2.3, the audio analogue of holding a pixel for N
-// neighbours is holding a sample at the corresponding decimated rate, whose
-// audible imprint is a brick-wall lowpass at SR/(2·N). The aliasing component
-// of true decimation needs a worklet — deferred. `pixelX` lowpasses L,
-// `pixelY` lowpasses R (asymmetric stereo lo-fi when divergent).
+// pixelate — UV quantisation (video) + per-channel sample-rate reduction
+// (audio). Per plan.md §2.3, the audio side must truly hold samples at a
+// reduced rate so aliasing is part of the sound, not filtered away.
 
 import frag from '../video/shaders/pixelate.frag?raw';
 import type { OperatorDef, VideoStage, AudioStage } from '../core/operators';
@@ -42,56 +39,35 @@ class PixelateVideoStage implements VideoStage {
 class PixelateAudioStage implements AudioStage {
   readonly op = 'pixelate';
   readonly input: GainNode;
-  readonly output: ChannelMergerNode;
-  readonly #splitter: ChannelSplitterNode;
-  readonly #lpL: BiquadFilterNode;
-  readonly #lpR: BiquadFilterNode;
-  readonly #nyquist: number;
+  readonly output: GainNode;
+  readonly #worklet: AudioWorkletNode;
+  readonly #pixelX: AudioParam;
+  readonly #pixelY: AudioParam;
 
   constructor(ctx: AudioContext) {
-    this.#nyquist = ctx.sampleRate / 2;
     this.input = ctx.createGain();
-    this.input.channelCount = 2;
-    this.input.channelCountMode = 'explicit';
-    this.input.channelInterpretation = 'speakers';
-
-    this.#splitter = ctx.createChannelSplitter(2);
-    this.output = ctx.createChannelMerger(2);
-
-    this.#lpL = ctx.createBiquadFilter();
-    this.#lpL.type = 'lowpass';
-    this.#lpL.Q.value = 0.707;
-
-    this.#lpR = ctx.createBiquadFilter();
-    this.#lpR.type = 'lowpass';
-    this.#lpR.Q.value = 0.707;
-
-    this.input.connect(this.#splitter);
-    this.#splitter.connect(this.#lpL, 0);
-    this.#splitter.connect(this.#lpR, 1);
-    this.#lpL.connect(this.output, 0, 0);
-    this.#lpR.connect(this.output, 0, 1);
-
-    this.#setCutoffs(500, 500);
-  }
-
-  #setCutoffs(pixelX: number, pixelY: number): void {
-    const fL = Math.min(this.#nyquist - 1, this.#nyquist / Math.max(1, pixelX));
-    const fR = Math.min(this.#nyquist - 1, this.#nyquist / Math.max(1, pixelY));
-    const now = this.#lpL.context.currentTime;
-    this.#lpL.frequency.setTargetAtTime(fL, now, 0.02);
-    this.#lpR.frequency.setTargetAtTime(fR, now, 0.02);
+    this.#worklet = new AudioWorkletNode(ctx, 'pixelate-decimator', {
+      parameterData: { pixelX: 500, pixelY: 500 },
+    });
+    const pixelX = this.#worklet.parameters.get('pixelX');
+    const pixelY = this.#worklet.parameters.get('pixelY');
+    if (!pixelX || !pixelY) throw new Error('pixelate: missing worklet params');
+    this.#pixelX = pixelX;
+    this.#pixelY = pixelY;
+    this.output = ctx.createGain();
+    this.input.connect(this.#worklet);
+    this.#worklet.connect(this.output);
   }
 
   setParams(params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {
-    this.#setCutoffs(params['pixelX'] ?? 20, params['pixelY'] ?? 20);
+    const now = this.input.context.currentTime;
+    this.#pixelX.setTargetAtTime(Math.max(1, params['pixelX'] ?? 500), now, 0.02);
+    this.#pixelY.setTargetAtTime(Math.max(1, params['pixelY'] ?? 500), now, 0.02);
   }
 
   dispose(): void {
     this.input.disconnect();
-    this.#splitter.disconnect();
-    this.#lpL.disconnect();
-    this.#lpR.disconnect();
+    this.#worklet.disconnect();
     this.output.disconnect();
   }
 }

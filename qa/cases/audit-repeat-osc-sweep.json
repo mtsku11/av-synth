@@ -1,0 +1,97 @@
+{
+  "id": "audit-repeat-osc-sweep",
+  "title": "Repeat sweep on osc source",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-repeat-osc-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "repeat-osc-1x1-hold",
+        "to": "repeat-osc-6x5-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": "<",
+        "delta": -0.05,
+        "description": "raising repeat counts should materially compress oscillator image structure into a denser tiled field"
+      },
+      {
+        "from": "repeat-osc-1x1-hold",
+        "to": "repeat-osc-6x5-hold",
+        "domain": "audio",
+        "metric": "rmsLevelDb",
+        "op": ">",
+        "delta": 0.75,
+        "source": "exported-audio",
+        "segmentPaddingMs": 220,
+        "description": "raising repeat counts should materially increase rendered comb energy on the oscillator mix"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "repeat",
+    "kind": "sweep",
+    "expectedVideo": [
+      "raising repeatX/repeatY should tile the oscillator field more densely without broken seams",
+      "the denser state should remain visually coherent rather than noisy"
+    ],
+    "expectedAudio": [
+      "the same move should deepen the dual-channel comb character on the rendered mix",
+      "the stronger setting should stay stable without runaway feedback"
+    ],
+    "manualChecks": [
+      "Does denser tiling feel coupled to the stronger comb coloration?",
+      "Is the stronger repeat setting still musically usable?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "repeat-osc-frequency-110"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatX",
+      "value": 1,
+      "screenshot": "repeat-osc-1x1-x"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatY",
+      "value": 1,
+      "screenshot": "repeat-osc-1x1-y"
+    },
+    {
+      "type": "wait",
+      "ms": 320,
+      "screenshot": "repeat-osc-1x1-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatX",
+      "value": 6,
+      "screenshot": "repeat-osc-6x5-x"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatY",
+      "value": 5,
+      "screenshot": "repeat-osc-6x5-y"
+    },
+    {
+      "type": "wait",
+      "ms": 520,
+      "screenshot": "repeat-osc-6x5-hold"
+    }
+  ]
+}

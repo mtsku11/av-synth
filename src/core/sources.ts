@@ -69,19 +69,17 @@ export function createSourceInstance(
   };
 }
 
-export function attachSourceAudio(
-  instance: SourceInstance,
-  audioCtx: AudioContext,
-): void {
+export function attachSourceAudio(instance: SourceInstance, audioCtx: AudioContext): void {
   if (instance.audioStage) return;
   instance.audioStage = instance.def.createAudioStage(audioCtx);
 }
 
-export function disposeSourceInstance(
-  instance: SourceInstance,
-  gl: WebGL2RenderingContext,
-): void {
-  instance.videoStage.dispose(gl);
+export function disposeSourceAudio(instance: SourceInstance): void {
   instance.audioStage?.dispose();
   instance.audioStage = null;
+}
+
+export function disposeSourceInstance(instance: SourceInstance, gl: WebGL2RenderingContext): void {
+  instance.videoStage.dispose(gl);
+  disposeSourceAudio(instance);
 }

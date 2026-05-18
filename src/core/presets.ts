@@ -18,10 +18,7 @@ export async function loadPresets(): Promise<PresetBank> {
   return (await res.json()) as PresetBank;
 }
 
-export function applyPreset(
-  preset: Preset,
-  instances: readonly OperatorInstance[],
-): void {
+export function applyPreset(preset: Preset, instances: readonly OperatorInstance[]): void {
   for (const [key, value] of Object.entries(preset)) {
     const dot = key.indexOf('.');
     if (dot < 0) continue;
@@ -35,8 +32,10 @@ export function applyPreset(
       continue;
     }
 
-    const instance = instances.find((i) => i.def.op === scope);
-    if (!instance) continue;
-    instance.params[param] = value;
+    const matches = instances.filter((instance) => instance.def.op === scope);
+    if (matches.length === 0) continue;
+    for (const instance of matches) {
+      instance.params[param] = value;
+    }
   }
 }

@@ -1,0 +1,82 @@
+{
+  "id": "audit-modulate-osc-sweep",
+  "title": "Modulate sweep on osc source",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-modulate-osc-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "baseline",
+        "to": "modulate-050-hold",
+        "domain": "video",
+        "metric": "temporalDiff",
+        "op": ">",
+        "delta": 0.04,
+        "description": "higher modulate depth on the osc source should drive a clearly larger frame-to-frame warp than the dry baseline"
+      },
+      {
+        "from": "modulate-018-hold",
+        "to": "modulate-050-hold",
+        "domain": "video",
+        "metric": "temporalDiff",
+        "op": ">",
+        "delta": 0.03,
+        "description": "the stronger modulate setting should visibly deepen the warp relative to the lighter setting"
+      }
+    ]
+  },
+  "audit": {
+    "family": "feedback-composition",
+    "operator": "modulate",
+    "kind": "sweep",
+    "expectedVideo": [
+      "raising modulate amount should increase UV warp without tearing or black frames",
+      "the visual motion should remain phase-coherent rather than jittering randomly"
+    ],
+    "expectedAudio": [
+      "raising modulate amount should deepen phase modulation and sidebands without collapsing pitch identity",
+      "output should stay controlled across the sweep with no obvious crackle or level jumps"
+    ],
+    "manualChecks": [
+      "Does PM depth increase feel proportional to the visual warp depth?",
+      "Does the higher setting stay usable for professional sound design rather than sounding broken?",
+      "Does the stronger modulate setting clearly change the rendered oscillator timbre by ear even though a monotonic spectral-centroid lift is not stable enough to hard-gate?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "modulate-sweep-frequency-110"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "modulate",
+      "paramId": "amount",
+      "value": 0.18,
+      "screenshot": "modulate-018"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "modulate-018-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "modulate",
+      "paramId": "amount",
+      "value": 0.5,
+      "screenshot": "modulate-050"
+    },
+    {
+      "type": "wait",
+      "ms": 450,
+      "screenshot": "modulate-050-hold"
+    }
+  ]
+}

@@ -79,10 +79,7 @@ class OscAudioStage implements AudioSourceStage {
     this.#oscs = [make(), make(), make()];
   }
 
-  setParams(
-    params: Readonly<Record<string, number>>,
-    ctx: CouplingContext,
-  ): void {
+  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
     const freq = Math.max(0, params['frequency'] ?? 60);
     const sync = params['sync'] ?? 0.1;
     const offset = params['offset'] ?? 0;
@@ -91,7 +88,7 @@ class OscAudioStage implements AudioSourceStage {
     // Slow LFO on frequency: f(t) = f₀ · (1 + sync · sin(2π t / T_drift))
     // Using sin rather than a linear ramp keeps the audio bounded over time.
     const drift = Math.sin((2 * Math.PI * ctx.time) / T_DRIFT);
-    const f0 = freq * ctx.baseFreq * (1 + sync * drift);
+    const f0 = freq * (1 + sync * drift);
     const now = ctx.time;
     // setTargetAtTime smooths jumps from UI changes without dezippering noise
     this.#oscs[0].frequency.setTargetAtTime(f0, now, 0.02);

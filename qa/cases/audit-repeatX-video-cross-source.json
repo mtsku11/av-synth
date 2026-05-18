@@ -1,0 +1,85 @@
+{
+  "id": "audit-repeatX-video-cross-source",
+  "title": "RepeatX cross-source spot check on committed video fixture",
+  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "transport": { "start": true, "settleMs": 1500 },
+  "recording": { "filename": "audit-repeatX-video-cross-source", "tailMs": 850 },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "repeatx-video-1-hold",
+        "to": "repeatx-video-6-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": "<",
+        "delta": -0.005,
+        "description": "raising RepeatX reps should materially compress decoded-media structure into a denser horizontal tile pattern"
+      },
+      {
+        "from": "repeatx-video-1-hold",
+        "to": "repeatx-video-6-hold",
+        "domain": "audio",
+        "metric": "leftMinusRightRmsLevelDb",
+        "op": "<",
+        "delta": -0.75,
+        "source": "exported-audio",
+        "segmentPaddingMs": 220,
+        "description": "raising RepeatX reps should materially deepen left-channel comb asymmetry on the rendered decoded-media mix"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "repeatX",
+    "kind": "cross-source",
+    "expectedVideo": [
+      "the decoded fixture should gain stronger horizontal tiling as reps rise without seam corruption",
+      "the stronger setting should remain legible on the committed clip"
+    ],
+    "expectedAudio": [
+      "fixture audio should pick up the same left-channel feedforward comb treatment as the osc case",
+      "the rendered mix should remain stable without audible collapse"
+    ],
+    "manualChecks": [
+      "Does RepeatX remain visually useful on decoded media?",
+      "Does the left-channel treatment still feel intentional rather than accidental channel imbalance?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "repeatX",
+      "paramId": "reps",
+      "value": 1,
+      "screenshot": "repeatx-video-1"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeatX",
+      "paramId": "offset",
+      "value": 0,
+      "screenshot": "repeatx-video-offset-0"
+    },
+    {
+      "type": "wait",
+      "ms": 320,
+      "screenshot": "repeatx-video-1-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeatX",
+      "paramId": "reps",
+      "value": 6,
+      "screenshot": "repeatx-video-6"
+    },
+    {
+      "type": "wait",
+      "ms": 620,
+      "screenshot": "repeatx-video-6-hold"
+    }
+  ]
+}

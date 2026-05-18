@@ -80,7 +80,7 @@
     onpointerup={onPointerUp}
     onpointermove={onPointerMove}
   >
-    <circle cx={cx} cy={cy} r={r + 4} fill="var(--bg)" stroke="var(--line)" stroke-width="1" />
+    <circle {cx} {cy} r={r + 4} fill="var(--bg)" stroke="var(--line)" stroke-width="1" />
     <path d={bgArc} stroke="var(--line)" stroke-width="2" fill="none" stroke-linecap="round" />
     <path d={arcPath} stroke="var(--accent)" stroke-width="2" fill="none" stroke-linecap="round" />
     <line

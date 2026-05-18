@@ -5,10 +5,8 @@
   --line: #1f1f24;
   --accent: #7ee0ff;
   --warn: #ffae6e;
-  --font-mono:
-    ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
-  --font-sans:
-    system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 * {

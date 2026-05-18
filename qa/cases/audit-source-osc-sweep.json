@@ -1,0 +1,88 @@
+{
+  "id": "audit-source-osc-sweep",
+  "title": "Osc source sweep",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-source-osc-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "osc-frequency-40-hold",
+        "to": "osc-frequency-180-hold",
+        "domain": "audio",
+        "metric": "zeroCrossingRate",
+        "op": ">",
+        "delta": 0.009,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "raising osc frequency should materially increase rendered crossing density"
+      }
+    ]
+  },
+  "audit": {
+    "family": "sources",
+    "operator": "osc",
+    "kind": "sweep",
+    "expectedVideo": [
+      "sync should increase visible motion while frequency increases stripe density",
+      "the oscillator field should stay coherent with no frozen or torn frames"
+    ],
+    "expectedAudio": [
+      "raising frequency should sound like a clear pitch increase",
+      "the rendered oscillator should remain stable with no clicks or dropouts"
+    ],
+    "manualChecks": [
+      "Does the motion increase from sync feel related to the pitch behavior from frequency?",
+      "Does the high-frequency oscillator still sound intentional rather than brittle?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "sync",
+      "value": 0,
+      "screenshot": "osc-sync-000"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "osc-sync-000-hold"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "sync",
+      "value": 1.2,
+      "screenshot": "osc-sync-120"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "osc-sync-120-hold"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 40,
+      "screenshot": "osc-frequency-40"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "osc-frequency-40-hold"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 180,
+      "screenshot": "osc-frequency-180"
+    },
+    {
+      "type": "wait",
+      "ms": 400,
+      "screenshot": "osc-frequency-180-hold"
+    }
+  ]
+}

@@ -13,6 +13,10 @@ import { repeatYDef } from './repeatY';
 import { pixelateDef } from './pixelate';
 import { kaleidDef } from './kaleid';
 import { chromaShiftDef } from './chromaShift';
+import { brightnessDef } from './brightness';
+import { contrastDef } from './contrast';
+import { colorDef } from './color';
+import { saturateDef } from './saturate';
 import { posterizeDef } from './posterize';
 
 let registered = false;
@@ -32,6 +36,10 @@ export function registerAllOps(): void {
   registerOp(pixelateDef);
   registerOp(kaleidDef);
   registerOp(chromaShiftDef);
+  registerOp(brightnessDef);
+  registerOp(contrastDef);
+  registerOp(colorDef);
+  registerOp(saturateDef);
   registerOp(posterizeDef);
 }
 
@@ -53,5 +61,9 @@ export const DEFAULT_CHAIN: readonly string[] = [
   'pixelate',
   'kaleid',
   'chromaShift',
+  'brightness',
+  'contrast',
+  'color',
+  'saturate',
   'posterize',
 ];

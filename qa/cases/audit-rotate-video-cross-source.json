@@ -1,0 +1,78 @@
+{
+  "id": "audit-rotate-video-cross-source",
+  "title": "Rotate cross-source spot check on committed video fixture",
+  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "transport": { "start": true, "settleMs": 1500 },
+  "recording": { "filename": "audit-rotate-video-cross-source", "tailMs": 850 },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "rotate-video-000-hold",
+        "to": "rotate-video-110-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": ">",
+        "delta": 0.001,
+        "description": "raising rotate should materially reorganize framing/detail on decoded media"
+      },
+      {
+        "from": "rotate-video-000-hold",
+        "to": "rotate-video-110-hold",
+        "domain": "audio",
+        "metric": "leftMinusRightRmsLevelDb",
+        "op": "<",
+        "delta": -2,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "positive rotation should materially bias the rendered decoded-media stereo field toward the right channel"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "rotate",
+    "kind": "cross-source",
+    "expectedVideo": [
+      "the decoded fixture should rotate cleanly without black wedges or undefined edges",
+      "the stronger rotation should produce a visible framing change on the committed clip"
+    ],
+    "expectedAudio": [
+      "fixture audio should follow the same stereo-rotation law as the osc case",
+      "the rendered mix should stay stable without codec-like crackle or level collapse"
+    ],
+    "manualChecks": [
+      "Does rotate remain musically and visually intentional on decoded media?",
+      "Does the stronger setting still feel like one coherent AV operator?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "rotate",
+      "paramId": "angle",
+      "value": 0,
+      "screenshot": "rotate-video-000"
+    },
+    {
+      "type": "wait",
+      "ms": 320,
+      "screenshot": "rotate-video-000-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "rotate",
+      "paramId": "angle",
+      "value": 1.1,
+      "screenshot": "rotate-video-110"
+    },
+    {
+      "type": "wait",
+      "ms": 520,
+      "screenshot": "rotate-video-110-hold"
+    }
+  ]
+}

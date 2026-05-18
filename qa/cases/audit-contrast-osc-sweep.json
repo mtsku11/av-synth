@@ -1,0 +1,76 @@
+{
+  "id": "audit-contrast-osc-sweep",
+  "title": "Contrast sweep on osc source",
+  "source": { "kind": "osc" },
+  "transport": { "start": true, "settleMs": 1200 },
+  "recording": { "filename": "audit-contrast-osc-sweep", "tailMs": 700 },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "contrast-070-hold",
+        "to": "contrast-240-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": ">",
+        "delta": 0.02,
+        "description": "stronger contrast should increase visible stripe separation"
+      },
+      {
+        "from": "contrast-070-hold",
+        "to": "contrast-240-hold",
+        "domain": "audio",
+        "metric": "spectralCentroidHz",
+        "op": ">",
+        "delta": 30,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "stronger contrast should brighten the rendered oscillator through the clipper"
+      }
+    ]
+  },
+  "audit": {
+    "family": "color-tonal",
+    "operator": "contrast",
+    "kind": "sweep",
+    "expectedVideo": ["higher contrast should separate the oscillator stripes more aggressively"],
+    "expectedAudio": [
+      "higher contrast should sound more driven and brighter without collapsing the tone"
+    ],
+    "manualChecks": ["Does the distortion character still feel intentional rather than harsh?"]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 90,
+      "screenshot": "contrast-frequency-90"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "contrast",
+      "paramId": "amount",
+      "value": 0.7,
+      "screenshot": "contrast-070"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "contrast-070-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "contrast",
+      "paramId": "amount",
+      "value": 2.4,
+      "screenshot": "contrast-240"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "contrast-240-hold"
+    }
+  ]
+}

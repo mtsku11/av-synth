@@ -119,15 +119,12 @@ class VoronoiAudioStage implements AudioSourceStage {
     this.#grainLfo.start();
   }
 
-  setParams(
-    params: Readonly<Record<string, number>>,
-    ctx: CouplingContext,
-  ): void {
+  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
     const scale = Math.max(0, params['scale'] ?? 5);
     const speed = params['speed'] ?? 0.3;
     const blending = Math.max(0, Math.min(1, params['blending'] ?? 0.3));
 
-    const density = Math.min(this.#nyquist / 2, scale * ctx.baseFreq);
+    const density = Math.min(this.#nyquist / 2, scale);
     this.#grainLfo.frequency.setTargetAtTime(density, ctx.time, 0.02);
 
     // Filter wobble via JS-driven k-rate update (no continuous schedule).
