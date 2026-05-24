@@ -8,6 +8,18 @@ Success criterion for each milestone is listed; do not declare it done until the
 
 Run a **quality sprint before public release**, but the active audio direction is now singular: one benchmark-grade granulator, one feedback delay, one shared LFO/MIDI modulation fabric. The next meaningful progress is not more Hydra surface area and not more multi-engine audio-rack work; it is a curated video-first AV effects instrument with a professional video look engine, a collapsed granulator-first audio surface, and QA that reflects that narrower product honestly.
 
+## Live release blockers (2026-05-24 normalization)
+
+Treat this section, `M6 — Deploy`, and the granulator acceptance items below as the real backlog. Older `M0`–`M5.9` sections are retained as build provenance and design history; unchecked boxes there are **not** automatically current blockers unless they are repeated here in release-track form.
+
+- [x] **C1/C2/C3 — Feedback-delay public card, spec §10 shared-feedback identity, legacy `<AudioRack>` removal.** Landed 2026-05-24. `App.svelte` now routes the granulator through the real `FeedbackDelay` post-effect (`granulator.output -> FeedbackDelay.input -> AudioEngine master`) instead of the old rack/freezer path, the Audio tab mounts `MasterMeter` + `GranulatorCard` + new `FeedbackDelayCard` only, and the legacy rack is no longer mounted in the public shell. The shared `feedback` value is app-owned on the public side: moving the feedback-delay control updates all video `feedback` operators, editing a video `feedback` node feeds the same value back into the card, and program recall now supports an `audio.feedbackDelay` block. Verified green: `npm run check`, `npm run test:run -- src/core/presets.test.ts src/audio/feedback-delay.test.ts`, and `npx playwright test qa/e2e/c1-feedback-delay-surface.spec.ts -c qa/playwright.config.ts` against the live local app.
+- [ ] **B2.3 canonical 4-hour soak run** — rerun `qa/e2e/b2.3-granulator-soak.spec.ts` with `GRANULATOR_SOAK_S=14400` and record the result in `qa/reviews/granulator/`.
+- [ ] **Canonical CPU re-measurement on a 2020-class Intel MBP (gate #5).** Replace the current M4 Pro-only provisional row in the verdict doc with the reference-class measurement once hardware access exists.
+- [ ] **D3 human listening sign-off.** Two human reviewers must compare the committed av-synth listening pack against Granulator II and log verdicts in `qa/reviews/granulator/2026-05-24-d3-d4-harnesses.md`.
+- [ ] **D4 real loopback/scope latency sign-off.** Run the external hardware measurement and log it in `qa/reviews/granulator/2026-05-24-d3-d4-harnesses.md`. The in-app proxy remains regression protection, not the final gate.
+- [ ] **Final manual audible sign-off for explicit QA exceptions.** Close the older operator-family manual cases in `qa/reviews/` and note any conscious deferrals in writing.
+- [ ] **First staging deploy + post-deploy smoke.** Publish the private/staging build, record the canonical URL in `deploy.md`, and run the smoke pass against the real host before talking about public release.
+
 ### Granulator + LFO-coupling audit follow-up (2026-05-22 → 2026-05-23)
 
 Per `qa/reviews/2026-05-22-granulator-lfo-audit.md`:
@@ -22,7 +34,7 @@ Per `qa/reviews/2026-05-22-granulator-lfo-audit.md`:
   - [x] **Granulator gain-staging design fix** — Landed 2026-05-23. Chose √N normalisation inside the worklet (direction recommended in the verdict doc): a smoothed multiplier `1/√(active voices)` is applied to the output sum, time-constant 30 ms to avoid zipper noise on polyphony changes. Pre-limit truepeak dropped from +12.27 dBFS to -0.06 dBFS at adversarial settings; the brick-wall limiter is now unstressed. Side effect to be aware of: perceived loudness at the default `grainField` settings (≈2.45 average concurrent grains) drops ≈4 dB; preset gain values may want re-tuning over time but are functionally fine.
   - [ ] **Canonical CPU re-measurement on a 2020-class MBP (gate #5)** — re-run `qa/scripts/granulator-cpu.mjs` on the spec's reference-class hardware (2020 Intel MBP per §13) and replace the median row in the verdict doc. Marc does not own one; machine access TBD.
 - [x] **B3 — One curated demo program in `public/presets.json`.** Landed 2026-05-23. Loader extension: new optional `audio.granulator` block on `VideoEffectProgram`, plus `applyProgramAudio(program, handlers)` in `src/core/presets.ts`. The handler surface now accepts the numeric slider params and the validated enum picks `envelope` / `mode`, while still skipping malformed values. `App.svelte` calls it next to `applyProgram(program, instances)` at the program-apply site — routes through the same `setGranulatorParam(name, value)` used by manual sliders, plus direct `setEnvelope` / `setMode` application so the worklet, preset, and UI stay aligned. `grainField` now carries the full intended granulator state (`mode: cloud`, `envelope: hann` plus the numeric params) alongside the matching feedback/posterize/chromaShift video side. Unit tests in `presets.test.ts` cover routing, no-audio-block no-op, and malformed numeric/enum filtering. Verified green: typecheck 0/0, targeted preset/granulator tests green.
-- [ ] **C1/C2/C3 — Feedback-delay public card, spec §10 shared-feedback identity, legacy `<AudioRack>` removal.** Parked by user; re-open when ready.
+- [x] **C1/C2/C3 — Feedback-delay public card, spec §10 shared-feedback identity, legacy `<AudioRack>` removal.** Landed 2026-05-24. New `src/audio/feedback-delay-params.ts` defines the canonical 5-control surface (`time`, `feedback`, `damping`, `cross`, `mix`) with neutral cold-boot defaults (`feedback=0`, `mix=0`). `src/ui/FeedbackDelayCard.svelte` is now the public surface for that post-effect. `App.svelte` owns `feedbackDelayParams`, creates `FeedbackDelay(audio.ctx, feedbackDelayParams)` inside `ensureGranulatorPipeline()`, connects `granulator.output` into the delay and the delay into `audio.attachAuxiliarySource()`, and keeps the shared `feedback` law honest by synchronising the card with video `feedback` operators in both directions. `public/presets.json` + `applyProgramAudio()` now support `audio.feedbackDelay`, and the legacy `<AudioRack>` UI is fully unmounted from the public Audio tab instead of living behind a disclosure.
 - [x] **D1 — Per-channel pitch routing into separate worklet voices.** Landed 2026-05-24. Triggered MIDI notes no longer collapse onto the shared `pitch` AudioParam. `MidiRouter` now routes channel-aware note-on / note-off / pitch-bend calls through the granulator sink when available, `Granulator` forwards `{type:'noteOn'|'noteOff'|'notePitch'}` messages with the MIDI channel, and `public/worklets/granulator.js` tags each note-triggered grain with its source channel plus its per-grain pitch jitter / reverse state. Per-channel bend updates now retune only the matching active grain voices inside the worklet, and releasing a note channel stops later bend traffic from touching those finished grains. Chosen policy: in triggered mode, note-driven pitch stays per-voice; it no longer rewrites the ambient cloud's shared `pitch` param. Verification: targeted `midi.test.ts`, `granulator.test.ts`, and `grain-scheduler.test.ts` green; typecheck 0/0.
 - [x] **D2 — 4-point Hermite + CPU auto-dispatch** (spec §2). Landed 2026-05-24. The granulator worklet now ships both interpolation paths: 8-point windowed sinc remains the default, and a 4-point Hermite sampler is selected automatically per block when active-voice pitch load crosses the current internal budget (`sum(max(1, |ratio|)) * 8 > 192`). The fallback decision is internal-only, but the worklet now emits `interpMode` port messages for tests and any future diagnostic panel; the grain scheduler ignores that extra message traffic. This is an implementation-grade first budget, not the final hardware-calibrated threshold — the canonical 2020 Intel MBP CPU re-measurement in gate #5 is still owed. Verification: targeted `granulator.test.ts` now asserts both the Hermite fallback and the low-load sinc path; `grain-scheduler.test.ts` confirms non-`grain` messages remain benign.
 - [~] **D3 — Two listening tests for Granulator II parity** (spec §15 steps 3/4). Harness landed 2026-05-24. New committed input fixtures: `qa/fixtures/granulator-held-tone-48k.wav` and `qa/fixtures/granulator-source-stereo-48k.wav`. `qa/scripts/granulator-listening-pack.mjs` now renders the av-synth comparison pack via `npm run qa:granulator:listening` into `qa/results/granulator-listening/` (`held-tone-plus12`, `held-tone-plus24`, `curated-classic`, `curated-cloud-dense` plus `manifest.json` carrying the exact params/seeds). Review/protocol note lives at `qa/reviews/granulator/2026-05-24-d3-d4-harnesses.md`. **Still owed:** two human reviewer verdicts against Granulator II; gate not closed by asset generation alone.
@@ -47,6 +59,8 @@ The `M0`–`M4` sections below are retained as build provenance, not as the live
 
 ## M0 — Repo & tooling bootstrap
 
+Historical provenance only. This milestone is complete in practice; the unchecked boxes are intentionally preserved as origin-story notes and must not be treated as current backlog.
+
 Success: a Vite+TS+Svelte dev server runs, displays a blank canvas, and `git status` is clean.
 
 - [ ] `git init`; first commit with the prototype HTML preserved as-is at the root (rename to `prototype.html` once the new app is rendering)
@@ -61,6 +75,8 @@ Success: a Vite+TS+Svelte dev server runs, displays a blank canvas, and `git sta
 
 ## M1 — Architectural skeleton
 
+Historical provenance only. This milestone is complete in practice; the unchecked boxes are intentionally preserved as early-build notes and must not be treated as current release blockers.
+
 Success: a `App.svelte` mounts; an empty `Patch.svelte` panel; an empty `<canvas>` for video; an `AudioContext` exists; the `currentTime` clock is visible in the footer.
 
 - [ ] `src/core/clock.ts` — transport singleton: `audioContext`, `bpm`, `baseFreq`, derived `time` (audio-driven), public start/stop
@@ -73,6 +89,8 @@ Success: a `App.svelte` mounts; an empty `Patch.svelte` panel; an empty `<canvas
 - [ ] `App.svelte` lays out: top header (program/finish surface), centre canvas, right control panel, bottom scope/spectrum
 
 ## M2 — Port the prototype's existing operators into the new architecture
+
+Historical provenance only. Open items here are Hydra-parity history, not the live release backlog, unless they are re-promoted elsewhere in this file.
 
 Success: open the new app, load a video file, every slider from the prototype works identically, every preset matches the prototype output bit-for-bit (or, for audio, ear-for-ear).
 
@@ -89,6 +107,8 @@ Each operator below has both a video shader and an audio sub-graph, both registe
 - [x] Port the built-in video-effect program bank into `public/presets.json` and keep it as the top-of-page product surface rather than a sidecar preset folder ✅ 2026-05-20. The bank still carries the shipped legacy looks plus the curated Hydra-translation programs, but the public strip is now intentionally trimmed to the stronger routed-port looks (`Port / Marianne`, `Port / Velasco`, `Port / Nelson Twist`, `Port / Pixelscape`, `Port / Disintegration`, `Port / Acid Bus Seat`, and `Port / Glitchy Slit Scan`) so the visible app reads cleaner while QA/internal program coverage can still target the hidden entries.
 
 ## M3 — Fill in the rest of the Hydra surface area
+
+Historical provenance only. This section remains useful as design coverage, but open boxes here are not release blockers by default after the granulator-first redirect.
 
 Success: every operator listed in `plan.md` is implemented in both domains, the coupling spec is enforced, each operator has a unit test (audio worklet correctness + GLSL shader compile check), and the chainable API works end-to-end.
 
@@ -112,6 +132,8 @@ Work in family-batches. Order chosen by mathematical-foundation dependency:
 
 ## M4 — Chainable live-coding API (advanced/post-v1 unless scope changes)
 
+Historical provenance only. This surface is explicitly advanced/post-v1 unless the product scope changes.
+
 Success: a CodeMirror editor accepts Hydra-style chained calls (`osc(60,0.1,1.5).modulate(noise(3)).out()`) and the result drives both renderers. The parser is permissive of Hydra dialect.
 
 - [ ] CodeMirror 6 instance in `src/ui/Editor.svelte`, JS syntax mode
@@ -123,6 +145,8 @@ Success: a CodeMirror editor accepts Hydra-style chained calls (`osc(60,0.1,1.5)
 - [x] Simplify the public patch surface back to a serial chain editor: remove the separate `Controls` panel, start from an empty chain, let users add unary operators from a menu one by one, and edit each operator’s sliders inline on its own card. Keep the richer graph/bus runtime internal for programs, Blend convergence, and QA instead of exposing it as the default UX ✅ 2026-05-19
 
 ## M5 — Polish & product surface
+
+Mixed historical context. Only the active release-track items repeated in `Live release blockers`, `Current next step`, `M5.8`, `M5.6`, `M6`, or the granulator section below should drive current work.
 
 Success: the app looks and feels like a product, not a prototype. Could ship to a public URL.
 
@@ -163,6 +187,8 @@ Success: the app looks and feels like a product, not a prototype. Could ship to 
 
 ## M5.8 — Video quality sprint: TouchDesigner-inspired look engine
 
+Use this section only for the remaining renderer/look-engine polish work that is still explicitly part of the release story. Do not treat already-landed unchecked notes here as evidence that the pyramid/look stack is missing wholesale.
+
 Success: the app no longer reads as a basic shader toy. A loaded video can be treated with a small set of authored looks that have convincing glow, halation, displacement, temporal feedback, color finish, and performance controls.
 
 - [ ] Audit the existing presentation stack in `src/video/renderer.ts` and `src/video/shaders/presentation.frag` against the target look set before adding new operators
@@ -192,6 +218,8 @@ Historical note: the rack engines (`grain cloud`, `self mod bus`, `fold plus`, `
 
 ## M5.5 — QA & Regression Harness
 
+Mostly historical provenance. The live open work from this QA stack is the remaining human/manual sign-off recorded above, not re-implementing the harness itself.
+
 Success: the repo can run a repeatable live-browser QA pass locally, save artifacts to a stable layout, and feed those artifacts into the recommended MCP analyzers.
 
 - [x] Define the QA stack: Playwright for live behavior, `mcp-music-analysis` for audio behavior, `ffmpeg-quality-metrics` as the authoritative visual metrics backend, `video-quality-mcp` for metadata/GOP/artifact summaries, `ffmpeg-mcp` as a pipeline helper, and explicit manual audible/visual review for the remaining exception-heavy cases ✅ 2026-05-17; hardened 2026-05-18
@@ -203,6 +231,8 @@ Success: the repo can run a repeatable live-browser QA pass locally, save artifa
 - [x] Split the Playwright smoke/audit suite into family-grouped spec files, harden artifact lookup against non-`smoke-*` output dirs, and allow modest local parallelism while keeping CI conservative ✅ 2026-05-19
 
 ## M5.6 — Pre-deploy operator-family audit
+
+Mostly historical provenance. The harness and matrix are live; the remaining open work is the explicit manual sign-off and any issues it uncovers.
 
 Success: every implemented operator family has passed both automated and manual AV QA on committed fixtures, regressions are fixed, and deploy is blocked until the audit matrix is green.
 
@@ -249,7 +279,7 @@ Success: staging URL serves the app for real-world manual testing, or public URL
 - [ ] Deploy a first staging build and record the canonical staging URL in repo docs
 - [ ] Run a post-deploy Playwright smoke pass against the staging URL and fix any live-only regressions
 - [ ] Before any public/professional release, complete these additional blockers:
-  - quality sprint scope is complete or consciously narrowed in writing: bloom pyramid/look engine, authored feedback/displacement presets, granular synthesis, FM/self-mod, upgraded wavefolding, and nonlinear gain-staging
+  - quality sprint scope is complete or consciously narrowed in writing: bloom/look-engine tuning, benchmark-grade granulation, the public feedback-delay surface, and nonlinear gain-staging
   - final human visual/audible sign-off says the app no longer feels amateur in the target demo path
   - video-derived feature extraction path is present in the shipped app (`v.luma`, `v.flux`, `v.edge` or a consciously narrowed equivalent)
   - rerun QA/audit for the newly implemented quality families and update `qa/reviews/`
@@ -310,7 +340,7 @@ Spec lives in `plan.md` §14 plus the §0a redirect callout. The audio rack and 
 - [x] `src/core/midi.ts` — Web MIDI input with MPE support (per-note pitch bend, channel pressure, CC74). CC-learn mode per granulator parameter. Note-on → first grain audio out ≤ 5 ms.
   - **Spec §15 step 8 code work landed 2026-05-22.** `src/core/midi.ts` ships four pure layers + one shell. (1) `parseMidiMessage(bytes)` parses 1-indexed-channel `noteOn` / `noteOff` (including the velocity-0-as-note-off running-status convention) / `pitchBend` (14-bit decode with 8192 centre → 0, asymmetric −1/+1 endpoints) / `channelPressure` / `controlChange` (CC value normalised to 0..1). (2) `MpeNoteStateMap` keeps one slot per MIDI channel with `{channel, note, velocity, pitchBend, pressure, timbre, startTime}`, LRU-ordered for `mostRecent`, matches MPE both Lower-zone (mgr ch 1, members 2..15) and Upper-zone (mgr ch 16, members 15..2) because no zone is hard-coded. CC74 is the only CC that lands in `timbre`. (3) `applyBinding(b, msg)` maps a `MidiSource` (`cc` / `pitchBend` / `channelPressure` / `noteVelocity`, each with `channel: MidiChannel \| 'any'`) to a value in `[min, max]` with optional `gamma07` curve; pitch-bend re-maps −1..+1 → 0..1 first. (4) `MidiRouter` orchestrates over a `ParamSink` (the granulator) with options `rootNote (default 45 = A2)`, `pitchBendSemitoneRange (default 2)`, `mpeEnabled (default true)`, `bindings`, `clock`. Note-on sets `pitch = (note - root) + bend·range` and `gain = (vel/127)^0.7`; per-channel pitch-bend only moves `pitch` if that channel holds the most-recent note; note-off zeros `gain` only when no notes remain held (MPE-aware) or unconditionally when `mpeEnabled=false`. `learn(param, range)` returns a promise that resolves on the first CC / PB / pressure / noteOn surface event. `defaultMpeBindings()` returns spec §11 default MPE mappings (pressure → density 20..200, CC74 → positionJitter 0..1) — opt-in via `addBinding`, never auto-installed. (5) `WebMidiInput` thin shell over `navigator.requestMIDIAccess` with `onstatechange` re-wire on hot-plug; not tested in jsdom. Test coverage at `src/core/midi.test.ts` is 42 cases (parser including pitch-bend endpoints + malformed input + status-byte fall-through; gamma curve; semitones-from-root; MPE state per-channel + LRU + ignore-non-CC74; binding match + channel filter + curve; default MPE bindings shape; router note-on/pitch/gain; MPE-aware note-off; per-note pitch-bend gating; user bindings; learn-promise resolution + non-resolve on note-off; removeBindings). **Honest deferrals (per spec §13 quality gate, not part of midi.ts as a module):** (a) ~~the "note-on → first audible grain ≤ 5 ms" target needs a worklet one-shot `noteOn` message and per-grain velocity baking~~ **unblocked 2026-05-22 (follow-on)** — `public/worklets/granulator.js` now accepts a `{type:'noteOn', pitch, velocity}` message, drains the queue at the top of `process()` (≈3 ms at 48 kHz / 128 frames), and bakes `velocityToGainWorklet(velocity)` into a per-grain `vGain[slot]` that multiplies the pan-gains in `renderActiveVoices`. `Granulator.triggerNoteOn(pitchSt, velocity)` posts the message; `ParamSink.triggerNoteOn?` is the optional contract the router calls when present. Router updated: triggered mode no longer touches the `gain` AudioParam — master level stays user-controlled. Test coverage added (`triggered mode: note-on calls triggerNoteOn (pitch + velocity) and does NOT touch gain`, `triggered mode: note-off does NOT zero gain`, `triggered mode: passes raw MIDI velocity`). Total midi.test.ts now 45 cases. (b) Per-note multi-pitch routing into separate worklet voices is still worklet-level; the **most-recent** held note still drives global `pitch` (mono-of-most-recent). When per-voice pitch lands in the worklet, `MpeNoteStateMap.get(channel)` is already in place to drive it. (c) ~~AudioRack UI / `AudioEngine` integration~~ **partial 2026-05-22 (follow-on)** — `src/audio/engine.ts` gained `attachAuxiliarySource(node) → disconnect`. `src/App.svelte` instantiates `Granulator` + `MidiRouter` + `WebMidiInput` after `audio.init()` (idempotent across `onStart` / `onFileChange`); decoded clip audio is loaded into the granulator via `loadClipIntoGranulator`. `src/ui/GranulatorCard.svelte` (new) renders the full 14-control surface plus envelope / mode pickers and a MIDI-learn button per slider wired to `router.learn()` / `router.removeBindings()`. Mounted above the existing legacy `<AudioRack>` in the Audio tab — the legacy multi-engine rack stays in-place pending the public collapse decision (see **UI collapse** section below). Full AudioRack collapse to *just* granulator + feedback delay + master meter remains open. **Listening-test latency verification** (≤ 5 ms note-on → first audio grain) remains a QA-harness measurement, not a code claim.
 - [x] Feedback delay post-effect — `src/audio/feedback-delay.ts`. Stereo cross-coupled FDN, 5 ms – 4 s, feedback ≤ 0.99, lowpass damping. Cross-coupled to video FBO recursion depth (the shared-feedback law).
-  - **Spec §15 step 7 code work landed 2026-05-22.** `src/audio/feedback-delay.ts` ships: stereo input via `ChannelSplitterNode(2)` → two `GainNode` sums → two `DelayNode`s (max 4 s) → two lowpass `BiquadFilterNode` damping stages (`Q = Math.SQRT1_2`, `frequency ∈ [200, 20000] Hz`) → four feedback `GainNode`s arranged as the spec's 2×2 matrix `(a·L→sumL, b·L→sumR, a·R→sumR, b·R→sumL)` with `a = feedback·cos(cross)`, `b = feedback·sin(cross)`. Delays merge through `ChannelMergerNode(2)` into a `wet` gain, summed with a `dry` gain (linear crossfade: `dry = 1 − mix`). Public surface: `setTime(s)`, `setFeedback(amount)`, `setCross(theta)`, `setDamping(hz)`, `setMix(mix)`, with hard clamps: `time ∈ [0.005, 4] s`, `feedback ∈ [0, 0.99]`, `damping ∈ [200, 20000] Hz`, `cross ∈ [0, π/2]`, `mix ∈ [0, 1]`. Connect callers via `input` / `output` `GainNode`s. Test coverage at `src/audio/feedback-delay.test.ts` is 13 cases (all clamp helpers including non-finite handling, coupling matrix at the three canonical θ landmarks 0 / π/4 / π/2, and the `a² + b² = feedback²` energy identity across five θ samples). **Still deferred**: cross-couple `feedback` to the video FX rack's `u_feedback` uniform (the shared-feedback law per spec §7) — needs a coupling-context route, not just a parameter; that's the AV-coupling math and stays with Claude. UI controls in `AudioRack.svelte` are a separate pass.
+  - **Spec §15 step 7 code work landed 2026-05-22; public integration landed 2026-05-24.** `src/audio/feedback-delay.ts` ships the stereo cross-coupled delay itself, and the public integration pass now mounts it for real: `src/audio/feedback-delay-params.ts` + `src/ui/FeedbackDelayCard.svelte` define the 5-control public surface, `App.svelte` creates a `FeedbackDelay` inside `ensureGranulatorPipeline()` and inserts it on the granulator branch before the master limiter, and the shared `feedback` law is enforced at the app layer by synchronising the delay card with video `feedback` operators. The old rack/freezer path remains in-repo only as internal scaffolding.
 - [ ] Master limiter on the bus stays as is.
 
 **Modulation surface:**
@@ -319,8 +349,8 @@ Spec lives in `plan.md` §14 plus the §0a redirect callout. The audio rack and 
 - [ ] MIDI CC / MPE, LFOs, and selected video-derived sources share one compact modulation matrix UI (source picker + depth, not bespoke automation per control).
 
 **UI collapse:**
-- [ ] `AudioRack.svelte` collapses to a single granulator card + a feedback delay card + a master meter. Existing rack engines (`fold plus`, `freeze smear`, `window replay`, `tone focus`, `space duck`, `self mod bus`) removed from public UX. Worklet code may remain in-repo as internal building blocks but is not registered or exposed.
-  - **Partial 2026-05-22.** `src/ui/GranulatorCard.svelte` is now mounted at the top of the Audio tab — granulator + envelope/mode pickers + per-control MIDI-learn. The legacy multi-engine `<AudioRack>` is still mounted below it pending the user's call on full removal (parking of feedback-delay coupling work means the feedback-delay card isn't yet collapsed either). Final removal of the legacy rack and a master meter add are the open items here.
+- [x] `AudioRack.svelte` collapses to a single granulator card + a feedback delay card + a master meter. Existing rack engines (`fold plus`, `freeze smear`, `window replay`, `tone focus`, `space duck`, `self mod bus`) removed from public UX. Worklet code may remain in-repo as internal building blocks but is not registered or exposed.
+  - **Landed 2026-05-24.** The Audio tab in `App.svelte` now mounts only `MasterMeter`, `GranulatorCard`, and `FeedbackDelayCard`. The legacy multi-engine `<AudioRack>` is still present in-repo for internal scaffolding, but it is no longer mounted or reachable from the shipped shell.
 - [x] Granulator UI matches the 14-control contract in `references/granulator-port-spec.md`: `position`, `position_jitter`, `pitch`, `pitch_jitter`, `duration`, `duration_jitter`, `density`, `distribution`, `envelope`, `pan_spread`, `y_spread`, `reverse_probability`, `voice_count`, `mode`. Inline values in physical units where applicable (ms, semitones, grains/s). No separate `attack/decay` control in v1. MIDI-learn button per control.
   - **Landed 2026-05-22.** `src/ui/GranulatorCard.svelte` ships every spec §6 control plus internal `gain`, envelope and mode pickers (5 / 3 buttons respectively), and a per-slider MIDI-learn button that toggles `router.learn(name, {min,max})` → renders the bound source as `CCnn ch1` / `PB any` / `AT any` / `vel ch3` etc., with click-again-to-clear semantics via `router.removeBindings(b => b.param === name)`. Pulsing visual state while waiting for a surface event; bound state shows the source string.
 

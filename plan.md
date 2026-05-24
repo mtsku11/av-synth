@@ -535,9 +535,9 @@ Effect on the roadmap:
 
 ### 10.7 Release tracks after the pivot
 
-The repo now has two explicit release tracks:
+The repo now has three explicit release tracks:
 
-1. **Quality sprint** — the current implementation target. Goal: make the core uploaded-video path feel professionally finished in both domains. Required: TouchDesigner-inspired WebGL look engine, serious granular/FM/wavefolding audio work, gain-staging discipline, focused QA, and human sign-off.
+1. **Quality sprint** — the current implementation target. Goal: make the core uploaded-video path feel professionally finished in both domains. Required: the existing TouchDesigner-inspired WebGL look engine tuned honestly for the shipped presets, the granulator-first audio surface completed around **granulator + feedback delay + limiter**, disciplined gain staging, focused QA, and human sign-off.
 2. **Staging RC** — private evaluation target. Goal: deploy the best current quality-sprint slice to a private/staging URL for real browser, device, visual, and listening validation. Required: QA/audit green on the implemented surface, final human audible/visual sign-off on the documented manual cases, a deploy workflow/runbook, and a post-deploy smoke pass against the staging URL.
 3. **Public v1** — the first broadly shareable release. Goal: ship the current video-first product honestly, without implying unfinished Hydra parity. Required beyond staging: quality-sprint scope complete or explicitly narrowed, issues discovered during staging absorbed, and public positioning anchored to "video-first AV effects" rather than "general AV synth." Remaining public-surface Color work (`sum`, `.r .g .b .a`) should be implemented only if it is still a real launch requirement after quality sign-off.
 
@@ -659,7 +659,7 @@ Public/professional `M6 — Deploy` stays blocked until all of the following are
 - all discovered AV-coupling, quality, or stability defects are fixed or consciously deferred in writing
 - final human audible sign-off is complete for the explicit manual cases in `qa/reviews/`
 - the video-first correction pass is complete: video is the default product path, procedural sources are demoted from the public UX, and the product/docs no longer present the app as a procedural synth first
-- the quality sprint is complete or consciously narrowed in writing: TouchDesigner-inspired bloom/look/feedback polish, real granular synthesis, real FM/self-mod, upgraded wavefolding, and gain-staging/wet-dry discipline
+- the quality sprint is complete or consciously narrowed in writing: TouchDesigner-inspired bloom/look/feedback polish, benchmark-grade granulation, the public feedback-delay surface, and gain-staging/wet-dry discipline
 - final human visual/audible sign-off says the target demo path no longer feels amateur
 - remaining public-v1 Color work (`sum`) is either implemented or explicitly deferred as Hydra-parity work that is not required for public v1
 - video-derived feature extraction is present in the shipped path (`v.luma`, `v.flux`, `v.edge` or a consciously narrowed equivalent)
@@ -670,9 +670,9 @@ Public/professional `M6 — Deploy` stays blocked until all of the following are
 For a fresh session handoff, the completion sequence is now:
 
 1. Treat the video-first correction pass from §10.4 as complete enough for staging; do not reopen it as a vague blocker.
-2. Run the quality sprint in two visible slices: video look engine first, then audio DSP palette and gain staging.
+2. Run the quality sprint in two visible slices: video look-engine tuning first, then the remaining granulator-first audio work and gain staging.
 3. For video, implement bloom pyramid/LUT-look/authored feedback-displacement presets/quality tiers before adding more abstract operators.
-4. For audio, implement granular/FM-self-mod/upgraded wavefolding and level discipline before treating the current sound as release-ready.
+4. For audio, complete the remaining public `feedback delay` surface, keep the granulator benchmark-grade under QA, and finish the real listening/latency/manual sign-off gates before treating the current sound as release-ready.
 5. Finish the remaining manual audible and visual sign-off cases listed in `qa/reviews/`; update review docs for the new flagship effects.
 6. If that pass finds issues, fix them and rerun the narrowest relevant QA/audit path.
 7. Use Cloudflare Pages as the default staging host unless the user explicitly chooses another target, and deploy through the repo workflow/runbook.
@@ -891,8 +891,8 @@ No GPL/LGPL source from `references/` is copied into `src/`.
 
 ### 14.8 Status
 
-- `planning` (2026-05-22): the reference stack is in-repo and the spec is written.
-- The remaining pre-implementation gate is Marc sign-off on `references/granulator-port-spec.md`.
-- Once that sign-off lands, implementation starts from the sequencing in the reference spec, not from the older multi-engine audio-rack backlog.
+- `in-progress` (2026-05-24): the reference stack is in-repo, the spec is written, and the granulator implementation is materially underway.
+- Landed already: grain-buffer decode path, clip-derived fps plumbing, app-owned `mode` / `envelope`, preset recall, LFO-bank targeting, per-channel MIDI pitch routing, Hermite auto-dispatch, listening-pack generation, latency-proxy harness, true-peak gate fix, the public feedback-delay card, the shared-feedback app wiring, and the final removal of the legacy rack from the mounted Audio tab.
+- Remaining release-track work is no longer "start implementation." It is the narrower closure set captured in `todo.md`: the 4-hour soak confirmation, reference-hardware CPU re-measurement, D3 listening verdicts, D4 real loopback latency run, and final staging/public sign-off.
 
 ---

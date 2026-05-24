@@ -20,6 +20,7 @@ import {
   GRANULATOR_MODES,
 } from '../audio/granulator';
 import type { GranulatorSliderParam } from '../audio/granulator-params';
+import type { FeedbackDelayParamName } from '../audio/feedback-delay-params';
 import { TAU, clamp01, ease, lerp } from '../lib/math';
 import type {
   PresentationLensDirtName,
@@ -62,8 +63,11 @@ export type GranulatorProgramState = Partial<Record<GranulatorSliderParam, numbe
   mode?: GranulatorMode;
 };
 
+export type FeedbackDelayProgramState = Partial<Record<FeedbackDelayParamName, number>>;
+
 export interface VideoEffectProgramAudio {
   granulator?: GranulatorProgramState;
+  feedbackDelay?: FeedbackDelayProgramState;
 }
 
 export interface VideoEffectProgram {
@@ -280,6 +284,7 @@ export interface ApplyProgramAudioHandlers {
   setGranulatorParam?: (name: GranulatorSliderParam, value: number) => void;
   setGranulatorEnvelope?: (value: GranulatorEnvelope) => void;
   setGranulatorMode?: (value: GranulatorMode) => void;
+  setFeedbackDelayParam?: (name: FeedbackDelayParamName, value: number) => void;
 }
 
 export function applyProgramAudio(
@@ -303,6 +308,13 @@ export function applyProgramAudio(
     }
     if (typeof value === 'number' && Number.isFinite(value)) {
       handlers.setGranulatorParam?.(name as GranulatorSliderParam, value);
+    }
+  }
+  const feedbackDelay = program.audio?.feedbackDelay;
+  if (!feedbackDelay) return;
+  for (const [name, value] of Object.entries(feedbackDelay)) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      handlers.setFeedbackDelayParam?.(name as FeedbackDelayParamName, value);
     }
   }
 }

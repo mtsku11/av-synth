@@ -22,6 +22,11 @@
   import { PlaceholderSource, VideoElementSource } from './video/sources';
   import { SilentSource, VideoElementAudioSource } from './audio/sources';
   import { Granulator, type GranulatorEnvelope, type GranulatorMode } from './audio/granulator';
+  import { FeedbackDelay } from './audio/feedback-delay';
+  import {
+    FEEDBACK_DELAY_DEFAULTS,
+    type FeedbackDelayParamName,
+  } from './audio/feedback-delay-params';
   import { captureMonoFromStream, findOnsetSample } from './audio/latency-probe';
   import {
     GRANULATOR_DEFAULTS,
@@ -39,11 +44,6 @@
     listOps,
     type OperatorInstance,
   } from './core/operators';
-  import {
-    createAudioRackModulation,
-    createAudioRackInstance,
-    type AudioRackInstance,
-  } from './core/audio-rack';
   import {
     BUS_INDICES,
     SOURCE_NODE_ID,
@@ -81,7 +81,7 @@
     orderInstancesByGraph,
   } from './core/patch-chain';
   import { BLEND_OPS } from './ops/blend';
-  import AudioRack from './ui/AudioRack.svelte';
+  import FeedbackDelayCard from './ui/FeedbackDelayCard.svelte';
   import GranulatorCard from './ui/GranulatorCard.svelte';
   import MasterMeter from './ui/MasterMeter.svelte';
   import LfoBank from './ui/LfoBank.svelte';
@@ -99,7 +99,6 @@
   let renderer: VideoRenderer | null = null;
   let initError = $state<string | null>(null);
   let instances = $state<OperatorInstance[]>([]);
-  let audioRackInstances = $state<AudioRackInstance[]>([]);
   let sourceLoaded = $state(false);
   let loadedVideoName = $state<string | null>(null);
   let programs = $state<VideoEffectProgramBank>({});
@@ -124,7 +123,11 @@
   let granulatorEnabled = $state(false);
   let granulatorEnvelope = $state<GranulatorEnvelope>('hann');
   let granulatorMode = $state<GranulatorMode>('classic');
-  let granulatorDisconnect: (() => void) | null = null;
+  let feedbackDelay: FeedbackDelay | null = null;
+  let feedbackDelayDisconnect: (() => void) | null = null;
+  let feedbackDelayParams = $state<Record<FeedbackDelayParamName, number>>({
+    ...FEEDBACK_DELAY_DEFAULTS,
+  });
   let midiRouter = $state<MidiRouter | null>(null);
   let webMidiInput: WebMidiInput | null = null;
   let midiDevices = $state<readonly WebMidiDevice[]>([]);
@@ -290,6 +293,7 @@
     setSourceParam(paramId: string, value: number): Promise<boolean>;
     applyProgram(name: string): Promise<boolean>;
     setGranulatorParam(name: string, value: number): Promise<boolean>;
+    setFeedbackDelayParam(name: string, value: number): Promise<boolean>;
     getAudioContext(): AudioContext | null;
     isGrainDecoded(): boolean;
     ensureGrainAudioLoaded(): Promise<boolean>;
@@ -871,6 +875,9 @@
     const instance = instances.find((candidate) => candidate.id === instanceId);
     if (!instance) return;
     instance.params[paramId] = value;
+    if (instance.def.op === 'feedback' && paramId === 'feedback') {
+      setFeedbackDelayParam('feedback', value, { syncVideo: false, clearProgram: false });
+    }
     instances = [...instances];
     graph.syncParams(instances);
     activeProgram = null;
@@ -898,25 +905,69 @@
     activeProgram = null;
   }
 
-  function setAudioRackParamValue(instanceId: string, paramId: string, value: number): void {
-    const instance = audioRackInstances.find((candidate) => candidate.id === instanceId);
-    if (!instance) return;
-    instance.params[paramId] = value;
-    audioRackInstances = [...audioRackInstances];
+  function syncSharedFeedbackToVideoChain(sharedValue: number): void {
+    let changed = false;
+    for (const instance of instances) {
+      if (instance.def.op !== 'feedback') continue;
+      const range = instance.def.coupling.params.feedback?.spec.range ?? [0, 0.95];
+      const next = Math.max(range[0], Math.min(range[1], sharedValue));
+      if (instance.params.feedback === next) continue;
+      instance.params.feedback = next;
+      changed = true;
+    }
+    if (!changed) return;
+    instances = [...instances];
+    graph.syncParams(instances);
   }
 
-  function setAudioRackParamLfo(
-    instanceId: string,
-    paramId: string,
-    lfoIndex: number | null,
+  function syncSharedFeedbackFromVideoChain(): void {
+    let sawFeedback = false;
+    let next = 0;
+    for (const instance of instances) {
+      if (instance.def.op !== 'feedback') continue;
+      sawFeedback = true;
+      next = Math.max(next, instance.params.feedback ?? 0);
+    }
+    if (!sawFeedback) return;
+    setFeedbackDelayParam('feedback', next, { syncVideo: false, clearProgram: false });
+  }
+
+  function applyFeedbackDelayParam(
+    target: FeedbackDelay | null,
+    name: FeedbackDelayParamName,
+    value: number,
   ): void {
-    const instance = audioRackInstances.find((candidate) => candidate.id === instanceId);
-    if (!instance) return;
-    const assignment = instance.lfoAssignments[paramId];
-    if (!assignment) return;
-    assignment.lfoIndex = lfoIndex;
-    audioRackInstances = [...audioRackInstances];
-    activeProgram = null;
+    if (!target) return;
+    switch (name) {
+      case 'time':
+        target.setTime(value);
+        return;
+      case 'feedback':
+        target.setFeedback(value);
+        return;
+      case 'damping':
+        target.setDamping(value);
+        return;
+      case 'cross':
+        target.setCross(value);
+        return;
+      case 'mix':
+        target.setMix(value);
+        return;
+    }
+  }
+
+  function setFeedbackDelayParam(
+    name: FeedbackDelayParamName,
+    value: number,
+    options: { syncVideo?: boolean; clearProgram?: boolean } = {},
+  ): void {
+    feedbackDelayParams = { ...feedbackDelayParams, [name]: value };
+    applyFeedbackDelayParam(feedbackDelay, name, value);
+    if (name === 'feedback' && options.syncVideo !== false) {
+      syncSharedFeedbackToVideoChain(value);
+    }
+    if (options.clearProgram !== false) activeProgram = null;
   }
 
   function setGranulatorParam(name: GranulatorSliderParam, value: number): void {
@@ -1113,80 +1164,6 @@
     activeProgram = null;
   }
 
-  function onAddAudioRackEngine(engineId: string): void {
-    if (!engineId) return;
-    audioRackInstances = [...audioRackInstances, createAudioRackInstance(engineId)];
-  }
-
-  function onAddAudioRackModulation(instanceId: string): void {
-    const instance = audioRackInstances.find((candidate) => candidate.id === instanceId);
-    if (!instance) return;
-    instance.modulations = [...instance.modulations, createAudioRackModulation(instance)];
-    audioRackInstances = [...audioRackInstances];
-  }
-
-  function setAudioRackModulationSource(
-    instanceId: string,
-    modulationId: string,
-    source: 'v.luma' | 'v.flux' | 'v.edge',
-  ): void {
-    const instance = audioRackInstances.find((candidate) => candidate.id === instanceId);
-    const modulation = instance?.modulations.find((candidate) => candidate.id === modulationId);
-    if (!instance || !modulation) return;
-    modulation.source = source;
-    audioRackInstances = [...audioRackInstances];
-  }
-
-  function setAudioRackModulationTarget(
-    instanceId: string,
-    modulationId: string,
-    target: string,
-  ): void {
-    const instance = audioRackInstances.find((candidate) => candidate.id === instanceId);
-    const modulation = instance?.modulations.find((candidate) => candidate.id === modulationId);
-    if (!instance || !modulation || !target) return;
-    modulation.target = target;
-    audioRackInstances = [...audioRackInstances];
-  }
-
-  function setAudioRackModulationAmount(
-    instanceId: string,
-    modulationId: string,
-    amount: number,
-  ): void {
-    const instance = audioRackInstances.find((candidate) => candidate.id === instanceId);
-    const modulation = instance?.modulations.find((candidate) => candidate.id === modulationId);
-    if (!instance || !modulation) return;
-    modulation.amount = amount;
-    audioRackInstances = [...audioRackInstances];
-  }
-
-  function onRemoveAudioRackModulation(instanceId: string, modulationId: string): void {
-    const instance = audioRackInstances.find((candidate) => candidate.id === instanceId);
-    if (!instance) return;
-    instance.modulations = instance.modulations.filter(
-      (candidate) => candidate.id !== modulationId,
-    );
-    audioRackInstances = [...audioRackInstances];
-  }
-
-  function onMoveAudioRackEngine(id: string, direction: -1 | 1): void {
-    const index = audioRackInstances.findIndex((instance) => instance.id === id);
-    const nextIndex = index + direction;
-    if (index < 0 || nextIndex < 0 || nextIndex >= audioRackInstances.length) return;
-    const next = [...audioRackInstances];
-    const [moved] = next.splice(index, 1);
-    next.splice(nextIndex, 0, moved!);
-    audioRackInstances = next;
-  }
-
-  function onRemoveAudioRackEngine(id: string): void {
-    const instance = audioRackInstances.find((candidate) => candidate.id === id);
-    if (!instance) return;
-    instance.audioStage?.dispose();
-    audioRackInstances = audioRackInstances.filter((candidate) => candidate.id !== id);
-  }
-
   function findPatchNode(op: string, opIndex = 0) {
     return graphNodes.filter((node) => node.op === op)[opIndex] ?? null;
   }
@@ -1276,6 +1253,12 @@
         if (!granulator) return false;
         setGranulatorParam(name as GranulatorSliderParam, value);
         granulator.setParam(name as GranulatorSliderParam, value);
+        await tick();
+        return true;
+      },
+      setFeedbackDelayParam: async (name, value) => {
+        if (!feedbackDelay) return false;
+        setFeedbackDelayParam(name as FeedbackDelayParamName, value);
         await tick();
         return true;
       },
@@ -1597,8 +1580,11 @@
     if (granulator) return;
     try {
       const g = await Granulator.create(audio.ctx);
+      const delay = new FeedbackDelay(audio.ctx, feedbackDelayParams);
       granulator = g;
-      granulatorDisconnect = audio.attachAuxiliarySource(g.output);
+      feedbackDelay = delay;
+      g.output.connect(delay.input);
+      feedbackDelayDisconnect = audio.attachAuxiliarySource(delay.output);
       g.setEnabled(granulatorEnabled);
       g.setEnvelope(granulatorEnvelope);
       g.setMode(granulatorMode);
@@ -1607,6 +1593,12 @@
         number,
       ][]) {
         g.setParam(name, value);
+      }
+      for (const [name, value] of Object.entries(feedbackDelayParams) as [
+        FeedbackDelayParamName,
+        number,
+      ][]) {
+        applyFeedbackDelayParam(delay, name, value);
       }
       midiRouter = new MidiRouter(g);
     } catch (e) {
@@ -1851,6 +1843,7 @@
     instances = nextInstances;
     applyProgramGraph(program, instances);
     applyProgram(program, instances);
+    syncSharedFeedbackFromVideoChain();
     applyProgramAudio(program, {
       setGranulatorParam: (name, value) => {
         setGranulatorParam(name, value);
@@ -1858,6 +1851,8 @@
       },
       setGranulatorEnvelope: (value) => setGranulatorEnvelope(value),
       setGranulatorMode: (value) => setGranulatorMode(value),
+      setFeedbackDelayParam: (name, value) =>
+        setFeedbackDelayParam(name, value, { clearProgram: false }),
     });
     applyActiveProgramAutomation(program);
     applyProgramRenderStyle(program.render);
@@ -1964,6 +1959,13 @@
   function onAddPatchNode(op: string): void {
     if (!renderer) return;
     const instance = createInstance(op, renderer.gl);
+    if (instance.def.op === 'feedback') {
+      const range = instance.def.coupling.params.feedback?.spec.range ?? [0, 0.95];
+      instance.params.feedback = Math.max(
+        range[0],
+        Math.min(range[1], feedbackDelayParams.feedback),
+      );
+    }
     instances = [...instances, instance];
     syncSerialGraph(instances);
     if ((instance.def.inputArity ?? 1) > 1) {
@@ -1976,9 +1978,11 @@
     if (!renderer) return;
     const instance = instances.find((candidate) => candidate.id === id);
     if (!instance) return;
+    const removedFeedback = instance.def.op === 'feedback';
     disposeInstance(instance, renderer.gl);
     instances = instances.filter((candidate) => candidate.id !== id);
     syncSerialGraph(instances);
+    if (removedFeedback) syncSharedFeedbackFromVideoChain();
     activeProgram = null;
   }
 
@@ -2059,11 +2063,6 @@
     audio.setPlan(graphPlan);
   });
 
-  $effect(() => {
-    if (!audio.isInitialised) return;
-    audio.setAudioRack(audioRackInstances);
-  });
-
   onDestroy(() => {
     stopVideoFeatureSampling();
     captureStream?.getTracks().forEach((track) => track.stop());
@@ -2084,8 +2083,10 @@
     grainBuffer = null;
     grainScheduler?.dispose();
     grainScheduler = null;
-    granulatorDisconnect?.();
-    granulatorDisconnect = null;
+    feedbackDelayDisconnect?.();
+    feedbackDelayDisconnect = null;
+    feedbackDelay?.dispose();
+    feedbackDelay = null;
     granulator?.dispose();
     granulator = null;
     renderer?.dispose();
@@ -2095,7 +2096,6 @@
   async function onStart() {
     await audio.init();
     audio.setPlan(graphPlan);
-    audio.setAudioRack(audioRackInstances);
     await ensureGranulatorPipeline();
 
     // Audio side of the active source needs the AudioContext, so wire it now
@@ -2162,7 +2162,6 @@
     if (!audio.isInitialised) {
       await audio.init();
       audio.setPlan(graphPlan);
-      audio.setAudioRack(audioRackInstances);
     }
     await ensureGranulatorPipeline();
     void loadClipIntoGranulator(file);
@@ -2183,10 +2182,7 @@
   <header class="topbar">
     <div class="brand">
       <h1>av-synth</h1>
-      <span class="boot"
-        >M5.7 · {instances.length} ops · {audioRackInstances.length} audio engines · source:
-        {sourceBadge}</span
-      >
+      <span class="boot">M5.7 · {instances.length} ops · source: {sourceBadge}</span>
       <span class="cursor" aria-hidden="true">█</span>
     </div>
     <div class="stage-controls">
@@ -2386,27 +2382,7 @@
             onSetParam={setGranulatorParam}
             onSetParamLfo={setGranulatorParamLfo}
           />
-          <details>
-            <summary>internal legacy audio rack</summary>
-            <p>
-              Public audio is parked on granulator + master limiter during this sprint. The legacy
-              rack remains here only as internal scaffolding.
-            </p>
-            <AudioRack
-              instances={audioRackInstances}
-              lfoBank={clock.lfoBank}
-              onAddEngine={onAddAudioRackEngine}
-              onAddModulation={onAddAudioRackModulation}
-              onMove={onMoveAudioRackEngine}
-              onRemove={onRemoveAudioRackEngine}
-              onRemoveModulation={onRemoveAudioRackModulation}
-              onSetParam={setAudioRackParamValue}
-              onSetParamLfo={setAudioRackParamLfo}
-              onSetModulationAmount={setAudioRackModulationAmount}
-              onSetModulationSource={setAudioRackModulationSource}
-              onSetModulationTarget={setAudioRackModulationTarget}
-            />
-          </details>
+          <FeedbackDelayCard values={feedbackDelayParams} onSetParam={setFeedbackDelayParam} />
         {:else if activeWorkspaceSurface === 'lfo'}
           <LfoBank
             bank={clock.lfoBank}

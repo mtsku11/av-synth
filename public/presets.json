@@ -718,6 +718,13 @@
       "posterize.gamma": 0.94
     },
     "audio": {
+      "feedbackDelay": {
+        "time": 0.28,
+        "feedback": 0.78,
+        "damping": 6200,
+        "cross": 0.7853981634,
+        "mix": 0.38
+      },
       "granulator": {
         "envelope": "hann",
         "mode": "cloud",
@@ -761,6 +768,15 @@
       "chromaShift.amount": 0.0,
       "posterize.bins": 64,
       "posterize.gamma": 1.0
+    },
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.18,
+        "feedback": 0.0,
+        "damping": 6000,
+        "cross": 0.0,
+        "mix": 0.0
+      }
     }
   }
 }

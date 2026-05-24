@@ -1908,3 +1908,23 @@ Why this shape: the listening gate is human, but the expensive part to keep repr
 **D4 is deliberately split into a proxy and a real loopback path.** `measureGranulatorLatencyProxy()` uses the app's internal post-limit capture stream plus a same-path marker pulse to measure marker-to-grain delta without the capture-buffer bias that broke the first version of the harness. The Playwright spec `qa/e2e/d4-midi-latency-proxy.spec.ts` now runs via `npm run qa:granulator:latency` and measured **2.993 ms** on this host. That is useful regression protection, but it is not the final release gate.
 
 Why the split: browser-only measurement can tell us whether the routed note-on path regressed beyond one audio block, but it cannot substitute for a real physical output/input check. The hardware-facing path therefore stays explicit: `window.__AV_SYNTH_QA__.fireGranulatorLatencyProbe()` emits a marker click and the same routed note event for an external loopback/scope recording. The proxy keeps CI/local refactors honest; the manual loopback run is still the thing that closes gate #3.
+
+## 2026-05-24 — Backlog normalization after the granulator takeover
+
+`todo.md` had drifted into an ambiguous mix of live blockers and historical unchecked provenance. Chosen cleanup policy: keep the old `M0`–`M5.9` ladders for build history, but stop treating their unchecked boxes as the active backlog by default. The live release path is now documented explicitly at the top of `todo.md` (`Live release blockers`) and in the updated `plan.md` release-track language.
+
+The practical effect is important: "finish everything" no longer means resurrecting bootstrap-era boxes like `git init`, nor does it imply the older FM/self-mod/wavefolding quality sprint as a public-audio requirement. The real remaining release-track work is the granulator-first closure set: public feedback-delay surface, 4-hour soak confirmation, reference-hardware CPU re-measurement, D3/D4 human-hardware sign-offs, final manual audible sign-off, and staging deploy validation.
+
+## 2026-05-24 — C1/C2/C3 landed (feedback-delay public surface + shared AV feedback + rack unmount)
+
+The public Audio tab now matches the written product direction instead of implying "granulator first, plus maybe the old rack." `App.svelte` mounts `MasterMeter`, `GranulatorCard`, and new `FeedbackDelayCard` only. `src/ui/AudioRack.svelte` and `src/core/audio-rack.ts` remain in-repo as internal scaffolding, but the shell no longer mounts them or feeds them lifecycle state.
+
+The granulator branch is now wired through the real `FeedbackDelay` module rather than the old `feedback-freeze` worklet path. Chosen topology: `granulator.output -> FeedbackDelay.input -> AudioEngine.attachAuxiliarySource(delay.output) -> master -> limiter`. This keeps the spec's "after the granulator, before the master limiter" contract literal without reopening `AudioEngine` internals.
+
+The shared-feedback law is enforced at the app layer, not by adding a new renderer coupling channel. Chosen policy:
+- the public feedback-delay card owns the shared value on the audio side
+- changing that card updates every mounted video `feedback` operator's `feedback` param (clamped to the operator's range)
+- editing a video `feedback` node pushes the same value back into the card
+- program recall can now set `audio.feedbackDelay.*`, and if `audio.feedbackDelay.feedback` is present it becomes the canonical shared value
+
+Why this shape: the renderer already resolves its history-polish feedback amount by scanning video `feedback` instances. Synchronising those instance params keeps the defining AV identity honest without introducing a second partially-overlapping feedback scalar in `CouplingContext` during the release sprint.

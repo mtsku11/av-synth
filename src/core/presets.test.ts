@@ -220,11 +220,15 @@ describe('applyProgramAudio', () => {
   it('routes every granulator value through the callback', () => {
     const calls: string[] = [];
     applyProgramAudio(
-      program({ granulator: { density: 35, duration: 70, gain: 0.55, envelope: 'hann', mode: 'cloud' } }),
+      program({
+        granulator: { density: 35, duration: 70, gain: 0.55, envelope: 'hann', mode: 'cloud' },
+        feedbackDelay: { time: 0.28, feedback: 0.78, mix: 0.42 },
+      }),
       {
         setGranulatorParam: (name, value) => calls.push(`${name}:${value}`),
         setGranulatorEnvelope: (value) => calls.push(`envelope:${value}`),
         setGranulatorMode: (value) => calls.push(`mode:${value}`),
+        setFeedbackDelayParam: (name, value) => calls.push(`delay-${name}:${value}`),
       },
     );
     expect(calls).toEqual([
@@ -233,6 +237,9 @@ describe('applyProgramAudio', () => {
       'gain:0.55',
       'envelope:hann',
       'mode:cloud',
+      'delay-time:0.28',
+      'delay-feedback:0.78',
+      'delay-mix:0.42',
     ]);
   });
 

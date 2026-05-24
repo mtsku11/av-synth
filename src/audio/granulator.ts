@@ -3,8 +3,8 @@
 // Spec: references/granulator-port-spec.md. Implements the full 14-control surface (§6) plus
 // internal `gain`. Envelope and mode are exposed as string-typed helpers — internally they
 // reach the worklet as integer AudioParam values to stay on the k-rate fast path. The wrapper
-// is not yet routed through AudioEngine's master chain; the caller connects `output`
-// explicitly until UI / engine wiring lands in a later spec sequencing step.
+// still exposes a raw `output` node; the caller owns whether that output goes straight to the
+// master bus or through an intermediate post-effect such as the shared feedback delay.
 
 import { ensureAudioWorklets } from './worklets';
 import type { MidiChannel } from '../core/midi';
