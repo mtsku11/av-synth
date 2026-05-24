@@ -52,7 +52,7 @@ void main() {
   vec2 jitter2 = hash22(seed + 13.7) - 0.5;
 
   float activeThreshold = mix(0.93, 0.18, densityNorm);
-  float active = step(hash21(seed + 7.1), activeThreshold);
+  float gateMask = step(hash21(seed + 7.1), activeThreshold);
   float reverseMask = step(hash21(seed + 29.7), clamp(u_reverse, 0.0, 1.0));
   vec2 mirror = mix(vec2(1.0), vec2(-1.0, 1.0), reverseMask);
 
@@ -68,7 +68,7 @@ void main() {
   float shapeNorm = clamp(u_shape, 0.0, 1.0);
   float windowRadius = mix(0.98, 0.34, shapeNorm);
   float edge = max(abs(local.x * mirror.x), abs(local.y));
-  float window = (1.0 - smoothstep(windowRadius, 1.0, edge * 2.0)) * active;
+  float window = (1.0 - smoothstep(windowRadius, 1.0, edge * 2.0)) * gateMask;
 
   vec2 drift = jitter2 * cellSize * mix(0.1, 0.85, abs(u_pitch));
   vec2 sampleR = clamp(heldUv - spreadOffset + drift, vec2(0.0), vec2(1.0));
