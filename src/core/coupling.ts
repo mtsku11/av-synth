@@ -7,11 +7,26 @@
 // "Coupling principle".
 
 import type { ParamSpec } from './params';
+import type { GlobalLfo } from './mod-bank';
 
 export const COLOR_BAND_CROSSOVERS_HZ = {
   lowMid: 300,
   midHigh: 3000,
 } as const;
+
+export interface VideoFeatureState {
+  available: boolean;
+  luma: number;
+  flux: number;
+  edge: number;
+}
+
+export const EMPTY_VIDEO_FEATURES: VideoFeatureState = {
+  available: false,
+  luma: 0,
+  flux: 0,
+  edge: 0,
+};
 
 export interface CouplingContext {
   /** Hz per cycle-per-screen, per plan.md §0. Default 1. */
@@ -31,6 +46,10 @@ export interface CouplingContext {
    * `.fast(n)` overrides (M3) take precedence over this when present.
    */
   rate: number;
+  /** Shared public modulation bank. Parameters can opt into one of these six LFOs. */
+  lfoBank: readonly GlobalLfo[];
+  /** Low-rate feature signals sampled from the active video input. */
+  videoFeatures: VideoFeatureState;
 }
 
 export interface ParamCoupling {

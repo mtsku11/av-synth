@@ -1,9 +1,20 @@
+// saturate — HSV saturation (video) + harmonic soft-saturator (audio).
+//
+// Audio analogue (2026-05-19 reassignment): asymmetric soft-clip waveshaper.
+// `amount` drives a pre-gain into a fixed asymmetric tanh-shaped curve, so
+// amount=0 → silence (matches grayscale on video), amount=1 → near-identity
+// for typical signal levels (matches the video identity), amount>1 → harder
+// saturation with both odd and small-even harmonic content (matches the
+// "vivid" / oversaturated look on video). Differs from `contrast`: contrast
+// keeps a normalised unity-peak tanh (dynamics-oriented, no level change),
+// `saturate` is un-normalised so the perceived loudness rises with the
+// harmonic content (timbre-oriented), mirroring how video saturation makes
+// colour read more intensely without changing the geometry of the image.
+
 import frag from '../video/shaders/saturate.frag?raw';
 import type { OperatorDef, VideoStage, AudioStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
-
-const MS = 1 / Math.SQRT2;
 
 class SaturateVideoStage implements VideoStage {
   readonly op = 'saturate';
@@ -31,21 +42,34 @@ class SaturateVideoStage implements VideoStage {
   }
 }
 
+// Curve generation runs once at construction. The shape is
+// f(x) = tanh(x) + 0.15·(1 − tanh(x)²)·x, an asymmetric soft-clip:
+// • symmetric tanh → odd harmonics (the dominant saturator character)
+// • the second term tilts the curve slightly so positive/negative excursions
+//   are not exactly mirrored → small even-harmonic content (the "tube" tilt)
+// At |x| ≤ 0.3 (most signals at typical operating levels) the curve is within
+// 1% of identity, so drive≈1 sounds clean; pushing drive >1 then engages the
+// nonlinearity progressively.
+function makeSaturateCurve(): Float32Array {
+  const N = 1024;
+  const curve = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const x = -1 + (2 * i) / (N - 1);
+    const sym = Math.tanh(x);
+    const asym = 0.15 * (1 - sym * sym) * x;
+    curve[i] = sym + asym;
+  }
+  return curve;
+}
+
 class SaturateAudioStage implements AudioStage {
   readonly op = 'saturate';
   readonly input: GainNode;
-  readonly output: ChannelMergerNode;
-  readonly #splitter: ChannelSplitterNode;
-  readonly #mid: GainNode;
-  readonly #side: GainNode;
-  readonly #midFromL: GainNode;
-  readonly #midFromR: GainNode;
-  readonly #sideFromL: GainNode;
-  readonly #sideFromR: GainNode;
-  readonly #midToL: GainNode;
-  readonly #midToR: GainNode;
-  readonly #sideToL: GainNode;
-  readonly #sideToR: GainNode;
+  readonly output: GainNode;
+  readonly #drive: GainNode;
+  readonly #shaper: WaveShaperNode;
+  readonly #toneFilter: BiquadFilterNode;
+  readonly #compensate: GainNode;
 
   constructor(ctx: AudioContext) {
     this.input = ctx.createGain();
@@ -53,69 +77,48 @@ class SaturateAudioStage implements AudioStage {
     this.input.channelCountMode = 'explicit';
     this.input.channelInterpretation = 'speakers';
 
-    this.#splitter = ctx.createChannelSplitter(2);
-    this.output = ctx.createChannelMerger(2);
-    this.#mid = ctx.createGain();
-    this.#side = ctx.createGain();
+    this.#drive = ctx.createGain();
+    this.#drive.gain.value = 1;
 
-    this.#midFromL = ctx.createGain();
-    this.#midFromL.gain.value = MS;
-    this.#midFromR = ctx.createGain();
-    this.#midFromR.gain.value = MS;
-    this.#sideFromL = ctx.createGain();
-    this.#sideFromL.gain.value = MS;
-    this.#sideFromR = ctx.createGain();
-    this.#sideFromR.gain.value = -MS;
-    this.#midToL = ctx.createGain();
-    this.#midToL.gain.value = MS;
-    this.#midToR = ctx.createGain();
-    this.#midToR.gain.value = MS;
-    this.#sideToL = ctx.createGain();
-    this.#sideToR = ctx.createGain();
+    this.#shaper = ctx.createWaveShaper();
+    this.#shaper.curve = makeSaturateCurve() as Float32Array<ArrayBuffer>;
+    this.#shaper.oversample = '2x';
+    this.#toneFilter = ctx.createBiquadFilter();
+    this.#toneFilter.type = 'lowpass';
+    this.#toneFilter.frequency.value = 18000;
+    this.#toneFilter.Q.value = 0.0001;
+    this.#compensate = ctx.createGain();
+    this.#compensate.gain.value = 1;
 
-    this.input.connect(this.#splitter);
-    this.#splitter.connect(this.#midFromL, 0);
-    this.#splitter.connect(this.#midFromR, 1);
-    this.#splitter.connect(this.#sideFromL, 0);
-    this.#splitter.connect(this.#sideFromR, 1);
+    this.output = ctx.createGain();
+    this.output.gain.value = 1;
 
-    this.#midFromL.connect(this.#mid);
-    this.#midFromR.connect(this.#mid);
-    this.#sideFromL.connect(this.#side);
-    this.#sideFromR.connect(this.#side);
-
-    this.#mid.connect(this.#midToL).connect(this.output, 0, 0);
-    this.#mid.connect(this.#midToR).connect(this.output, 0, 1);
-    this.#side.connect(this.#sideToL).connect(this.output, 0, 0);
-    this.#side.connect(this.#sideToR).connect(this.output, 0, 1);
-
-    this.#setWidth(1);
-  }
-
-  #setWidth(amount: number): void {
-    const now = this.output.context.currentTime;
-    const width = Math.max(0, amount);
-    this.#sideToL.gain.setTargetAtTime(MS * width, now, 0.02);
-    this.#sideToR.gain.setTargetAtTime(-MS * width, now, 0.02);
+    this.input.connect(this.#drive);
+    this.#drive.connect(this.#shaper);
+    this.#shaper.connect(this.#toneFilter);
+    this.#toneFilter.connect(this.#compensate);
+    this.#compensate.connect(this.output);
   }
 
   setParams(params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {
-    this.#setWidth(params['amount'] ?? 1);
+    const amount = Math.max(0, params['amount'] ?? 1);
+    const heat = Math.max(0, amount - 1);
+    const now = this.#drive.context.currentTime;
+    this.#drive.gain.setTargetAtTime(amount, now, 0.02);
+    this.#toneFilter.frequency.setTargetAtTime(
+      Math.max(1200, 18000 / (1 + heat * heat * 0.4)),
+      now,
+      0.03,
+    );
+    this.#compensate.gain.setTargetAtTime(1 / (1 + heat * 0.28), now, 0.03);
   }
 
   dispose(): void {
     this.input.disconnect();
-    this.#splitter.disconnect();
-    this.#mid.disconnect();
-    this.#side.disconnect();
-    this.#midFromL.disconnect();
-    this.#midFromR.disconnect();
-    this.#sideFromL.disconnect();
-    this.#sideFromR.disconnect();
-    this.#midToL.disconnect();
-    this.#midToR.disconnect();
-    this.#sideToL.disconnect();
-    this.#sideToR.disconnect();
+    this.#drive.disconnect();
+    this.#shaper.disconnect();
+    this.#toneFilter.disconnect();
+    this.#compensate.disconnect();
     this.output.disconnect();
   }
 }
@@ -136,7 +139,7 @@ export const saturateDef: OperatorDef = {
           default: 1,
           curve: 'lin',
           unit: 'ratio',
-          hint: 'HSV saturation multiplier (video) / stereo width multiplier (audio)',
+          hint: 'HSV saturation multiplier (video) / harmonic saturator drive (audio)',
         },
         toVideo: (raw) => raw,
         toAudio: (raw) => raw,

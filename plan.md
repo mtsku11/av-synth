@@ -22,6 +22,31 @@ Time is the second axis:
 
 ---
 
+## 0a. Product redirect (2026-05-21) — granulator-first instrument
+
+The product direction has been narrowed. av-synth is now a **dual-domain granulation instrument with an HD video FX rack**, not a one-to-one Hydra mirror.
+
+- The **core engine** is a shared-playhead granulator that scrubs a loaded video clip's **audio buffer** and its **frame texture ring** in lockstep. One grain event triggers an audio grain and a video grain with the same position, pitch, duration, envelope, and jitter. Spec lives in §14.
+- The **audio user-facing surface collapses** to: granulator + feedback delay + master limiter. Nothing else. The granulator must be *really good* — M4L MPE Granulator II is the quality benchmark.
+- The **video user-facing surface stays Hydra-shaped**: §1–§7 (sources, geometry, color, blend, modulate, output, sequence) remain valid as the **post-granulation FX rack** that runs after the video grain engine. They are no longer paired with audio analogues.
+- The **"every Hydra op has an audio twin"** principle from the original framing is **retired**. §1–§5 audio-analogue tables are kept in this document as *design rationale and modulation law reference*, not as a build target. Only the granulator and feedback delay are shipped audio operators.
+- The **global LFO bank** and **MIDI input** are the AV coupling fabric. Slow modulation runs through LFOs; per-grain triggers run through MIDI. Both drive both domains.
+- **WebGPU + Electron desktop phase (§13)** is unchanged. The video grain engine is feasible on WebGL2 for the web build; WebGPU's compute shaders only become essential when the FX rack reaches TouchDesigner-class effects.
+
+**What changes elsewhere in this doc:**
+- §8 (audio input FFT) is demoted to "analyser tap for video reactivity," not a primary audio operator surface.
+- §10.4 / §10.5 / §10.7 (release tracks) need re-staging around granulator delivery and quality, not Hydra-op completion. The §10.5 audio rack (`grain cloud`, `fold plus`, `freeze smear`, `self mod bus`, `tone focus`, `space duck`, `window replay`) is superseded by §14: the rack collapses to a single granulator engine + feedback delay.
+- §12.4 (`grain` as a planned op) is **promoted and superseded** by §14. It is no longer a future operator; it is the engine.
+- §12.1 / §12.2 / §12.3 / §12.5 (`blur`, `flux`, `selfMod`, `foldPlus`) are **dropped from the shipped audio surface**. `flux` survives as a video-derived modulation feature (still useful as an LFO source).
+
+**What does not change:**
+- The video operator spec (§1–§7) and its math.
+- The coupling-layer architecture in `src/core/coupling.ts` — it still normalises params; it just maps fewer audio targets now.
+- The QA stack (§10.5 / §10.6) — gates still apply, but the operator-family audit gate now applies to the video operator set only, with a parallel granulator-specific quality gate defined in §14.9.
+- The desktop phase (§13).
+
+---
+
 ## 0. Globals
 
 | Token | Hydra | Audio analogue | Coupling |
@@ -132,21 +157,21 @@ Geometry ops act on the input field's domain (UVs). Audio analogue: they act on 
 ### 2.3 `pixelate(pixelX=20, pixelY=20)`
 
 - **Video**: quantise UVs to a grid → spatial downsampling.
-- **Audio analogue**: **decimation / sample-rate reduction**. Holding a sample for `N` frames is the time-domain analogue of holding a UV for `N` pixels.
-  - `pixelX` → decimation factor on L; `pixelY` → on R (or mono = max).
-- **Status**: `todo` (the prototype's `crush` is *posterize*, not pixelate).
+- **Audio analogue**: **windowed resampling / held recent-time slices** on the shipped product path. Coarser image blocks read more convincingly as progressively longer held windows and slower recent-time replay than as naked sample-hold decimation once the effect is stacked with modulation, feedback, and finish passes.
+  - `pixelX` → L-channel window size / replay coarseness; `pixelY` → R-channel window size / replay coarseness.
+- **Status**: `present` (2026-05-21 product remap). The earlier decimation formulation remains a mathematically valid reference, but the live audio path now uses a dedicated windowed-resampling worklet because it yields a stronger block/hold abstraction in practice.
 
 ### 2.4 `repeat(repeatX=3, repeatY=3, offsetX=0, offsetY=0)`
 
 - **Video**: `uv → fract(uv · [repeatX, repeatY] + offset)`.
-- **Audio analogue**: **multi-tap comb filter**. Spatial repetition at period `1/repeatX` ↔ temporal repetition at delay `1/(repeatX · baseFreq) · loopLen`, where `loopLen` is a transport-locked window (default = 1 bar). `repeatX` taps, equal-spaced. `offset` shifts the tap phase.
-- **Status**: `todo`.
+- **Audio analogue**: **recent-time grain slicing / windowed resampling** on the shipped product path. Repeated image tiles read more convincingly as looping short recent-time slices than as a resonator when stacked with other effects. `repeatX/Y` shorten the capture window and raise reseed density; `offsetX/Y` bias slice position and stereo skew.
+- **Status**: `present` (2026-05-21 product remap). The earlier comb-filter formulation remains a mathematically valid reference, but the live audio path now uses deterministic grain slicing because it yields stronger abstract repetition in practice.
 
 ### 2.5 `repeatX(reps=3, offset=0)` / `repeatY(reps=3, offset=0)`
 
 - **Video**: 1-axis tile.
-- **Audio analogue**: comb on left or right channel only (or feedforward vs feedback comb if we treat X as FF and Y as FB).
-- **Status**: `todo`.
+- **Audio analogue**: **axis-biased grain stutter / freeze**. `repeatX` emphasises a left-weighted recent-time slice texture; `repeatY` emphasises a right-weighted freeze/stutter texture. This preserves the directional feel of one-axis repetition without relying on thin comb coloration.
+- **Status**: `present` (2026-05-21 product remap). The earlier feedforward/feedback-comb interpretation is superseded in the release-track audio surface by the stronger axis-biased grain textures.
 
 ### 2.6 `kaleid(nSides=4)`
 
@@ -158,10 +183,10 @@ Geometry ops act on the input field's domain (UVs). Audio analogue: they act on 
 ### 2.7 `scrollX(amount=0.5, speed=0)` / `scrollY(amount=0.5, speed=0)`
 
 - **Video**: translate UVs.
-- **Audio analogue**: **delay-line scrub** (X) and **stereo pan** (Y), or — more rigorously — both axes are *delay-tap position* in a stereo delay matrix.
-  - `amount` → pan position (or fixed delay offset).
-  - `speed` → LFO on the pan/delay (auto-pan, vibrato).
-- **Status**: `todo`.
+- **Audio analogue**: **phase-offset smear / stereo motion** rather than accidental pitch drift. A horizontal image translation is a spatial phase shift, so `scrollX` now uses a fixed fractional-delay branch whose offset depth follows `amount`; `speed` moves that offset layer laterally in stereo instead of modulating the delay time. `scrollY` remains the cleaner stereo-position / auto-pan side of the pair.
+  - `amount` → fixed slip amount / pan position.
+  - `speed` → tap-balance motion or auto-pan rate, not "secret pitch."
+- **Status**: `present` (2026-05-20 refinement, updated same day). The original `scrollX` delay-time scrub was mathematically defensible but read too much like unintended vibrato in product use. The first correction moved to fixed taps; the current implementation tightens that further into a fixed phase-offset branch with stereo motion, so the effect reads as horizontal displacement rather than pitch wobble. `scrollY` remains stereo pan. `audit-scrollX-osc-sweep.json` stays manual on exported audio, but its expected listening target is now phase smear / motion rather than vibrato.
 
 ---
 
@@ -181,13 +206,13 @@ Color ops act on the codomain — values, not coordinates. Audio analogue: they 
 
 - **Video**: hue shift per channel (additive).
 - **Audio analogue**: **per-band single-sideband (SSB) frequency shift**. Split signal into low/mid/high bands, apply Bode-style frequency shift to each by `r/g/b` Hz. `a` → wet/dry of the shifted vs original.
-- **Status**: `present` (video). Audio side is `todo`. Currently the prototype's video shift is RGB *spatial* offset (chromatic aberration), not hue — note discrepancy with full-Hydra `shift`; flag in coupling spec.
+- **Status**: Audio side is `todo`. The video side here describes the **full Hydra `shift`** (hue rotation per channel). The prototype's RGB *spatial-offset* effect (chromatic aberration) has been split off into a separate operator, `chromaShift` — see §3.14. Both ops will coexist in the public surface.
 
 ### 3.3 `invert(amount=1)`
 
 - **Video**: `colour → mix(colour, 1 - colour, amount)`.
 - **Audio analogue**: **phase invert with crossfade**. `s → mix(s, -s, amount)`. Indistinguishable on a single channel but produces nulling on summed channels — the audio version of the inverted-spectrum visual effect appears in M/S mixes.
-- **Status**: `todo`.
+- **Status**: `present` (2026-05-18). Identity at `amount = 0`, full invert at `amount = 1`. Sits in `DEFAULT_CHAIN`. Audited via `audit-invert-video-sweep.json` (manual-only — single-channel invert is inaudible and meanLuma deltas depend on fixture sign).
 
 ### 3.4 `contrast(amount=1.6)`
 
@@ -207,13 +232,13 @@ Color ops act on the codomain — values, not coordinates. Audio analogue: they 
 - **Audio analogue**: **noise gate with soft knee**. `gain = smoothstep(threshold - tolerance, threshold + tolerance, |s|)`.
   - `threshold` → gate threshold in linear amplitude (or dBFS depending on UI).
   - `tolerance` → knee width.
-- **Status**: `todo`.
+- **Status**: `present` (2026-05-18). Ships as `luma(threshold, tolerance, amount)` — a third wet/dry `amount` mix param is added so the op can sit in `DEFAULT_CHAIN` with identity at `amount = 0`. Hydra signature deviation documented in `memory.md` 2026-05-18 entry. The video shader premultiplies rgb by the key so meanLuma actually drops when engaged. Audited via `audit-luma-video-sweep.json` with hard gates on `meanLuma` and exported-WAV `meanVolumeDb`.
 
 ### 3.7 `thresh(threshold=0.5, tolerance=0.04)`
 
 - **Video**: hard threshold to b/w.
 - **Audio analogue**: **Schmitt-trigger / 1-bit comparator** — `s → sign(s − threshold)` with hysteresis `= tolerance`. Generates square-wave from a sinusoid; harmonic-rich.
-- **Status**: `todo`.
+- **Status**: `present` (2026-05-18). Ships as `thresh(threshold, tolerance, amount)` — a third wet/dry `amount` mix param is added so the op can sit in `DEFAULT_CHAIN` with identity at `amount = 0`. Hydra signature deviation documented in `memory.md` 2026-05-18 entry. Audio is a stateless waveshaper comparator; true Schmitt hysteresis is deferred to the M3 worklet pass. Audited via `audit-thresh-osc-sweep.json` with hard gates on `spatialStd` and exported-WAV `spectralCentroidHz`.
 
 ### 3.8 `color(r=1, g=1, b=1, a=1)`
 
@@ -225,32 +250,40 @@ Color ops act on the codomain — values, not coordinates. Audio analogue: they 
 ### 3.9 `saturate(amount=2)`
 
 - **Video**: HSV saturation multiplier.
-- **Audio analogue**: **stereo width** (M/S saturation: `S → S · amount`, clamp). High `saturate` ↔ wide stereo, `0` ↔ mono. Audio "saturation" in the distortion sense is reserved for `contrast`.
-- **Status**: `todo`.
+- **Audio analogue**: **harmonic soft-saturator** (asymmetric waveshaper). `drive = amount`; the curve is `f(x) = tanh(x) + 0.15·(1 − tanh(x)²)·x`, an asymmetric soft-clip combining symmetric tanh (odd harmonics, the main saturator character) with a small even-harmonic tilt (tube-like). At `amount = 0` the pre-gain mutes the signal — matches `grayscale` on video. At `amount = 1` the drive sits in the near-linear region of the curve so it's audibly clean — matches `identity` on video. As `amount` grows past 1 the curve nonlinearity engages progressively and the perceived loudness rises with the new harmonic content — matches `oversaturated / vivid` on video.
+- **Why this differs from `contrast`**: `contrast` is a normalised unity-peak tanh (`tanh(s · amount) / tanh(amount)`) — dynamics-oriented, no level change as you push it. `saturate` is the **un-normalised** soft-clip with even-harmonic tilt — timbre-oriented, level *does* rise as you drive it, and even-harmonic content gives it the warmer "tube" colour that's the audio analogue of vivid colour reading more intensely. Keeping the two operators on different axes (dynamics vs timbre) is the disambiguation; both are tanh-based but solve different problems.
+- **Status**: `present` (2026-05-19). Reassignment from the previous M/S stereo-width implementation (2026-05-16 → 2026-05-19) — see `memory.md` 2026-05-19 entry for the design rationale. Audited via `audit-saturate-video-sweep.json`; QA manualChecks were updated to listen for harmonic richness rather than stereo widening.
 
 ### 3.10 `hue(amount=0.4)`
 
 - **Video**: HSV hue rotation by `amount · 2π`.
-- **Audio analogue**: **constant-interval pitch shift** (preserves harmonic structure, rotates the entire spectrum on a log axis). `pitchRatio = 2^(amount · 12 / 12) = 2^amount` (one octave per unit). Alternative for cheap version: all-pass phase rotation (Hilbert transform with frequency-independent phase shift `amount · 2π`).
-- **Status**: `todo`.
+- **Audio analogue**: **constant-interval pitch shift** (preserves harmonic structure, rotates the entire spectrum on a log axis). `pitchRatio = 2^amount` (one octave per unit, slider unit `oct`). Alternative for cheap version: all-pass phase rotation (Hilbert transform with frequency-independent phase shift `amount · 2π`).
+- **Status**: `present` (2026-05-18). Identity at `amount = 0` (the Hydra invocation default `0.4` will be applied by the M4 live-code adapter; our chain default is `0` so the op sits in `DEFAULT_CHAIN` neutrally). Video uses a hue-rotation matrix; audio reuses the `pitch-shifter` worklet introduced for `scale`. Pitch range clamped to ±1 octave. Audited via `audit-hue-solid-sweep.json` — hard gates are **live-only** (`meanR↓ ≥ 0.2` and `meanG↑ ≥ 0.2` between the 0 and 1/3 holds). The exported-audio side is **manual review only** (downgraded 2026-05-18 same day as initial ship): the solid source measures at the digital noise floor on the exported WAV (~-173 dB), so `zeroCrossingRate` and similar exported-audio metrics are quantisation-noise-driven rather than pitch-driven — the gate sign-flipped between two consecutive runs at identical settings. Same `solid-fixture noise-floor` precedent as `colorama` / `modulate` / `scrollX`; see `memory.md` 2026-05-18 rule entry.
 
 ### 3.11 `colorama(amount=0.005)`
 
-- **Video**: chaotic per-pixel hue swap; visually a colour scramble.
-- **Audio analogue**: **chaotic ring-modulation** — carrier frequency is a Hénon or logistic map iterated each block, `amount` controls the chaotic-parameter regime. Or: per-bin spectral permutation in an FFT processor.
-- **Status**: `todo`.
+- **Video**: chaotic per-pixel hue swap; visually a colour scramble that breathes over time. Each pixel's rotation is `amount · ((xPixel - 0.5) + (xGlobal - 0.5)) · 2π`, where `xPixel` is a logistic-map iteration seeded by a UV hash (spatial decorrelation, static for a pixel) and `xGlobal` is a logistic-map iteration seeded by `0.37` and stepped `floor(ctx.time · 5) + 1` times — the same scalar the audio carrier uses, so the temporal motion is shared. `amount = 0` is identity per pixel, so the op sits in `DEFAULT_CHAIN` neutrally.
+- **Audio analogue**: **chaotic ring-modulation locked to the visual chaos**. Carrier is an `OscillatorNode` whose frequency is recomputed at each k-rate poll as `50 + xGlobal · 300` Hz, where `xGlobal` is the identical scalar the shader's loop produces from `ctx.time`. No free-running audio state — both domains derive their chaos from the same time-driven logistic sequence, which is the AV-coupling guarantee. Wet/dry mix is implemented by feeding `(1 - amount)` as the DC value of a `GainNode` whose `gain` AudioParam additionally receives `carrier × amount` — `amount = 0` is pure passthrough, `amount = 1` is pure ring-mod. Memory.md §11 resolves the map choice as **logistic** (predictable bifurcation, single-state, no worklet needed). Hydra's invocation default `0.005` is left to the M4 live-code adapter.
+- **Status**: `present` (2026-05-18). Audited via `audit-colorama-solid-sweep.json` (hard live `spatialStd` gate ≥ +0.10 on the solid R=1 fixture — the GLSL is fully deterministic per-pixel from the UV hash so the visual scramble is rock-solid). The exported-audio side is **manual review only** because the solid source's exported-WAV spectral baseline jumps significantly across fresh browser sessions (observed centroid baseline 162 Hz → 287 Hz between runs); precedent is `audit-modulate-osc-sweep` and `audit-scrollX-osc-sweep` which also keep their exported-audio sides manual.
 
 ### 3.12 `sum(scale=[1,1,1,1])`
 
 - **Video**: scalar `dot(rgba, scale)`.
-- **Audio analogue**: **channel down-mix**. `mono = dot([L, R, ...], scale)`.
-- **Status**: `todo`.
+- **Audio analogue**: **weighted recombination of the AV-matched analysis channels**. In the shipped product mapping, the same four weights recombine low / mid / high / envelope-contour branches rather than raw stereo channels, so `sum` reads like a true partner to `.r .g .b .a` instead of a generic mono button.
+- **Status**: `present` (2026-05-21). Shipped as a product-facing weighted collapse operator with an added wet/dry `amount` parameter so the node can enter the public serial surface neutrally. On video it mixes the source toward a weighted grayscale/alpha sum of `rgba`; on audio it mixes toward a weighted recombination of the low/mid/high/envelope analysis branches. This is a deliberate product-signature deviation from raw Hydra syntax, for the same reason `luma` and `hue` carry neutral defaults in the shipped chain model.
 
 ### 3.13 Channel accessors `.r .g .b .a`
 
 - **Video**: pick one channel as luminance.
 - **Audio analogue**: **band-split + pick**. Pull one band from the 3-band split and route it forward.
-- **Status**: `todo`.
+- **Status**: `present` (2026-05-20). Implemented as paramless product-facing isolate operators rather than only as syntax sugar in a future live-code layer: `.r` maps to red-channel / low-band isolate, `.g` to green-channel / mid-band isolate, `.b` to blue-channel / high-band isolate, and `.a` to alpha-or-luma matte / envelope-contour isolate. On video they output grayscale-plus-alpha matte branches suitable for downstream `mask` / `layer`; on audio they expose the corresponding band/envelope slice.
+
+### 3.14 `chromaShift(amount=0)` — av-synth original (not in Hydra)
+
+- **Video**: RGB *spatial* offset (chromatic aberration). R and B channels are sampled at small UV offsets from G, producing the red/cyan fringing seen on cheap lens edges. `amount` in `[0, 0.08]` is the UV-fraction magnitude of the per-channel offset.
+- **Audio analogue**: **Haas-style stereo decorrelation** (L-channel micro-delay). L is delayed by `amount · 0.25` seconds (up to 20 ms at `amount = 0.08`); R passes through. This is the temporal analogue of the visual operator's spatial signature: in the video domain you offset colour channels through *space*, in the audio domain you offset stereo channels through *time*. The shared mathematical structure is "delay one of N parallel channels relative to the others", which produces decorrelation in whichever dimension that channel-set spans (R vs G/B in 2D image space ↔ L vs R in 1D time). Below the Haas fusion threshold (~30 ms) the brain still localises to the earlier channel but the timbre/image widens — matching how chromatic aberration widens the perceived edge of an object without breaking object identity.
+- **Why this is canonical, not the §3.2 SSB spec**: an earlier draft of plan.md speculated about an SSB per-band frequency shift for the aberration-style effect. We tried that mapping and rejected it: SSB shift collapses the harmonic structure of the source (every partial moves by the same Hz, destroying the natural geometric ratios between partials) and is audibly violent at any setting beyond a few Hz. The Haas decorrelation matches the *spatial-separation* semantics of the visual effect (R/G/B in different positions ↔ L/R at different times) without destroying the source, and at the amount-range we ship (≤ 20 ms) it sits below the fusion threshold. The fact that the visual side is *spatial decorrelation between channel groups* is the structural fact; SSB shift answers a different question (per-band Hz translation), which would only be right if the video were actually doing hue rotation, which §3.2 covers separately.
+- **Status**: `present` (2026-05-18, mapping ratified 2026-05-19). Audited via `audit-chromaShift-video-sweep.json`. Identity at `amount = 0` (delay → 0, sits in `DEFAULT_CHAIN` neutrally). Possible future upgrade: replace the static delay with a slow LFO-modulated delay for a wide-chorus character; that variation is recorded in `memory.md` as an open follow-up.
 
 ---
 
@@ -292,43 +325,51 @@ The general form, in both domains:
 
 - **Video**: rotate UVs by `multiple · tex.r + offset`.
 - **Audio analogue**: **phase modulation in the M/S domain**. Rotate the M/S vector by `multiple · mod(t) + offset`.
-- **Status**: `todo`.
+- **Status**: `present` (2026-05-20 first shipped slice uses the previous frame as the video modulator and a signal-driven stereo rotation AudioWorklet on the audio side. That is enough to carry self-referential Hydra-style looks such as the Marianne port while the larger external-modulator family remains open.)
 
 ### 5.3 `modulateScale(tex, multiple=1, offset=1)`
 
 - **Video**: scale UVs by `multiple · tex.r + offset`.
 - **Audio analogue**: **modulated time-scale = pitch modulation** = **vibrato** in the small-amount limit. Drive a varispeed resampler from `mod`.
-- **Status**: `todo`.
+- **Status**: `present` (2026-05-20 product slice uses previous-frame red as the video modulator and the live audio signal as the self-modulator inside a dedicated pitch-shift worklet. This keeps the operator useful in the simplified serial UI without requiring explicit secondary-modulator routing.)
 
 ### 5.4 `modulatePixelate(tex, multiple=10, offset=3)`
 
 - **Video**: pixelation amount driven by `tex`.
-- **Audio analogue**: **modulated decimation** — sample-rate-reduction factor varies with the modulator. Drives glitch / "stutter" textures.
-- **Status**: `todo`.
+- **Audio analogue**: **modulated windowed resampling / held recent-time replay** — the replay window varies with the modulator instead of literal sample-rate reduction. This keeps the audio side in the same product vocabulary as `pixelate` while preserving Hydra's "pixelation amount driven by `tex`" law.
+- **Status**: `present` (2026-05-21 remap). The shipped slice still uses previous-frame luma/red on video and live-signal amplitude on audio, but the audio side now drives a buffered held-window replay process around a base `offset` resolution instead of the older held-sample decimator.
 
 ### 5.5 `modulateRepeat(tex, repeatX=3, repeatY=3, offsetX=0.5, offsetY=0.5)`
 
 - **Video**: repeat counts driven by `tex`.
 - **Audio analogue**: **modulated comb-tap count** — number of taps varies. Cheap implementation: modulated single-tap delay = **chorus / flanger** (when `repeat` ≈ 1) or **tape-stop** (when `repeat → 0`).
-- **Status**: `todo`.
+- **Status**: `present` (2026-05-20 product slice uses previous-frame RGB as the repeat-count modulator on video and a live-signal-driven bpm-locked self-comb on audio. It is intentionally unary/self-modulated in the public UI.)
 
 ### 5.6 `modulateScrollX(tex, scrollX=0.5, speed=0)` / `modulateScrollY`
 
 - **Video**: pan driven by `tex`.
 - **Audio analogue**: **modulated pan / modulated delay tap** — auto-pan whose position is set by the modulator.
-- **Status**: `todo`.
+- **Status**: `present` (2026-05-20 product slice: `modulateScrollX` uses previous-frame red / live-signal amplitude to drive a moving phase-offset layer; `modulateScrollY` uses previous-frame green / the live signal to drive stereo position. Both retain the signed `speed` drift term.)
 
 ### 5.7 `modulateKaleid(tex, nSides=4)`
 
 - **Video**: kaleid amount driven by `tex`.
 - **Audio analogue**: **wavefolder drive modulation** — fold count or fold gain modulated by `mod`. This produces dynamically evolving harmonic content keyed to the modulator.
-- **Status**: `todo`.
+- **Status**: `present` (2026-05-20 product slice uses previous-frame red and live-signal amplitude to move between identity and the requested side/fold count. The public surface exposes `nSides` only, matching Hydra’s shape while keeping the simplified UI lean.)
 
 ### 5.8 `modulateHue(tex, amount=1)`
 
 - **Video**: hue rotation driven by `tex`.
 - **Audio analogue**: **modulated SSB shift** — frequency-shift amount varies with `mod`. Creates barber-pole / Shepard-tone-like glissandi when the modulator is a ramp.
-- **Status**: `todo`.
+- **Status**: `present` (2026-05-20 product slice keeps the video semantics literal and uses a self-modulated octave-ratio shifter on audio rather than a true SSB path. That is the current product compromise: coherent motion and musical behavior now, exact spectral-shift parity later if needed.)
+
+### 5.9 Future routed `modulate*` family over explicit secondary inputs
+
+- **Product stance**: the shipped `modulate*` family is intentionally unary/self-referential in the public patch surface, but the graph/runtime is already capable of true secondary-input routing and should eventually expose explicit routed `modulate*` variants through the narrow routing UI and built-in programs.
+- **Scope**: start with routed versions of Hydra’s core family — `modulate`, `modulateRotate`, `modulateScale`, `modulatePixelate`, `modulateRepeat`, `modulateScrollX/Y`, `modulateKaleid`, `modulateHue` — and allow one app-specific displacement-first variant such as `modulateDisplace` if it better serves the product than strict Hydra parity.
+- **Important rule**: the second input is not limited to geometric textures. Routed modulators may be previous-frame buses, `src(oN)` returns, luma/matte branches, channel isolates, color fields, or other finish/control branches whenever those produce a stronger abstract result than geometry-only warping.
+- **Status**: `partial` (2026-05-21 routed-program slice). `modulateDisplace` opened the routed track, and explicit two-input companions `modulateRouted`, `modulateRotateRouted`, `modulateScaleRouted`, `modulatePixelateRouted`, `modulateRepeatRouted`, `modulateHueRouted`, and `modulateScrollYRouted` now ship for program/advanced-use cases with real secondary branches on both video and audio. The original `modulate`, `modulateRotate`, `modulateScale`, `modulatePixelate`, `modulateRepeat`, `modulateHue`, and `modulateScrollY` remain intentionally unary/self-modulated in the default product surface so existing QA and simple patch use do not silently change semantics.
+- **Program QA policy**: tighten metric assertions only for Hydra-port programs that survive the product pass as stable authored looks. `Pixelscape`, `Acid Bus Seat`, and `Glitchy Slit Scan` now qualify because their routed-scale / routed-pixelate rebuilds produce repeatable motion deltas over the shipped fixture, while the remaining ports can stay smoke-only until they need stricter protection.
 
 ---
 
@@ -339,7 +380,7 @@ The general form, in both domains:
 | `.out(o0)` | route the chain's output to audio bus 0 (4 buses total: `o0..o3`, master-summed by default). |
 | `render(o0..o3)` | display/route all four buses simultaneously (audio: monitor all four sub-mixes). |
 
-Status: `partial` (one implicit bus).
+Status: `present` (2026-05-19: explicit `o0..o3` sink routing is live in the graph/runtime, audio master-sums all active bus sinks, `src(oN)` resolves against real per-bus history in both domains, the UI can select the monitor bus, and the shell exposes a compact `render(o0..o3)` quad monitor).
 
 ---
 
@@ -355,7 +396,7 @@ Hydra accepts arrays anywhere a number is expected; arrays sequence over time. T
 | `.offset(n)` | phase-offset in sequence | pattern phase-offset | Identity (`n ∈ [0, 1]`). |
 | `.invert()` | reverse-iterate the array | reverse pattern | Identity. |
 
-Status: `todo` for all.
+Status: `todo` for the universal/public surface. 2026-05-20 update: the built-in program layer now ships a narrow subset instead — stepped `sequence` motion with `.fast` / `.smooth` / `.ease` / `.offset` / `.invert` semantics plus time LFOs — so curated Hydra-inspired looks can preserve their signature motion without exposing full per-slider automation in the main patch UI.
 
 ---
 
@@ -368,7 +409,7 @@ Hydra's audio-input subsystem feeds FFT bins into video as numeric values. We ne
 
 Both directions share the same smoothing/cutoff/scale conventions.
 
-Status: `todo`. The prototype has no `AnalyserNode` and no video-feature extractor.
+Status: `todo` for the public/general Hydra surface. The app now does have both primitives internally: `src/audio/engine.ts` owns an `AnalyserNode`, `src/App.svelte` samples `v.luma` / `v.flux` / `v.edge`, and built-in programs can already bind raw FFT bins or video features to parameter automation. What remains undone is the general user-facing `a.fft[i]` / `a.setBins` / `a.setSmooth` / `a.setCutoff` / `a.setScale` API rather than the absence of runtime signal plumbing.
 
 ---
 
@@ -376,7 +417,7 @@ Status: `todo`. The prototype has no `AnalyserNode` and no video-feature extract
 
 For honesty: the prototype has `feedback` as a top-level parameter (frame-blend with the previous output). In Hydra this is achieved by `src(o0)` + `.blend()`. Reconcile:
 
-- Make the modular renderer support `src(oN)` cleanly, then express `feedback` as a preset shorthand (`src(o0).blend(o1, fb)`).
+- The modular renderer now supports `src(oN)` cleanly, so feedback/self-mod patterns can be expressed through real bus returns rather than only through the dedicated shorthand op.
 - Audio-side feedback (prototype's long delay's feedback gain) is then literally the same parameter as visual feedback, both routing into a `mix(current, previous, fb)` op.
 
 ---
@@ -385,17 +426,127 @@ For honesty: the prototype has `feedback` as a top-level parameter (frame-blend 
 
 | Family | Total ops | `present` | `partial` | `todo` |
 |---|---:|---:|---:|---:|
-| Sources | 8 | 0 | 2 | 6 |
+| Sources | 8 | 1 | 2 | 5 |
 | Geometry | 7 | 0 | 3 | 4 |
-| Color | 13 | 1 | 1 | 11 |
-| Blend | 7 | 0 | 0 | 7 |
+| Color | 13 | 10 | 0 | 3 |
+| Blend | 7 | 7 | 0 | 0 |
 | Modulate | 8 | 0 | 1 | 7 |
-| Output/buses | 2 | 0 | 1 | 1 |
+| Output/buses | 2 | 2 | 0 | 0 |
 | Array modifiers | 5 | 0 | 0 | 5 |
 | Audio I/O | 5 | 0 | 0 | 5 |
-| **Total** | **55** | **1** | **8** | **46** |
+| **Total** | **55** | **20** | **6** | **29** |
 
-A meaningful slice of the Hydra surface area is wired up now. The current code evaluates implemented source/operator params through `src/core/coupling.ts`, shares `AudioContext` time across domains when audio is live, bypasses neutral operators in the default chain, ships the first Color operators (`brightness`, `contrast`, `color`, `saturate`), and upgrades `scale` / `pixelate` / `modulate` to AudioWorklet-backed DSP. The work ahead is still substantial, especially for the rest of Color, Blend, buses, and live-coding. Release intent is therefore split: staging/private deployment is acceptable for real-world manual testing of the implemented subset, but public/professional deployment remains blocked on the final audible sign-off plus the remaining essential `M3` Color and Blend work.
+A meaningful slice of the Hydra surface area is wired up now. The current code evaluates implemented source/operator params through `src/core/coupling.ts`, shares `AudioContext` time across domains when audio is live, bypasses neutral operators in the default chain, now ships the full release-track Hydra Color surface (`posterize`, `brightness`, `contrast`, `color`, `saturate`, `invert`, `luma`, `thresh`, `hue`, `colorama`, `sum`, plus `.r .g .b .a`), upgrades `scale` / `pixelate` / `modulate` to AudioWorklet-backed DSP, executes the full Blend family as true dual-input graph nodes rather than as a primary-wire approximation, and supports real `src(oN)` bus returns plus a compact `render(o0..o3)` monitor. The work ahead is no longer primarily "finish more Hydra." The active release-shaping priority is a quality sprint: make the video finish feel closer to TouchDesigner-style post work, make the audio effects musically convincing when stacked, and keep the public surface legible as a curated operator instrument rather than a half-exposed graph IDE. Staging/private deploy remains useful for evaluation, but public v1 should wait for the video look engine, audio DSP palette, and product-surface cleanup described below, or for an explicit written decision to narrow that scope.
+
+### 10.4 Product correction plan: video-first pivot
+
+The intended shipped product is:
+
+- uploaded video is the primary image signal
+- the audio attached to that video is the primary audio signal
+- Hydra-inspired operators manipulate the video field itself
+- audio effects are coupled to those same operator controls
+- video-derived features such as luminance, motion, and edge density can drive later coupling/program logic
+
+The intended shipped product is **not**:
+
+- a general procedural visual synth with video as one source among many
+- a product whose main UX opens on generated visuals instead of footage
+- a fixed giant chain whose presets are merely parameter snapshots with no program-level semantics
+
+Concrete correction steps before deploy:
+
+1. **UI/product reset**: make video the default path in `src/App.svelte`, demote procedural sources from the main UX, and rewrite product-facing copy/docs accordingly.
+2. **Program model reset**: treat presets as named video effect programs built around uploaded footage, not just snapshots over the always-on chain.
+3. **Video-derived feature pass**: implement the first `v.luma`, `v.flux`, and `v.edge` extraction path so future coupling can respond to actual video content, not only to user knob motion.
+4. **Composition architecture**: land Blend-family convergence and a real multi-input graph path so Hydra-style video manipulations can be built from the uploaded signal itself rather than approximated with procedural sources.
+5. **QA reset**: make video-input cases the primary smoke/audit path and treat procedural-source cases as secondary/internal coverage.
+
+Current implementation status for step 1: the shell no longer boots into a visible procedural generator path. `src/App.svelte` now cold-boots on the internal placeholder, leads the user toward loading footage, and surfaces the loaded clip as the primary source action. Procedural generators remain in-repo for QA/internal work, but the public exploratory toggle has now been removed again as part of the simplification pass. This is still a product-facing reset rather than a full architecture completion; the deeper items in steps 3-5 remain open.
+
+Current implementation status for step 2: the shipped `public/presets.json` bank is now metadata-backed and the UI presents it as **video effect programs** rather than raw preset buttons. Each entry carries video/audio intent plus operator focus, and selecting one from `src/App.svelte` reads as applying a named treatment to uploaded footage. The architecture has also widened beyond flat snapshots: built-in programs may now specify explicit chain order with repeated operator instances, internal bus/merge routing, and narrow time/FFT/video automation. The public patch UI is still intentionally serial; the richer graph remains an internal program/runtime capability rather than the default editing surface.
+
+Current implementation status for step 3: the first shipped video-derived feature path is now live. `src/App.svelte` samples low-rate `v.luma`, `v.flux`, and `v.edge` signals from the loaded clip itself and injects them into the shared `CouplingContext` so both audio and video domains can read the same feature state. The first pass is intentionally runtime signal plumbing plus observability, not the final per-param automation system: the feature values are now real and QA-backed, but the public shell no longer shows the raw monitor chips because the product simplification pass favored a cleaner surface over standalone diagnostics.
+
+Current implementation status for the patch surface: the runtime still supports the richer graph/bus model internally, but the shipped right-hand panel in `src/App.svelte` now behaves much closer to the intended public product. The old separate `Controls` panel is gone, the user still starts with an empty chain, and the add-effect surface in `src/ui/Patch.svelte` has been tightened again from the earlier searchable browser into compact family dropdowns. Unary operators are still grouped by intent (`Motion`, `Color`, `Texture`, `Feedback`, `Blend/Composite`, `Finish`, `Audio Character`), but the public composition gesture is now smaller and simpler: choose a family, add one node, tune it, then reorder it. Core controls still live inline on node cards while secondary sliders sit behind an advanced disclosure. The graph runtime remains in-repo because Blend-family convergence, `src(oN)` returns, and QA/program infrastructure still depend on it, but those advanced routing concepts are now internal/advanced rather than the primary UX. The first split-surface slice is now live as well: `src/App.svelte` exposes `Video` / `Audio` workspace tabs, the current chain editor remains under `Video`, and `src/ui/AudioRack.svelte` now exists as the shell that will collapse to the granulator-first audio surface described in §14 rather than continuing as a many-engine product. The first shared public modulation slice is live too: `src/ui/LfoBank.svelte` exposes six global LFOs with waveform/rate/depth, and both the video-node and audio control rows can bind params to `mod off / lfo 1..6` without growing bespoke automation UI.
+
+Current product-direction recommendation for the patch surface: keep iterating on the serial video model rather than reopening the graph editor, but stop making that same surface responsible for all audio design. The next public-surface gains should come from stronger family descriptions, better preset/program discovery, and a clean split between `Video` and `Audio`. The first composition slice is now live: the public patch surface still reads as a serial chain, but it also exposes a narrow routing/bus UI for composite nodes and explicit primary/secondary input picks where an operator truly needs them. Monitor-bus selection and quad-preview toggling have now been promoted into the top shell itself, replacing the more renderer-technical finish controls as the only always-visible stage controls. That keeps `layer`, `mask`, and other two-input nodes usable without reopening the old free-form graph editor or cluttering the panel with extra global cards. The public shell also no longer exposes transport controls or renderer-look controls as primary top-level surfaces; uploads/programs remain the main on-ramp while transport and look-engine ownership stay internal for runtime, programs, and QA. Richer routing should still stay in built-in programs and the internal runtime unless a later explicit advanced mode proves necessary; the audio side should now collapse toward one excellent granulator plus feedback delay rather than continue accreting separate engine families.
+
+Current product-direction recommendation for scope: do not continue porting Hydra operators indiscriminately. The remaining high-value Hydra-style additions on the video side are the ones that deepen composition and abstraction in a video-effects product: stronger `layer`/`mask` workflows, channel routing/swizzles, and better keyed `luma`/matte utilities. The first useful slice of that set is now shipped: `layer` / `mask` have threshold/tolerance/invert matte shaping, `luma` can key bright-or-dark regions against alpha-or-luma, `.r .g .b .a` can be used as product-surface swizzle/matte isolates, and `sum` now exists as the matching weighted channel-collapse finish op. The finish-forward looks (`Finish / Halo Key`, `Finish / RGB Spill`, `Finish / Shadow Matte`) remain available in the internal program bank and QA paths, but they are no longer part of the visible preset strip because the public surface is being narrowed toward the stronger routed-port looks. Lower-value parity work such as every small syntax feature, universal live-code import, or reopening the public graph editor should remain behind the release-track quality work unless a concrete product requirement changes that ordering. On the audio side, the new priority is not more Hydra-style one-to-one mappings but a dedicated rack of serious synthesis/effect families.
+
+Current implementation status for video quality: the app is already GPU-backed through WebGL2/FBOs, and the operator chain plus bloom/history/presentation passes run as shader passes inside `src/video/renderer.ts`. The weakness is aesthetic depth, not lack of GPU use. The post stack has now moved beyond the earlier single half-res bloom tap: it carries a small bloom pyramid, tier-driven bloom-source isolation controls (`threshold`, `soft knee`, `black level`, `gamma`, `brightness`), look-driven bloom/halation tint, public `performance` / `standard` / `cinema` quality selection, an embedded LUT bank (`neutral`, `amber`, `chrome`, `silvered`, `bleachBypass`), imported `.cube` LUT loading, procedural built-in lens dirt (`bloomMist`, `sensorDust`, `scuffedGlass`), and renderer-side authored post presets (`temporalEcho`, `radialSmear`, `glassWarp`, `edgeTrails`, `posterizedFeedback`, `lumaDisplace`) that can be bound per program from `public/presets.json`. The new `lumaDisplace` path is a real dedicated displacement pass that runs before presentation, rather than another approximation inside the warp/trail uniforms. Stay on the current WebGL2/FBO renderer for this sprint. Revisit `three.js` `EffectComposer` only if the current renderer becomes awkward to extend; keep WebGPU experimental/future because it is a larger architecture migration, not a polish shortcut.
+
+Current implementation status for the first three named video-first effect-program targets (`tunnel`, `bloom`, `kaleido` over uploaded video): all three are now end-to-end audit-backed. `public/presets.json` carries the metadata, operator values, and renderer-finish metadata; `applyProgram` is exercised by a new `apply-program` QA step type via the same path as the UI; and `qa/cases/audit-program-{tunnel,bloom,kaleido}-video.json` each apply the program to the committed `qa/fixtures/ci-smoke.mp4` clip and assert one live video-metric delta vs raw baseline that proves the program is actually engaged. Important renderer-state note: program activation now also owns look/quality/LUT/post-preset selection, so QA no longer depends on whichever shell finish the previous user happened to leave selected. That matters most for `bloom`: the old expectation assumed the earlier smoother-only post stack, but the new `temporalEcho` renderer preset deliberately adds trailing motion and UV drift, so its audit now asserts a temporal-diff increase rather than a decrease. Exported-audio sides for program cases remain MANUAL REVIEW ONLY because program-level audio gates are not yet hardened enough to trust as release blockers. The product-side UX for clicking a program without a loaded video has been tightened to surface an inline "load a video to hear and see it" call-to-action rather than silently applying to the placeholder path.
+
+### 10.5 Quality sprint: professional video and audio effects
+
+The current product concern is aesthetic quality, not missing low-level plumbing. The video path already uses GPU-backed WebGL2 shader passes; the audio path already has Web Audio plus AudioWorklets. The sprint should therefore spend implementation budget on deeper effect design and better defaults rather than another broad API-surface pass.
+
+Video goals:
+
+- TouchDesigner-like finish through a real look engine, not just more individual operators
+- bloom pyramid with threshold/pre-black, pre-gamma, pre-brightness, multiple downsample levels, wide recomposite, halation tint, and optional lens dirt
+- embedded film/LUT looks plus imported `.cube` support now; optional imported texture-LUT assets later
+- authored feedback/displacement programs: radial smear, glass warp, edge trails, luma displacement, temporal echo, posterized feedback, with `luma displacement` now implemented as its own pass
+- performance/standard/cinema quality tiers so expensive effects are opt-in on slower machines
+- keep WebGL2/FBOs as the primary implementation path until they become structurally limiting
+
+Audio goals:
+
+- a dedicated `Audio` tab that presents **one** flagship granulator engine, not a menu of separate public DSP families
+- one shared stereo feedback delay after the granulator, because feedback is the one post-effect with a strong and obvious AV law
+- six shared global LFOs as the first public modulation language across both domains
+- MIDI and MPE as first-class play input, not a stretch feature
+- explicit modulation routing from video-derived sources into granulator parameters rather than more hidden per-video-op audio analogues
+- focused worklet tests for interpolation quality, zero-allocation behavior, gain bounds, NaN/denormal avoidance, and note-on latency
+- a quality bar defined by listening parity and timing/performance gates, not by how many separate audio engines exist
+
+Current implementation status for that audio direction: the repo is in transition, not finished. The shell already has an `Audio` tab and a shared six-LFO bank, but the older multi-engine rack work still exists in code and docs as superseded context. The active direction is now narrower: collapse the public audio surface to the granulator + feedback delay described in §14, keep older worklets only as internal building blocks where useful, and stop treating the presence of multiple audio engine cards as progress toward release.
+
+Coupling policy for this sprint:
+
+- do not force every video operator to remain a public audio effect if the result is musically weak or confusing
+- keep the Hydra operator math on the **video** side, but treat most legacy audio analogues as historical rationale rather than release work
+- use the shared six-LFO bank, MIDI, and selected video-derived features as the coupling fabric
+- prefer one deep engine with strong modulation over many shallow public engines
+- document deliberate deviations explicitly so the product remains honest about when it is doing dimensional reduction, when it is exposing a modulation source, and when it is presenting a productized perceptual analogue
+
+Release policy:
+
+- This quality sprint outranks remaining Hydra Color parity unless a concrete release requirement says otherwise.
+- `sum` and `.r .g .b .a` remain useful but should not distract from the app feeling amateur in its core demo path.
+- The split `Video`/`Audio` product surface is now part of the release-track cleanup, not a post-v1 nicety, because the current mixed model makes the audio story harder to understand.
+- Staging deploy can be used to evaluate these effects on real machines; public v1 should wait for quality sign-off or a written scope reduction.
+
+### 10.6 Role of procedural sources after the pivot
+
+The pivot demotes procedural sources from the public product surface but does **not** delete them. Their post-pivot roles, ranked by load-bearing weight, are:
+
+1. **QA fixtures** (load-bearing). `osc`, `noise`, `voronoi`, `shape`, `gradient`, and `solid` back ~30 of the 45 committed audit cases. They are the only fixtures that are bit-exact deterministic across runs and machines, so they remain the only reliable substrate for hard-gated operator audit assertions on the geometry, modulate, and color families. Keep all six sources and their QA cases. Status: keep as internal infrastructure.
+2. **Operator development substrate** (load-bearing). Adding a new operator (e.g. `sum`, channel accessors, or a later `modulate*` variant) needs a known-input substrate to reason about correctness before turning the operator loose on real video. The procedural sources still serve this role, but they no longer need a public-facing toggle in the shipped shell. Keep the runtime/QA path, not the main-surface UI. Status: keep as internal infrastructure.
+3. **Educational/demo surface** (deferred). Procedural sources could re-emerge in a future advanced-mode UI for users who want to learn the AV-coupling laws without uploaded footage in the way. Not a near-term priority and not a release blocker. Status: parked, not on the roadmap until after public release.
+4. **First-class product surface** (dropped). Procedural sources will not return to the primary UX, cold-boot path, or release copy. They will not gate or shape roadmap priority. The `solid` RGB → triad mapping question parked under §11.1 stays parked because it only matters once that surface is re-elevated, which is no longer planned.
+
+Effect on the roadmap:
+
+- `s0..s3`, `initCam`, `initImage`, `initScreen` (plan §1.8) remain legitimate **video** input alternatives to uploaded files, but they are no longer treated as public-v1 blockers by default. They are advanced/post-v1 unless the launch target changes.
+- `src(oN)` is complete enough for the current release track; any remaining work around buses is polish, not a blocker.
+- The live-code editor remains strategically valid because it targets the same graph, but it is now an advanced authoring surface rather than a prerequisite for staging or public v1.
+
+### 10.7 Release tracks after the pivot
+
+The repo now has two explicit release tracks:
+
+1. **Quality sprint** — the current implementation target. Goal: make the core uploaded-video path feel professionally finished in both domains. Required: TouchDesigner-inspired WebGL look engine, serious granular/FM/wavefolding audio work, gain-staging discipline, focused QA, and human sign-off.
+2. **Staging RC** — private evaluation target. Goal: deploy the best current quality-sprint slice to a private/staging URL for real browser, device, visual, and listening validation. Required: QA/audit green on the implemented surface, final human audible/visual sign-off on the documented manual cases, a deploy workflow/runbook, and a post-deploy smoke pass against the staging URL.
+3. **Public v1** — the first broadly shareable release. Goal: ship the current video-first product honestly, without implying unfinished Hydra parity. Required beyond staging: quality-sprint scope complete or explicitly narrowed, issues discovered during staging absorbed, and public positioning anchored to "video-first AV effects" rather than "general AV synth." Remaining public-surface Color work (`sum`, `.r .g .b .a`) should be implemented only if it is still a real launch requirement after quality sign-off.
+
+What is intentionally **not** a blocker for the current release track unless the user explicitly changes product scope:
+
+- the CodeMirror/Hydra live-code surface from `M4`
+- alternate external-input authoring surfaces such as `s0..s3`, `initCam`, and `initScreen`
+- broader Hydra parity, including Color parity, unless a concrete launch requirement promotes it again
+- indiscriminate Hydra operator-count growth without a clear product role
 
 ---
 
@@ -495,6 +646,8 @@ For every family:
 4. Fix defects in the operator implementation or coupling law.
 5. Re-run until the family is green.
 
+Operational note: the Playwright suite is now split into family-grouped spec files under `qa/e2e/`. Local runs default to modest file-level parallelism for faster iteration, while CI stays single-worker and the analyzer/reference tooling no longer assumes `smoke-*` output directories.
+
 ### Deploy gate
 
 Public/professional `M6 — Deploy` stays blocked until all of the following are true:
@@ -505,22 +658,29 @@ Public/professional `M6 — Deploy` stays blocked until all of the following are
 - manual review notes are complete for every implemented family
 - all discovered AV-coupling, quality, or stability defects are fixed or consciously deferred in writing
 - final human audible sign-off is complete for the explicit manual cases in `qa/reviews/`
-- remaining essential `M3` Color work is implemented: `invert`, `luma`, `thresh`, `hue`, `colorama`, `sum`, `.r .g .b .a`
-- Blend family is implemented: `add`, `sub`, `mult`, `diff`, `layer`, `blend`, `mask`
+- the video-first correction pass is complete: video is the default product path, procedural sources are demoted from the public UX, and the product/docs no longer present the app as a procedural synth first
+- the quality sprint is complete or consciously narrowed in writing: TouchDesigner-inspired bloom/look/feedback polish, real granular synthesis, real FM/self-mod, upgraded wavefolding, and gain-staging/wet-dry discipline
+- final human visual/audible sign-off says the target demo path no longer feels amateur
+- remaining public-v1 Color work (`sum`) is either implemented or explicitly deferred as Hydra-parity work that is not required for public v1
+- video-derived feature extraction is present in the shipped path (`v.luma`, `v.flux`, `v.edge` or a consciously narrowed equivalent)
+- staging/private deploy feedback has been absorbed: any issues found there are fixed or consciously deferred in writing
 
 ### Release checklist
 
 For a fresh session handoff, the completion sequence is now:
 
-1. Finish the remaining manual audible sign-off cases listed in `qa/reviews/`.
-2. If that pass finds issues, fix them and rerun `qa:audit:ci` plus the locally available analyzers.
-3. Once the audible pass is clean, a staging/private deploy is allowed with Cloudflare Pages as the default host unless the user explicitly chooses another target.
-4. Use that staging deploy for real-world manual testing, environment validation, and live-only bug discovery. Do not describe it as the professional/public release.
-5. Before public release, finish the remaining essential `M3` work: the unfinished Color operators and the full Blend family.
-6. Rerun QA/audit and update `qa/reviews/` for the newly implemented families.
-7. Configure deploy CI with the existing audited QA gate still blocking release.
-8. Deploy the public build, record the canonical public URL in the repo docs, and run a post-deploy Playwright smoke pass against that URL.
-9. Only then mark the project complete.
+1. Treat the video-first correction pass from §10.4 as complete enough for staging; do not reopen it as a vague blocker.
+2. Run the quality sprint in two visible slices: video look engine first, then audio DSP palette and gain staging.
+3. For video, implement bloom pyramid/LUT-look/authored feedback-displacement presets/quality tiers before adding more abstract operators.
+4. For audio, implement granular/FM-self-mod/upgraded wavefolding and level discipline before treating the current sound as release-ready.
+5. Finish the remaining manual audible and visual sign-off cases listed in `qa/reviews/`; update review docs for the new flagship effects.
+6. If that pass finds issues, fix them and rerun the narrowest relevant QA/audit path.
+7. Use Cloudflare Pages as the default staging host unless the user explicitly chooses another target, and deploy through the repo workflow/runbook.
+8. Run a post-deploy Playwright smoke pass against the staging URL and use that environment for real-world device/listening validation. Do not describe it as the professional/public release.
+9. Before public v1, decide whether `sum` is a launch requirement or deferred Hydra-parity work; do not let it outrank unresolved quality concerns.
+10. Keep live-code and alternate external inputs off the public-v1 blocker list unless product scope changes.
+11. Deploy the public build, record the canonical public URL in the repo docs, and run a post-deploy Playwright smoke pass against that URL.
+12. Only then mark the project complete.
 
 ---
 
@@ -528,7 +688,211 @@ For a fresh session handoff, the completion sequence is now:
 
 - **Spatial-frequency unit for sources**. Default chosen: `osc(N)` → `N Hz`. Alternative: `N cycles per screen-width × baseFreq`. Decision in `memory.md`.
 - **3-band crossover frequencies for `color()`**. Landed as `COLOR_BAND_CROSSOVERS_HZ = { lowMid: 300, midHigh: 3000 }` in `src/core/coupling.ts`; future question is whether presets should override it.
-- **`hue` pitch-shift law**. `2^amount` (octaves) vs `1200 · amount` cents — choose unit-of-presentation in UI without changing the math.
+- ~~**`hue` pitch-shift law**. `2^amount` (octaves) vs `1200 · amount` cents — choose unit-of-presentation in UI without changing the math.~~ Resolved 2026-05-18: octaves, slider unit `oct`, range `[-1, 1]`. See `memory.md`.
 - **`scrollX` vs `scrollY` audio asymmetry**. Treating X as time-domain delay and Y as stereo pan is a design choice — alternative is the opposite. Decision in `memory.md`.
-- **`colorama` chaotic-map choice**. Hénon, logistic, or per-bin scramble. Pick one, document why.
+- ~~**`colorama` chaotic-map choice**. Hénon, logistic, or per-bin scramble.~~ Resolved 2026-05-18: **logistic** map, single state, no worklet — predictable bifurcation, cheap, and shared between the video shader and the audio ring-mod carrier. See `memory.md`.
 - **`solid` RGB → triad mapping**. R=1, G=3/2, B=2 is one option; major triad (1, 5/4, 3/2) and tritone (1, √2, 2) are alternatives. UI-selectable.
+
+---
+
+## 12. Planned av-synth originals (future ops outside Hydra)
+
+These operators are not part of Hydra. They are planned av-synth additions identified from design review of which synthesis techniques are still uncoupled in the current matrix. The 2026-05-20 quality review changes their priority: `selfMod`/FM and the audio-quality work are now part of the active quality sprint, not distant post-Color backlog. `blur` and `flux` remain useful product effects, but public release should prioritise the flagship video look engine plus granular/FM/wavefolding audio before broadening Hydra parity.
+
+### 12.1 `blur(amount=0)` — coupled lowpass filter
+
+- **Video**: spatial blur of the input field. Symmetric 2D Gaussian (or box-kernel approximation) with kernel radius `amount · K_MAX` pixels, where `K_MAX` is a renderer-side cap (suggested 32 px at 1280×720). `amount = 0` is identity.
+- **Audio analogue**: **single-band sweepable lowpass filter** (Biquad LP, Q ≈ 0.707 / Butterworth). Cutoff curve: `f_c = sampleRate/2 · (1 - amount)^4` so the response is gentle near `amount = 0` and tightens aggressively as `amount → 1`. `amount = 0` is identity (cutoff at Nyquist); `amount = 1` is fully closed (cutoff → 0 Hz, signal vanishes).
+- **Coupling**: spatial-frequency cutoff in cycles/pixel ↔ temporal-frequency cutoff in Hz via the same `baseFreq` law that governs sources (see `memory.md` 2026-05-16 `osc(N)` decision). High spatial frequencies (sharp edges) and high temporal frequencies (treble) are removed together; soft blur = warm sound. Distinct from `noise(scale)` which uses a lowpass internally to shape a noise source — `blur` is a chainable filter that processes whatever upstream produced.
+- **Status**: `future`. Open question: 2D-separable Gaussian vs. radial mipmap LOD — the mipmap approach is much cheaper at high blur and would let the kernel grow effectively unbounded, but the spectral roll-off is steeper than Gaussian and may not couple as cleanly to a Butterworth audio LP. Decide before implementation.
+
+### 12.2 `flux(amount=0, attack=0.05, release=0.5)` — coupled envelope follower
+
+- **Video-derived input**: `v.flux` — the per-frame temporal-change scalar already exposed by `CouplingContext` (see `src/App.svelte` video-features pass, M5.7 2026-05-18).
+- **Video**: optional brightening tied to motion (`colour → colour · (1 + amount · v.flux)`) so on-screen motion visibly self-emphasises. Identity at `amount = 0`. Acceptable to ship without any video-side transform if it competes too hard with `feedback` / `modulate` for the same visual real estate; the audio-side coupling is the whole point.
+- **Audio analogue**: **envelope follower / motion-driven VCA**. Internal one-pole follower tracks `v.flux` with separate `attack` and `release` time constants (in seconds, mapped to one-pole α via `α = 1 - exp(-1/(rate · τ))`). Output gain = `1 + amount · (envelope - mean(envelope))`, clamped non-negative. `amount = 0` is identity; positive `amount` raises gain during motion, negative `amount` ducks it. Default `attack = 50 ms`, `release = 500 ms` mirror typical compressor sidechain feel.
+- **Coupling**: this is **reverse-direction coupling** (video → audio) — the first operator in the spec that lets a feature extracted from the loaded video drive the audio signal. Both domains read the same scalar `v.flux` at the same `ctx.time`; latency budget is one video frame (≈16 ms at 60 fps) since `v.flux` is computed in the renderer's per-frame pass.
+- **Status**: `future`. Open question: whether `flux` should be an *audio effect* (gain/filter applied in-line, as specced here) or an *automation source* (a CV-style modulator that other ops subscribe to via a routing matrix). The in-line variant fits the current graph model and ships easier; the CV variant is more flexible but requires graph-level changes (parameter automation sources beyond `clock.rate`). Default to in-line for v1.
+
+### 12.3 `selfMod(amount=0)` — coupled feedback FM / self-modulation
+
+- **Video**: UV displacement of the input texture by `amount · src(o0)` — uses the previous output frame as the modulator. Identical to `modulate(src(o0), amount)` once `src(oN)` and the bus architecture (§6) land, but exposed as a single named op for ergonomics. `amount = 0` is identity.
+- **Audio analogue**: **feedback phase-modulation / FM** — the modulator signal is the previous audio block (or a one-block-delayed copy of the operator's own output). `y(n) = x(n + amount · y(n - blockSize))` via a dedicated AudioWorklet. The musically useful surface should expose carrier/mod ratio, modulation index, feedback, envelope smoothing, optional sideband filter, and wet/dry. The classic Yamaha DX7 operator-6-feedback topology is the reference, but the product target is controlled musical movement over uploaded audio rather than raw noisy chaos. Clamp feedback/index ranges to prevent runaway FM.
+- **Coupling**: same `amount` controls both. The fundamental latency in both domains is one tick of self-reference (one frame on video ≈ 16 ms, one audio block ≈ 3 ms at 128-frame / 48 kHz). The asymmetry between those latencies is the same as the bidirectional-coupling tension already noted in `memory.md` (16 ms vs 3 ms); `selfMod`'s tight inner loop will surface it more audibly than other ops.
+- **Status**: `present` (2026-05-20 first slice). The app now ships a dedicated `selfMod` operator with a previous-frame self-displacement shader on video and a `self-modulator` AudioWorklet on audio. Exposed params are `amount`, `ratio`, `index`, `feedback`, `smoothing`, `tone`, and `mix`. Internally the audio path is a bounded feedback phase-warper whose carrier runs at `ctx.rate * ratio`; `feedback` and `smoothing` shape the self-mod loop, `tone` is the post-sideband lowpass, and `mix` is wet/dry. This clears the "real FM/self-mod path exists" bar for the sprint, while leaving open a later graph-level modulator-routing pass if product testing wants stricter `src(oN)`-style signal FM instead of the current internal topology.
+
+### 12.4 `grain(...)` — granular processing over uploaded audio
+
+- **Video**: grain parameters must have a visible counterpart in the look engine. The current implementation uses a held-sample tile field: `size` controls grain footprint, `density` controls reseed cadence and coverage, `position` biases the held-sample orbit, `spray` adds per-grain sample jitter, `reverse` mirrors grain direction, `shape` sharpens or softens the grain mask, and `spread` separates channel-held samples. A future renderer ABI pass may still widen this into true temporal video granulation via history textures, but pass-through is no longer acceptable.
+- **Audio analogue**: real granular synthesis over the uploaded audio buffer, implemented in an AudioWorklet or equivalent sample-accurate path. Required parameters: grain size, density, spray/jitter, playback position, pitch, reverse probability, envelope shape, stereo spread, and wet/dry. This replaces the current `voronoi` source's noise/VCA placeholder as the project's serious granular path.
+- **Coupling**: grain density and pitch should respect the existing `baseFreq`/clock conventions where musically useful, but the dominant product behavior is "make the uploaded audio textural and controllable," not "prove a Hydra source analogy."
+- **Status**: `present` (2026-05-20 first slice landed; same-day coupling and architecture decision completed). The app now has a real `grain` operator on the main chain backed by `public/worklets/granular.js`, and it is fully coupled across both domains: audio uses a deterministic rolling-history granulator, while video uses a spatial held-sample grain field driven by the same controls. It already exposes `mix`, `size`, `density`, `position`, `spray`, `pitch`, `reverse`, `shape`, and `spread`. The current release track intentionally keeps that rolling-history architecture: the uploaded-media path is still `MediaElementAudioSource`-driven, so arbitrary whole-file grain addressing would require a larger decoded-audio ownership and transport-sync pass. Revisit that only if product testing specifically demands clip-locked scrubbing rather than textural live granulation.
+
+### 12.5 `foldPlus(...)` / wavefolder upgrade — musical nonlinear timbre
+
+- **Video**: keep `kaleid`'s visual polar symmetry, but consider a separate or expanded operator if the audio surface needs more controls than `nSides` can honestly represent. Possible visual counterparts: fold count, symmetry/asymmetry, bias, and post-filter warmth can map to polar segment count, center offset, color bias, and luma smoothing.
+- **Audio analogue**: upgrade from the current static `WaveShaperNode` fold curve into a serious wavefolding processor. Required parameters: drive, fold amount/count, symmetry, bias, oversampling mode, DC blocker, post lowpass, output trim, and wet/dry. Add level compensation so stacked nonlinear effects do not simply become louder, harsher broadband noise.
+- **Coupling**: fold count remains the mathematical bridge to `kaleid`, but drive/symmetry/bias are product controls needed to make the effect musical.
+- **Status**: `present` (2026-05-20 first upgrade slice). `kaleid` is no longer a one-slider shaper: the audio side now runs through a dedicated `fold-processor` AudioWorklet with fixed internal 4x oversampling, DC blocking, post lowpass tone control, output trim, and equal-power wet/dry, while the video side gained matching `drive`, `symmetry`, `bias`, `tone`, `output`, and `mix` controls around the existing polar fold. This clears the "serious wavefolding path exists" bar for the release sprint while leaving open a later decision on whether an eventual `foldPlus` operator should split off from `kaleid` for even less constrained coupling.
+
+### 12.6 Shared gain-staging and nonlinear-effect discipline
+
+- **Problem**: stacked audio effects currently become noisy or boring because many processors are serial, broadband, and level-insensitive. A final limiter prevents clipping but does not make nonlinear chains musical.
+- **Required design rule**: nonlinear effects should own input trim where needed, level compensation, output trim, wet/dry, and post-filtering. Add an internal master soft-clip/saturation stage before the final limiter if listening tests show the limiter alone is too abrupt.
+- **Testing**: every new AudioWorklet should have small worklet-level tests for identity/default behavior, gain bounds, NaN/denormal avoidance, and at least one spectral sanity check. Use the existing pitch-shifter worklet test pattern.
+- **Status**: `present` (2026-05-20 first release-track pass). The master bus now soft-clips before the limiter, `kaleid` owns compensation/trim/tone/wet-dry, and `saturate`, `selfMod`, and `grain` each gained internal post-filter or compensation discipline instead of relying entirely on the master limiter. Remaining work is audible product tuning and any additional compensation needed after manual listening, not the absence of a gain-staging architecture.
+
+---
+
+## 13. Desktop distribution (final phase) — Electron + WebGPU
+
+This is the **final** product phase. It runs only after all earlier release gates pass (video-first correction pass complete, Color `sum`/`.r .g .b .a` shipped, Blend family shipped, audible sign-off filed in `qa/reviews/`, public/professional web release shipped). Desktop is not a substitute for the web app — it is a higher-headroom delivery target for the same codebase.
+
+### 13.1 Why Electron (not Tauri)
+
+- **Chromium parity is the feature, not the cost.** av-synth is a WebGL2/WebGPU + AudioWorklet app. What ships in Electron is the exact engine debugged in the browser. Tauri's system-WebView (WKWebView on macOS, WebView2 on Windows, WebKitGTK on Linux) introduces three different rendering and AudioWorklet substrates with three different bug surfaces. For an AV tool this is not acceptable.
+- **WebGPU availability is guaranteed.** Electron ships a known Chromium version, so WebGPU and `EXT_color_buffer_float`-class capabilities are present unconditionally. Tauri inherits whatever the user's system WebView supports, which on Linux WebKitGTK is partial and on older macOS is gated by OS version.
+- **AudioWorklet behaviour is consistent.** Garbage-collection profiles, audio thread scheduling, and `AudioContext` latency hints differ between Chromium and WebKit. Electron pins this; Tauri does not.
+- **Distribution size is not the bottleneck.** ~150 MB Chromium runtime is fine for a creative tool. Ableton Live is 2 GB, TouchDesigner is 800 MB, Max/MSP is 600 MB. The audience already accepts large installs in this category.
+- **Trade accepted**: higher memory baseline, larger installer, Node.js attack surface. Mitigations: context-isolation on, `nodeIntegration: false` in the renderer, IPC contract narrow, no remote module, CSP locked down. Treat the renderer as a sandboxed web page that happens to have a privileged Node host behind a typed IPC bridge.
+
+### 13.2 WebGPU power (coupled to the desktop phase)
+
+- **Rationale**: WebGL2 has carried the operator set defined in §1–§6 of this document and is sufficient for Hydra-shaped 2D ping-pong chains. The ceiling appears when av-synth wants compute shaders for TouchDesigner-style work: particle systems with 10⁵–10⁶ points, fluid sims, point-cloud video, mesh-shader-class geometry, GPU-side audio-feature extraction, and large-kernel image processing that does not factor cleanly into a fragment pass.
+- **Backend strategy**: add a `RenderBackend` interface in `src/video/renderer.ts` with two implementations — `webgl2` (current) and `webgpu` (new). Operators register both a GLSL fragment and a WGSL fragment/compute pair; the renderer picks the backend at boot via a capability probe with a user override flag. No operator is WebGPU-only at this phase unless it is genuinely impossible on WebGL2 (compute-heavy ops only).
+- **What WebGPU buys specifically**:
+  - Compute shaders → real particle systems, fluid sims, histogram/CDF passes for adaptive color, GPU-side FFT for video-reactive ops without a CPU readback.
+  - Storage buffers → audio feature buffers (FFT bins, RMS history, onset markers) live on the GPU instead of being uniform-uploaded each frame.
+  - Multiple render targets in one pass → many of the modulate-family ops fold into a single dispatch.
+  - Bindless-ish texture access → cleaner multi-input composition for the Blend family.
+- **Coupling math is unchanged.** The `coupling.ts` mapping (one normalised parameter → video range + audio range) is backend-agnostic. WebGPU only changes how the video side executes the mapped value.
+- **WebGPU is gated to the desktop phase** because Electron pins Chromium ≥ the version that ships stable WebGPU, removing the browser-availability matrix. The web build keeps WebGL2 as the default backend and may expose WebGPU behind a feature flag once Safari WebGPU coverage is acceptable for the web target audience.
+
+### 13.3 Desktop-only affordances (in scope for this phase)
+
+- **Lower-latency audio**: use Electron's `--enable-features=AudioServiceOutOfProcess` and tune `AudioContext` latency hint to `interactive`; expose an explicit "audio buffer size" preference (128/256/512). Target round-trip < 12 ms on macOS CoreAudio, < 20 ms on Windows WASAPI exclusive-mode-equivalent, < 25 ms on Linux PipeWire. Not a guarantee on every device — a target.
+- **File system**: native open/save for video files, presets, project bundles, and rendered output without the browser's File System Access API quirks. Drag-and-drop a video file from Finder/Explorer onto the window.
+- **Hardware MIDI**: Web MIDI works in Chromium; on macOS this gives stable hardware controller mapping without Safari's gaps.
+- **Offline render**: GPU-paced offline render of a project to ProRes/H.264/PNG sequence with synchronized audio. Not realistic in the web build; native FFmpeg sidecar in the desktop build.
+- **System-audio capture**: optional, platform-specific, behind permission. macOS via ScreenCaptureKit (Sequoia+); Windows via WASAPI loopback; Linux via PipeWire. Not promised, listed as deferred.
+- **Persistent project format**: `.avsynth` bundle (zipped JSON graph + linked media references + preset cache). Same format readable by the web build for share-link interop.
+
+### 13.4 Out of scope for this phase (explicitly)
+
+- Native VST/AU plugin host. Different product. If pursued, it is a separate track using a JUCE/CLAP shell, not Electron.
+- Shipping av-synth itself as a VST/AU/CLAP plugin. Different product. Would require rewriting the audio engine outside the browser sandbox.
+- Mobile (iPadOS) packaging. Web build covers iPad via Safari; native iPad is a separate phase if pursued.
+- Custom GPU compositor outside the browser stack. The whole point of Electron + WebGPU is to keep the web stack.
+
+### 13.5 Engineering preconditions (must hold before this phase opens)
+
+1. Web build is at public/professional release — all gates from §10.5 / §10.6 / the release policy in `CLAUDE.md` §2 are green.
+2. `RenderBackend` interface is landed in the web build with `webgl2` as the only implementation, so the WebGPU backend can be added without architectural churn.
+3. Operator registry is backend-aware: each operator declares which backends implement it. CI fails if a registered operator is missing its declared backends.
+4. Coupling tests are backend-parametrised: the AV-coupling acceptance tests run against every available backend and must produce identical mapped values (the *mapping* is backend-independent; only the *render* differs).
+5. Audio engine has zero allocations in `process()` across every worklet, verified by a soak test, before any desktop-headroom claim is made. Desktop does not fix GC stutter; it only moves the budget.
+
+### 13.6 Acceptance criteria for the desktop phase
+
+- App boots on macOS (Apple Silicon + Intel), Windows 10/11 x64, Linux x64 (Ubuntu LTS + one rolling distro), with code-signed installers on macOS and Windows.
+- WebGPU backend is the default on desktop; WebGL2 backend is a fallback toggle.
+- Every operator that runs on web also runs on desktop with identical mapped output for the same normalised parameter (parity test in CI).
+- At least one operator family in `§12 Planned av-synth originals` that was deferred for web due to compute requirements (e.g. particle-based modulate, GPU-side audio analysis) ships in the desktop build, demonstrating the WebGPU headroom.
+- Audible sign-off in `qa/reviews/` repeats on the desktop build under each supported OS, not just inherited from web.
+- Crash-free session rate ≥ 99% over a 4-hour soak on each OS with a representative project.
+- Installer + first-run experience reviewed: no Node-bridge security warnings, no unsigned-binary warnings, no permission prompts that the user does not understand.
+
+### 13.7 Status
+
+- `not-started` (planned final phase). No Electron scaffolding, no WebGPU backend, no `RenderBackend` interface yet. Web build comes first; this section exists so the architecture decisions made before the desktop phase do not accidentally close the door on it.
+
+---
+
+## 14. Granulation engine (core, dual-domain)
+
+This section is now a **summary and release-policy wrapper** around the real engineering contract in [references/granulator-port-spec.md](/Users/marcscully/Projects/av-synth/references/granulator-port-spec.md:1). If this section and the reference spec ever diverge, the reference spec wins and this section must be updated in the same change.
+
+### 14.1 Product rule
+
+- The shipped audio surface is: **granulator + feedback delay + master limiter**.
+- The shipped video surface is: **video grain engine feeding the existing Hydra-style FX rack** from §1–§7.
+- The shared public modulation surface is: **six global LFOs first**, with MIDI/MPE and selected video-derived features joining through the same routing model.
+- The old multi-engine audio rack and the old "every Hydra op has an audio twin" framing are historical context only.
+
+### 14.2 Authoritative control surface
+
+The shipped granulator control set is the 14-control surface defined in [references/granulator-port-spec.md](/Users/marcscully/Projects/av-synth/references/granulator-port-spec.md:112):
+
+- `position`
+- `position_jitter`
+- `pitch`
+- `pitch_jitter`
+- `duration`
+- `duration_jitter`
+- `density`
+- `distribution`
+- `envelope`
+- `pan_spread`
+- `y_spread`
+- `reverse_probability`
+- `voice_count`
+- `mode` (`classic` / `loop` / `cloud`)
+
+Important anti-drift note: there is **no separate `attack/decay` control in v1**. Envelope asymmetry is expressed by envelope choice (`expdec` / `rexpdec`) unless the spec is amended later.
+
+### 14.3 Architectural commitments
+
+- One grain event drives both domains with shared `voice_id`, shared timing, and identical per-grain random statistics.
+- Audio follows the Bencina-style split of scheduling, voice management, and rendering described in [references/granulator-port-spec.md](/Users/marcscully/Projects/av-synth/references/granulator-port-spec.md:15).
+- The scheduler may use `MessagePort` lookahead to the video side; grain-event transport does not require `SharedArrayBuffer` in v1, but immutable audio source data may still use SAB if implementation needs zero-copy random access.
+- The video source path uses the pre-decoded texture-ring strategy from the reference spec; on the web this is intentionally a short-form-footage path with explicit refusal of oversize clips rather than a hidden streaming fallback.
+
+### 14.4 DSP and performance commitments
+
+- Shipped builds use **8-point windowed sinc** as the default interpolator and may fall back to **4-point Hermite** under CPU pressure; linear interpolation is architecture-scaffolding only and never a shipped endpoint.
+- Anti-alias filtering on upward pitch shift, reverse playback support, zero-allocation `process()`, and the 32-default / 64-max voice model are all part of the contract.
+- The quality bar is benchmark parity against Granulator II by listening, not just "it works."
+
+### 14.5 MIDI and modulation
+
+- MIDI is first-class, not stretch scope.
+- MPE support, MIDI-learn, and note-on latency targets are part of the release contract.
+- The six-LFO bank in `src/core/mod-bank.ts` remains the first public modulation language.
+- Video-derived features such as `v.luma`, `v.flux`, and `v.edge` remain valid modulation sources into granulator parameters, but should arrive through the same routing model rather than through standalone monitor-heavy UI.
+
+### 14.6 QA and acceptance policy
+
+The public audio release gate is now narrow:
+
+- granulator listening/performance/timing quality
+- feedback delay sanity and true-peak safety
+- master limiter compliance
+
+Legacy operator-audio audits remain useful as historical/internal coverage where they still exercise shared DSP blocks, but they are no longer the public audio acceptance story.
+
+The acceptance criteria are the ones defined in [references/granulator-port-spec.md](/Users/marcscully/Projects/av-synth/references/granulator-port-spec.md:216), with one important browser-facing clarification: video grain sync is judged as frame-accurate state alignment plus perceptual onset coherence, not as a literal 3 ms visible-pixel requirement.
+
+### 14.7 Reference stack and license boundary
+
+The current reference stack is fixed in:
+
+- [references/README.md](/Users/marcscully/Projects/av-synth/references/README.md:1)
+- [references/granulator-port-spec.md](/Users/marcscully/Projects/av-synth/references/granulator-port-spec.md:1)
+
+That stack is:
+
+- Borderlands source for AV instrument shape
+- Csound `partikkel` for feature taxonomy
+- Bencina for implementation architecture
+- Brandtsegg LAC 2011 for theory/cut confidence
+- Monolake Granulator II pack for listening calibration only
+
+No GPL/LGPL source from `references/` is copied into `src/`.
+
+### 14.8 Status
+
+- `planning` (2026-05-22): the reference stack is in-repo and the spec is written.
+- The remaining pre-implementation gate is Marc sign-off on `references/granulator-port-spec.md`.
+- Once that sign-off lands, implementation starts from the sequencing in the reference spec, not from the older multi-engine audio-rack backlog.
+
+---

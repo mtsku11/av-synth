@@ -10,6 +10,7 @@ export type ParamUnit =
   | 's' // seconds
   | 'sides' // integer count
   | 'cents' // pitch in cents
+  | 'oct' // pitch in octaves
   | 'ratio' // multiplier (e.g. 1.0x, 2.0x)
   | 'rad' // angle in radians
   | 'pct' // percent (value × 100)
@@ -63,6 +64,8 @@ export function formatValue(spec: ParamSpec, value: number): string {
       return `${Math.round(value)}`;
     case 'cents':
       return `${value.toFixed(0)} ¢`;
+    case 'oct':
+      return `${value >= 0 ? '+' : ''}${value.toFixed(2)} oct`;
     case 'ratio':
       return `${value.toFixed(3)}×`;
     case 'rad':

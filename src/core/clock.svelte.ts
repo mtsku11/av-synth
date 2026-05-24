@@ -1,5 +1,6 @@
 // Transport singleton. Owns AudioContext binding and the global musical clock.
 // Reactive via Svelte 5 runes — import `clock` from any component to read state.
+import { createDefaultGlobalLfoBank } from './mod-bank';
 
 class Clock {
   bpm = $state(120);
@@ -9,6 +10,7 @@ class Clock {
   // Global LFO frequency in Hz. Operators read this via CouplingContext.rate.
   // See memory.md (2026-05-16: rate lives on clock).
   rate = $state(0.3);
+  lfoBank = $state(createDefaultGlobalLfoBank());
   running = $state(false);
   // Mirrored AudioContext currentTime, ticked on rAF for UI display.
   displayTime = $state(0);

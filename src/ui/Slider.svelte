@@ -6,15 +6,17 @@
   interface Props {
     spec: ParamSpec;
     value: number;
+    onValueChange?: (value: number) => void;
   }
 
-  let { spec, value = $bindable() }: Props = $props();
+  let { spec, value = $bindable(), onValueChange }: Props = $props();
 
   const c01 = $derived(mapFromCurve(value, spec.range, spec.curve));
 
   function onInput(e: Event) {
     const c = Number((e.currentTarget as HTMLInputElement).value);
     value = mapToCurve(c, spec.range, spec.curve);
+    onValueChange?.(value);
   }
 </script>
 

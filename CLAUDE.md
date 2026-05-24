@@ -8,11 +8,11 @@ This file is the contract Claude reads on every session in this repo. It overrid
 
 ## 1. What this project is
 
-**av-synth** is a browser-based audio-visual synthesiser. It takes a video input (file, camera, screen, or procedurally generated source) and transforms it through a chain of operators **mathematically coupled to a parallel audio chain**. One parameter, one mathematical relationship, two domains — never two unrelated UIs glued together.
+**av-synth** is a browser-based **video-first audio/visual effects tool**. It takes a video input and its attached audio, then transforms both through a shared control/motion language. The public product is not "all of Hydra, but with sound" and not a general-purpose audio rack.
 
-The reference is Hydra (https://hydra.ojack.xyz). The novel contribution is: every Hydra video primitive has a defined, derivable audio analogue, and the coupling is the product, not an afterthought.
+Hydra remains the reference for the **video** operator grammar and compositional feel. The novel contribution is now narrower and clearer: a Hydra-shaped video FX rack paired with a **single serious dual-domain granulator**, one shared feedback delay, and one shared modulation fabric (six LFOs first, MIDI/MPE next, selected video-derived features through the same routing model).
 
-Current state: the modular app is the active implementation, with hardened QA/audit coverage for the implemented operator subset. Staging deploys are allowed for real-world manual testing, but public/professional deployment is blocked until the remaining essential `M3` work lands: the unfinished Color operators and the full Blend family.
+Current state: the video-first correction is largely done, the public shell already has `Video` / `Audio` tabs, the six-LFO bank exists, and the repo still contains older rack/worklet experiments from the superseded multi-engine phase. Those older engines are now **internal/historical context only**. The active public goal is: ship the granulator described in `references/granulator-port-spec.md`, collapse the `Audio` tab to `granulator + feedback delay + limiter`, and keep the video rack strong and simple.
 
 ---
 
@@ -22,70 +22,37 @@ Always read these *as files* — never reconstruct their contents from chat hist
 
 | File | Purpose | When to read |
 |---|---|---|
-| `plan.md` | Full Hydra API ↔ audio-domain mapping. The mathematical spec for every operator. | Before implementing any operator. Before any AV-coupling decision. |
-| `todo.md` | Staged build-out checklist (single-HTML → modular app). | Before starting work. Update as items close. |
+| `plan.md` | Product direction, video-operator math, release policy, and the summary wrapper around the granulator contract. | Before implementing any operator or making scope/release decisions. |
+| `todo.md` | Live backlog and milestone status. | Before starting work. Update as items close. |
 | `memory.md` | Decision log + open questions + design tensions. | At start of session. Append when a non-obvious decision is made. |
-| `av-hydra-preview (1).html` | The working prototype. Source of truth for currently-implemented behaviour. | When porting an existing feature to the modular codebase. |
+| `references/granulator-port-spec.md` | The authoritative engineering contract for the new audio core. | **Mandatory before any audio, MIDI, modulation-routing, or `Audio` tab work.** |
+| `references/README.md` | Provenance and license boundary for the granulator references. | Before implementing DSP details or borrowing ideas from the references. |
+| `qa/README.md` | QA policy, especially the distinction between legacy operator-audio coverage and the future granulator release gate. | Before changing tests or claiming release readiness. |
 
 The harness also has a separate per-session memory dir at `~/.claude/projects/-Users-marcscully-Projects-av-synth/memory/`. That holds cross-session preferences and feedback. The project-level `memory.md` is the human-readable engineering log — distinct from harness memory.
 
 ### Release policy (do not drift)
 
-- A **staging/private deploy** is allowed once the current QA/audit gate is green enough for manual environment testing.
-- A **public/professional deploy** is **not** allowed just because the currently implemented subset passes QA.
-- Public/professional deploy stays blocked until all three are true:
-  1. the final human audible sign-off in `qa/reviews/` is complete,
-  2. the remaining essential `M3` Color work is implemented (`invert`, `luma`, `thresh`, `hue`, `colorama`, `sum`, `.r .g .b .a`),
-  3. the Blend family is implemented (`add`, `sub`, `mult`, `diff`, `layer`, `blend`, `mask`).
-- If you are choosing between “deploy now” and “finish the missing families,” the correct interpretation is:
-  - staging/manual-test deploy: yes, allowed
-  - public/professional release: no, blocked until the essential unfinished `M3` work above is done
+- A **staging/private deploy** is allowed for manual evaluation once the public shell matches the intended product shape and the current QA stack is green enough for environment testing.
+- A **public/professional deploy** is **not** allowed just because the legacy operator matrix or current subset looks green.
+- Public/professional release stays blocked until the following are true:
+  1. the granulator contract in `references/granulator-port-spec.md` is approved and implemented at release quality,
+  2. the public audio surface is honestly collapsed to `granulator + feedback delay + limiter`,
+  3. the final human audible/visual sign-off in `qa/reviews/` is complete,
+  4. the release copy and QA docs no longer imply that the old many-engine rack or per-video-op audio twins are the product.
+- If you are choosing between "ship the old rack because it exists" and "finish the granulator-first core," the correct interpretation is: finish the granulator-first core.
 
 ---
 
 ## 3. Architecture
 
-```
-av-synth/
-├── index.html                      # Vite entry
-├── package.json
-├── vite.config.ts
-├── tsconfig.json
-├── src/
-│   ├── main.ts                     # boot
-│   ├── App.svelte                  # root
-│   ├── core/
-│   │   ├── graph.ts                # patch graph: nodes, edges, params
-│   │   ├── params.ts               # ParamSpec types, ranges, units
-│   │   ├── clock.ts                # transport, bpm, time, sequencer
-│   │   ├── coupling.ts             # AV mapping table — executable form of plan.md
-│   │   └── presets.ts
-│   ├── video/
-│   │   ├── renderer.ts             # WebGL2 context, FBO ping-pong, render loop
-│   │   ├── shaders/                # one folder per operator family
-│   │   │   ├── sources/            # osc, noise, voronoi, shape, gradient, solid
-│   │   │   ├── geometry/           # rotate, scale, pixelate, repeat, kaleid, scroll
-│   │   │   ├── color/              # posterize, contrast, hue, luma, thresh, …
-│   │   │   ├── blend/              # add, sub, mult, diff, layer, blend, mask
-│   │   │   ├── modulate/           # modulate, modulateRotate, modulateScale, …
-│   │   │   └── copy.frag
-│   │   ├── operators.ts            # operator registry, chainable Hydra-style API
-│   │   └── sources.ts              # cam / image / video / screen init
-│   ├── audio/
-│   │   ├── engine.ts               # AudioContext, graph builder, routing
-│   │   ├── worklets/               # AudioWorkletProcessor implementations
-│   │   ├── operators.ts            # mirrors video operator API; same names, audio impl
-│   │   ├── analyser.ts             # FFT + RMS + flux for video reactivity
-│   │   └── sources.ts              # mic / file / line / system-audio
-│   ├── ui/
-│   │   ├── Patch.svelte            # patch editor
-│   │   ├── Knob.svelte, Slider.svelte, Editor.svelte, Scope.svelte
-│   │   └── styles/
-│   └── lib/
-│       ├── math.ts                 # lerp, smoothstep, easing, dB↔linear
-│       └── glsl-loader.ts          # ?raw imports for shader strings
-└── public/presets/
-```
+Think about the runtime in three public layers:
+
+1. **Video rack** — the Hydra-shaped operator chain in `src/ui/Patch.svelte`, compiled by `src/core/patch-graph.ts`, rendered by `src/video/renderer.ts`.
+2. **Audio core** — the public `Audio` tab in `src/ui/AudioRack.svelte`, which should collapse to one granulator card plus one feedback-delay card, both driven by `src/audio/engine.ts`.
+3. **Shared modulation** — `src/core/mod-bank.ts`, MIDI input, and selected video-derived features feeding both domains through one routing model.
+
+Important implementation consequence: the older rack engines and older per-operator audio worklets may stay in-repo as scaffolding or internal blocks, but they are no longer the public architecture target.
 
 ### Stack (fixed unless escalated)
 
@@ -93,19 +60,19 @@ av-synth/
 - **Build**: Vite.
 - **UI**: Svelte (component model for patch UI, control surfaces, modal panels). Canvases and worklets are framework-agnostic.
 - **Video**: raw WebGL2. No three.js, no regl yet — the operator set is hand-written GLSL and that's the whole point.
-- **Audio**: Web Audio API + custom AudioWorklets for every non-trivial operator. Built-in nodes (`GainNode`, `DelayNode`, `BiquadFilterNode`, `AnalyserNode`) are fine where they're a perfect fit. Anything Hydra-shaped goes in a worklet.
+- **Audio**: Web Audio API + custom AudioWorklets for the granulator core and any genuinely non-trivial DSP blocks. Built-in nodes (`GainNode`, `DelayNode`, `BiquadFilterNode`, `AnalyserNode`) are fine where they're a perfect fit. Do not treat "Hydra-shaped audio twin" as an architecture requirement anymore.
 - **State**: a single reactive graph object (`src/core/graph.ts`). Parameters are typed by `ParamSpec` (range, unit, default, automation source). Both renderers subscribe; neither owns the truth.
 - **No backend** at this stage. Everything is static and runs in the browser.
 
 ### Coupling principle (non-negotiable)
 
-Every user-facing parameter has **one canonical specification** in `src/core/coupling.ts`. That spec exposes:
-- a *normalised* control value (the slider/knob),
-- a *video mapping* (range, curve, unit) consumed by the video operator,
-- an *audio mapping* (range, curve, unit) consumed by the audio operator,
-- and a *coupling function* (often identity, sometimes a fixed mathematical relationship — e.g. spatial frequency in cycles-per-screen → temporal frequency in Hz via the chosen base mapping).
+Every user-facing parameter still has **one canonical specification** at the coupling/modulation layer. For the video rack, that means mapped values consumed by the video operators. For the new audio direction, that means shared modulation/control data feeding the granulator and feedback core, not a requirement that every video operator still owns its own public audio twin.
 
-Renderers do not read raw slider values. They read mapped values from the coupling layer. This is the only way the AV stays in lockstep.
+Do not reintroduce the old assumption that "coupled" means "every Hydra operator must ship as a parallel public audio effect." In the current product, coupling mainly means:
+- one shared time base,
+- one shared modulation language,
+- one shared grain-event law across audio and video,
+- one honest relationship between visible motion/texture and audible motion/texture.
 
 ---
 
@@ -128,19 +95,23 @@ Renderers do not read raw slider values. They read mapped values from the coupli
 - **Git writes require explicit user approval.** Do not `git commit`, `git push`, amend commits, rebase, or rewrite history unless the user explicitly asks for that action after review.
 - **Default stopping point:** implement, update docs, run verification, and stop for review. Do not decide on your own that work should be committed or pushed.
 
-### Hydra-fidelity rules
+### Video/Hydra-fidelity rules
 
 - Operator **names match Hydra exactly** (`modulateRotate`, not `modulate_rotate` or `rotateMod`). Parameter names and ordering also match Hydra where Hydra defines them. Deviations require a memory.md entry.
-- Each operator has both a **video shader fragment** and an **audio worklet/node graph**, registered under the same key.
-- Each operator declares its **coupling spec** (see §3). No video-only operators without an audio analogue — if one is genuinely uncoupled, mark it `coupling: 'visual-only'` and justify in `plan.md`.
+- Hydra parity is a **video** concern first. Do not port Hydra operators just to recreate the superseded one-audio-twin-per-video-op model.
+- Two-input/routed `modulate*` work is still valuable on the video side when it produces stronger composition and abstraction. Treat those as product-shaping video features, not as an excuse to expand the public audio engine list.
 
 ### Audio rules
 
+- The shipped public audio surface is: **granulator + feedback delay + master limiter**.
+- Before touching audio, MIDI, or modulation routing, read `references/granulator-port-spec.md`.
+- Do **not** add new public audio-engine families (`FM`, `fold`, `freeze`, `tone`, `space`, etc.) unless the user explicitly changes scope and the docs are updated first.
+- Legacy worklets/rack engines can be reused internally if they materially help implementation, but do not keep or expand them as public cards just because they already exist.
 - **Sample-accurate timing matters.** Anything that schedules events uses the `AudioContext.currentTime` clock, not `setTimeout` or `requestAnimationFrame`.
 - **k-rate vs a-rate parameter automation** is a deliberate choice per operator. Document which in the worklet header.
 - **No clipping by default.** Master bus has a brick-wall limiter and a measurement tap. Loud presets must still measure under 0 dBFS true-peak.
 - **AudioWorklet first.** Avoid `ScriptProcessorNode` (deprecated, main-thread).
-- **All worklets ship a unit `process()` test** in `src/audio/worklets/__tests__/`.
+- **Granulator/feedback and any retained internal worklets ship worklet-level `process()` coverage.**
 
 ### Video rules
 
@@ -153,6 +124,8 @@ Renderers do not read raw slider values. They read mapped values from the coupli
 ### UI rules
 
 - The control surface is a product, not a debug panel. Type everything, label everything in physical units (Hz, dB, ms, sides, %), show value next to control.
+- Keep the public split clear: `Video` tab for the Hydra-shaped video rack, `Audio` tab for the collapsed granulator-first audio core, shared modulation surfaced once rather than duplicated everywhere.
+- Prefer compact family pickers and a small number of high-value controls over wide technical panels or monitor-heavy global chrome.
 - Visual identity: dark, high-contrast, monospaced for numerics, generous spacing. Treat the UI like a hardware synth panel.
 
 ---
@@ -180,9 +153,10 @@ Never delegate to DeepSeek: debugging, architecture decisions, security-sensitiv
 
 Inherits the global Post-Push Verification Protocol. Plus, for this project specifically:
 
-- **Any audio change** → load the app, play a video, listen for: clipping, denormals (CPU spike on silence), pops on parameter changes, DC drift. The AudioWorklet console must be clear.
+- **Any audio or modulation change** → load the app, play a video, and listen for: clipping, denormals (CPU spike on silence), pops on parameter changes, DC drift, stuck voices, or modulation steps that read like zipper noise. The AudioWorklet console must be clear.
 - **Any video shader change** → load the app, run each preset, scrub each slider end-to-end. Capture screenshots via Playwright for regressions.
-- **Any coupling change** → both renderers must reflect the same control input within one frame (~16 ms) and one audio block (~3 ms at 128-frame, 48 kHz).
+- **Any coupling or LFO-routing change** → both domains must reflect the same source assignment and depth, and no bespoke per-operator modulation UI should appear unless the user explicitly asks for it.
+- **Any granulator implementation step** → verify against `references/granulator-port-spec.md` instead of the old rack behavior. Legacy operator-audio tests are not enough to claim success on the new audio direction.
 
 ---
 
@@ -191,8 +165,9 @@ Inherits the global Post-Push Verification Protocol. Plus, for this project spec
 When you (Claude) need information:
 
 1. **First**, re-read the relevant project file (`plan.md`, `todo.md`, `memory.md`, source file).
-2. **Second**, if cross-file, use `ask-deepseek` per the global rule.
-3. **Last**, fall back to chat-history recall. Treat it as the least authoritative source.
+2. **Second**, if the task touches audio, granulation, MIDI, or modulation, read `references/granulator-port-spec.md` and `references/README.md` before writing code.
+3. **Third**, if cross-file, use `ask-deepseek` per the global rule.
+4. **Last**, fall back to chat-history recall. Treat it as the least authoritative source.
 
 If a fact contradicts between chat history and a file, the file wins.
 
@@ -202,7 +177,8 @@ If a fact contradicts between chat history and a file, the file wins.
 
 1. Read `memory.md` for outstanding decisions and questions.
 2. Read `todo.md` for the active milestone.
-3. If the user is asking about behaviour: skim `plan.md` for the operator spec before guessing.
-4. Check whether the task is for **staging/manual testing** or **public/professional release**; do not conflate them.
-5. Before ending the session, sync any affected Markdown files (`todo.md`, `plan.md`, `memory.md`, `CLAUDE.md`) to match the implementation and policy state.
-6. State the assumed task in one sentence, declare any assumption, then go.
+3. Skim `plan.md` for the current product/release direction before guessing.
+4. If the task touches audio, modulation, MIDI, or the `Audio` tab, read `references/granulator-port-spec.md` before touching code.
+5. Check whether the task is for **staging/manual testing** or **public/professional release**; do not conflate them.
+6. Before ending the session, sync any affected Markdown files (`todo.md`, `plan.md`, `memory.md`, `CLAUDE.md`) to match the implementation and policy state.
+7. State the assumed task in one sentence, declare any assumption, then go.

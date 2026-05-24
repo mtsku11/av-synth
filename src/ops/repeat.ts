@@ -1,15 +1,13 @@
-// repeat — UV tiling (video) + dual-channel IIR feedback comb (audio).
-// plan.md §2.4: spatial period 1/repeatX ↔ temporal period 1/(repeatX · loopHz).
-// One beat (60/bpm) is the loop window — comb delay = beat / reps.
-// `offsetX/Y` shift the tap phase within one period.
+// repeat — UV tiling (video) + stereo grain-slice repetition (audio).
+// The audio side is intentionally no longer a literal comb filter: repeated
+// image tiles read more convincingly as looping recent-time grains than as a
+// resonator when stacked in the product path.
 
 import frag from '../video/shaders/repeat.frag?raw';
-import type { OperatorDef, VideoStage, AudioStage } from '../core/operators';
+import type { OperatorDef, VideoStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
-
-const MAX_DELAY_S = 4; // accommodates slow tempos at reps=1
-const FEEDBACK = 0.6; // fixed comb depth — audible but stable
+import { RepeatTextureAudioStage } from './repeat-audio';
 
 class RepeatVideoStage implements VideoStage {
   readonly op = 'repeat';
@@ -46,82 +44,6 @@ class RepeatVideoStage implements VideoStage {
   }
 }
 
-class RepeatAudioStage implements AudioStage {
-  readonly op = 'repeat';
-  readonly input: GainNode;
-  readonly output: ChannelMergerNode;
-  readonly #splitter: ChannelSplitterNode;
-  readonly #delayL: DelayNode;
-  readonly #delayR: DelayNode;
-  readonly #fbL: GainNode;
-  readonly #fbR: GainNode;
-  readonly #mergeL: GainNode;
-  readonly #mergeR: GainNode;
-
-  constructor(ctx: AudioContext) {
-    this.input = ctx.createGain();
-    this.input.channelCount = 2;
-    this.input.channelCountMode = 'explicit';
-    this.input.channelInterpretation = 'speakers';
-
-    this.#splitter = ctx.createChannelSplitter(2);
-    this.output = ctx.createChannelMerger(2);
-
-    this.#delayL = ctx.createDelay(MAX_DELAY_S);
-    this.#delayR = ctx.createDelay(MAX_DELAY_S);
-    this.#fbL = ctx.createGain();
-    this.#fbR = ctx.createGain();
-    this.#fbL.gain.value = FEEDBACK;
-    this.#fbR.gain.value = FEEDBACK;
-    this.#mergeL = ctx.createGain();
-    this.#mergeR = ctx.createGain();
-
-    // L chain: split[0] → delayL → mergeL → output(L); feedback delayL → fbL → delayL
-    this.input.connect(this.#splitter);
-    this.#splitter.connect(this.#mergeL, 0); // dry L
-    this.#splitter.connect(this.#delayL, 0); // wet L tap
-    this.#delayL.connect(this.#fbL).connect(this.#delayL);
-    this.#delayL.connect(this.#mergeL);
-    this.#mergeL.connect(this.output, 0, 0);
-
-    this.#splitter.connect(this.#mergeR, 1);
-    this.#splitter.connect(this.#delayR, 1);
-    this.#delayR.connect(this.#fbR).connect(this.#delayR);
-    this.#delayR.connect(this.#mergeR);
-    this.#mergeR.connect(this.output, 0, 1);
-  }
-
-  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
-    const rx = Math.max(1, params['repeatX'] ?? 3);
-    const ry = Math.max(1, params['repeatY'] ?? 3);
-    const ox = Math.max(0, Math.min(1, params['offsetX'] ?? 0));
-    const oy = Math.max(0, Math.min(1, params['offsetY'] ?? 0));
-
-    const beat = 60 / Math.max(1, ctx.bpm);
-    const periodL = Math.min(MAX_DELAY_S, beat / rx);
-    const periodR = Math.min(MAX_DELAY_S, beat / ry);
-    // Offset shifts the tap phase by up to one period. Clamp so delayTime > 0.
-    const dL = Math.max(0.001, periodL * (1 + ox * 0.999));
-    const dR = Math.max(0.001, periodR * (1 + oy * 0.999));
-
-    const now = this.#delayL.context.currentTime;
-    this.#delayL.delayTime.setTargetAtTime(Math.min(MAX_DELAY_S, dL), now, 0.02);
-    this.#delayR.delayTime.setTargetAtTime(Math.min(MAX_DELAY_S, dR), now, 0.02);
-  }
-
-  dispose(): void {
-    this.input.disconnect();
-    this.#splitter.disconnect();
-    this.#delayL.disconnect();
-    this.#delayR.disconnect();
-    this.#fbL.disconnect();
-    this.#fbR.disconnect();
-    this.#mergeL.disconnect();
-    this.#mergeR.disconnect();
-    this.output.disconnect();
-  }
-}
-
 export const repeatDef: OperatorDef = {
   op: 'repeat',
   paramOrder: ['repeatX', 'repeatY', 'offsetX', 'offsetY'],
@@ -139,7 +61,7 @@ export const repeatDef: OperatorDef = {
           default: 1,
           curve: 'lin',
           unit: 'sides',
-          hint: 'X tiles (video) / L-comb period = beat/reps (audio)',
+          hint: 'X tiles (video) / recent-time grain repeat density (audio)',
         },
         toVideo: (c01) => c01,
         toAudio: (c01) => c01,
@@ -152,7 +74,7 @@ export const repeatDef: OperatorDef = {
           default: 1,
           curve: 'lin',
           unit: 'sides',
-          hint: 'Y tiles (video) / R-comb period = beat/reps (audio)',
+          hint: 'Y tiles (video) / stereo grain repeat density (audio)',
         },
         toVideo: (c01) => c01,
         toAudio: (c01) => c01,
@@ -165,7 +87,7 @@ export const repeatDef: OperatorDef = {
           default: 0,
           curve: 'lin',
           unit: 'norm',
-          hint: 'X tile phase shift / L tap phase shift within one period',
+          hint: 'X tile phase shift / grain loop position bias',
         },
         toVideo: (c01) => c01,
         toAudio: (c01) => c01,
@@ -178,7 +100,7 @@ export const repeatDef: OperatorDef = {
           default: 0,
           curve: 'lin',
           unit: 'norm',
-          hint: 'Y tile phase shift / R tap phase shift within one period',
+          hint: 'Y tile phase shift / stereo grain phase bias',
         },
         toVideo: (c01) => c01,
         toAudio: (c01) => c01,
@@ -189,6 +111,6 @@ export const repeatDef: OperatorDef = {
     return new RepeatVideoStage(gl);
   },
   createAudioStage(ctx) {
-    return new RepeatAudioStage(ctx);
+    return new RepeatTextureAudioStage(ctx);
   },
 };

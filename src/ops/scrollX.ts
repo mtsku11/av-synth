@@ -1,17 +1,14 @@
-// scrollX — horizontal UV translation (video) + delay-line scrub (audio).
-// plan.md §2.7: amount = static delay-tap offset; speed = LFO Hz on tap.
+// scrollX — horizontal UV translation (video) + phase-offset smear (audio).
 //
-// Implementation: DelayNode whose delayTime = base · amount + lfo · depth,
-// where lfo is a sine at speed Hz. ConstantSource centres the modulation
-// above zero so delayTime never goes negative.
+// A horizontal image translation is a spatial phase offset, not a phase
+// modulation. The audio analogue therefore stays as a fixed fractional-delay
+// branch whose stereo placement can move with speed, instead of scrubbing the
+// delay time and reading like unintended vibrato.
 
 import frag from '../video/shaders/scrollX.frag?raw';
 import type { OperatorDef, VideoStage, AudioStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
-
-const MAX_DELAY_S = 0.5;
-const LFO_DEPTH_S = 0.02; // 20 ms vibrato depth at full speed
 
 class ScrollXVideoStage implements VideoStage {
   readonly op = 'scrollX';
@@ -49,39 +46,57 @@ class ScrollXAudioStage implements AudioStage {
   readonly op = 'scrollX';
   readonly input: GainNode;
   readonly output: GainNode;
-  readonly #delay: DelayNode;
+  readonly #worklet: AudioWorkletNode;
+  readonly #dry: GainNode;
+  readonly #wet: GainNode;
+  readonly #panner: StereoPannerNode;
   readonly #lfo: OscillatorNode;
   readonly #depth: GainNode;
-  readonly #baseDelay: ConstantSourceNode;
+  readonly #amount: AudioParam;
+  readonly #basePan: ConstantSourceNode;
 
   constructor(ctx: AudioContext) {
     this.input = ctx.createGain();
     this.output = ctx.createGain();
-    this.#delay = ctx.createDelay(MAX_DELAY_S);
+    this.#worklet = new AudioWorkletNode(ctx, 'phase-offset', {
+      parameterData: { amount: 0 },
+    });
+    const amount = this.#worklet.parameters.get('amount');
+    if (!amount) throw new Error('scrollX: missing phase-offset amount param');
+    this.#amount = amount;
+    this.#dry = ctx.createGain();
+    this.#wet = ctx.createGain();
+    this.#panner = ctx.createStereoPanner();
     this.#lfo = ctx.createOscillator();
     this.#lfo.type = 'sine';
     this.#lfo.frequency.value = 0;
     this.#depth = ctx.createGain();
     this.#depth.gain.value = 0;
-    this.#baseDelay = ctx.createConstantSource();
-    this.#baseDelay.offset.value = MAX_DELAY_S * 0.5;
-    this.#baseDelay.start();
+    this.#basePan = ctx.createConstantSource();
+    this.#basePan.offset.value = 0;
+    this.#basePan.start();
 
-    this.input.connect(this.#delay).connect(this.output);
-    this.#baseDelay.connect(this.#delay.delayTime);
-    this.#lfo.connect(this.#depth).connect(this.#delay.delayTime);
+    this.input.connect(this.#dry).connect(this.output);
+    this.input.connect(this.#worklet);
+    this.#worklet.connect(this.#wet).connect(this.#panner).connect(this.output);
+    this.#basePan.connect(this.#panner.pan);
+    this.#lfo.connect(this.#depth);
+    this.#depth.connect(this.#panner.pan);
     this.#lfo.start();
   }
 
   setParams(params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {
     const amount = Math.max(0, Math.min(1, params['amount'] ?? 0.5));
     const speed = params['speed'] ?? 0;
-    const base = Math.max(0.001, amount * MAX_DELAY_S);
-    const now = this.#delay.context.currentTime;
-    this.#baseDelay.offset.setTargetAtTime(base, now, 0.02);
+    const now = this.output.context.currentTime;
+    const wet = amount * 0.82;
+    const dry = 1 - amount * 0.35;
+    this.#amount.setTargetAtTime(amount, now, 0.02);
     this.#lfo.frequency.setTargetAtTime(Math.abs(speed), now, 0.02);
-    // Depth scales with both amount (so dry → 0 modulation) and |speed|.
-    const depth = Math.min(LFO_DEPTH_S, base * 0.5) * Math.min(1, Math.abs(speed));
+    this.#dry.gain.setTargetAtTime(dry, now, 0.02);
+    this.#wet.gain.setTargetAtTime(wet, now, 0.02);
+    this.#basePan.offset.setTargetAtTime(0, now, 0.02);
+    const depth = Math.min(1, amount * 0.55 + Math.abs(speed) * 0.12);
     this.#depth.gain.setTargetAtTime(speed >= 0 ? depth : -depth, now, 0.02);
   }
 
@@ -92,15 +107,16 @@ class ScrollXAudioStage implements AudioStage {
       // already stopped
     }
     try {
-      this.#baseDelay.stop();
-    } catch {
-      // already stopped
-    }
+      this.#basePan.stop();
+    } catch {}
     this.input.disconnect();
-    this.#delay.disconnect();
+    this.#worklet.disconnect();
+    this.#dry.disconnect();
+    this.#wet.disconnect();
+    this.#panner.disconnect();
     this.#lfo.disconnect();
     this.#depth.disconnect();
-    this.#baseDelay.disconnect();
+    this.#basePan.disconnect();
     this.output.disconnect();
   }
 }
@@ -122,7 +138,7 @@ export const scrollXDef: OperatorDef = {
           default: 0,
           curve: 'lin',
           unit: 'norm',
-          hint: 'X translation (video) / delay-tap position (audio)',
+          hint: 'X translation (video) / fixed phase-offset depth (audio)',
         },
         toVideo: (c01) => c01,
         toAudio: (c01) => c01,
@@ -135,7 +151,7 @@ export const scrollXDef: OperatorDef = {
           default: 0,
           curve: 'lin',
           unit: 'hz',
-          hint: 'X scroll rate (video) / delay LFO rate (audio, signed)',
+          hint: 'X scroll rate (video) / stereo motion rate of the offset layer (audio, signed)',
         },
         toVideo: (c01) => c01,
         toAudio: (c01) => c01,

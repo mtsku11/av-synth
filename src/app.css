@@ -1,9 +1,10 @@
 :root {
-  --bg: #0a0a0c;
-  --fg: #e8e8eb;
-  --muted: #7a7a82;
-  --line: #1f1f24;
-  --accent: #7ee0ff;
+  --bg: #cfcfcf;
+  --fg: #000000;
+  --muted: #555555;
+  --line: #888888;
+  --accent: #2266cc;
+  --accent-dim: #a8c7ff;
   --warn: #ffae6e;
   --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;

@@ -1,8 +1,9 @@
 // feedback — frame-blend with the previous final output (video) and
-// delay-with-feedback (audio).
+// smeared freeze / feedback-PM echo (audio).
 //
 // Video: out = mix(current, prev_final, fb)  (plan.md §9)
-// Audio: delay line with feedback gain. Same `fb` parameter drives both.
+// Audio: previous-audio freeze + short delay-read PM. Same `fb` parameter
+// drives both the visual history mix and the audio freeze/displacement depth.
 
 import frag from '../video/shaders/feedback.frag?raw';
 import type { OperatorDef, VideoStage, AudioStage } from '../core/operators';
@@ -42,50 +43,69 @@ class FeedbackAudioStage implements AudioStage {
   readonly op = 'feedback';
   readonly input: GainNode;
   readonly output: GainNode;
-  readonly #delay: DelayNode;
-  readonly #fbGain: GainNode;
+  readonly #worklet: AudioWorkletNode;
+  readonly #feedback: AudioParam;
+  readonly #delayTime: AudioParam;
   readonly #wet: GainNode;
   readonly #dry: GainNode;
+  readonly #dcBlocker: BiquadFilterNode;
+  readonly #compensate: GainNode;
 
   constructor(ctx: AudioContext) {
     this.input = ctx.createGain();
     this.output = ctx.createGain();
-    this.#delay = ctx.createDelay(2.0);
-    this.#delay.delayTime.value = 0.18;
-    this.#fbGain = ctx.createGain();
-    this.#fbGain.gain.value = 0;
+    this.#worklet = new AudioWorkletNode(ctx, 'feedback-freeze', {
+      parameterData: { feedback: 0, delayTime: 0.18 },
+    });
+    const feedback = this.#worklet.parameters.get('feedback');
+    const delayTime = this.#worklet.parameters.get('delayTime');
+    if (!feedback || !delayTime) throw new Error('feedback: missing worklet params');
+    this.#feedback = feedback;
+    this.#delayTime = delayTime;
     this.#wet = ctx.createGain();
     this.#wet.gain.value = 0;
     this.#dry = ctx.createGain();
     this.#dry.gain.value = 1;
+    this.#dcBlocker = ctx.createBiquadFilter();
+    this.#dcBlocker.type = 'highpass';
+    this.#dcBlocker.frequency.value = 18;
+    this.#dcBlocker.Q.value = 0.0001;
+    this.#compensate = ctx.createGain();
+    this.#compensate.gain.value = 1;
 
-    // dry path
     this.input.connect(this.#dry);
     this.#dry.connect(this.output);
-    // delay path with feedback loop
-    this.input.connect(this.#delay);
-    this.#delay.connect(this.#fbGain);
-    this.#fbGain.connect(this.#delay);
-    this.#delay.connect(this.#wet);
+
+    this.input.connect(this.#worklet);
+    this.#worklet.connect(this.#dcBlocker);
+    this.#dcBlocker.connect(this.#compensate);
+    this.#compensate.connect(this.#wet);
     this.#wet.connect(this.output);
   }
 
   setParams(params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {
     const fb = Math.min(0.95, Math.max(0, params['feedback'] ?? 0));
     const delayTime = Math.max(0.001, params['delayTime'] ?? 0.18);
-    const now = this.#fbGain.context.currentTime;
-    this.#fbGain.gain.setTargetAtTime(fb, now, 0.02);
-    this.#wet.gain.setTargetAtTime(fb, now, 0.02);
-    this.#delay.delayTime.setTargetAtTime(delayTime, now, 0.05);
+    const now = this.input.context.currentTime;
+    const theta = fb * (Math.PI / 2);
+    const dry = Math.cos(theta);
+    const wet = Math.sin(theta);
+    const compensation = 1 - fb * 0.2 + fb * (1 / (1 + delayTime * 0.35 + fb * 0.25));
+    this.#feedback.setTargetAtTime(fb, now, 0.02);
+    this.#delayTime.setTargetAtTime(delayTime, now, 0.05);
+    this.#dry.gain.setTargetAtTime(dry, now, 0.02);
+    this.#wet.gain.setTargetAtTime(wet, now, 0.02);
+    this.#compensate.gain.setTargetAtTime(compensation, now, 0.02);
   }
 
   dispose(): void {
     this.input.disconnect();
     this.output.disconnect();
-    this.#delay.disconnect();
-    this.#fbGain.disconnect();
+    this.#worklet.disconnect();
     this.#wet.disconnect();
     this.#dry.disconnect();
+    this.#dcBlocker.disconnect();
+    this.#compensate.disconnect();
   }
 }
 
@@ -105,7 +125,7 @@ export const feedbackDef: OperatorDef = {
           default: 0,
           curve: 'lin',
           unit: 'norm',
-          hint: 'frame mix with previous output (video) / delay feedback gain (audio)',
+          hint: 'frame mix with previous output (video) / smeared freeze and feedback-PM depth (audio)',
         },
         toVideo: (raw) => raw,
         toAudio: (raw) => raw,
@@ -118,7 +138,7 @@ export const feedbackDef: OperatorDef = {
           default: 0.18,
           curve: 'log',
           unit: 's',
-          hint: 'audio delay time (no direct video analogue — uncoupled)',
+          hint: 'audio lookback window for the freeze/echo texture (no direct video analogue — uncoupled)',
         },
         toVideo: () => 0, // unused in video
         toAudio: (raw) => raw,

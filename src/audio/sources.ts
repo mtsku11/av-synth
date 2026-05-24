@@ -55,7 +55,12 @@ export class VideoElementAudioSource implements AudioSourceStage {
     ctxCache.set(video, this.output);
   }
 
-  dispose(): void {
-    this.output.disconnect();
-  }
+  // The output node is owned by the per-AudioContext WeakMap cache for the
+  // lifetime of the AudioContext (createMediaElementSource cannot be called
+  // twice for the same <video>). Disconnecting here is a bug: AudioEngine.setSource
+  // already disconnects old.output BEFORE swapping, and the new wrapper shares
+  // the same cached node — so the old wrapper's dispose() would re-disconnect
+  // it AFTER #rewire() had reconnected it, leaving the chain silent on a
+  // stop → restart cycle.
+  dispose(): void {}
 }
