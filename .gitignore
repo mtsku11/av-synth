@@ -32,6 +32,9 @@ Thumbs.db
 # Personal scratch
 scratch/
 *.scratch.*
+.claude/
+cello2.mp4
+av-synth-*.png
 
 # Playwright local screenshots
 .playwright-mcp/
