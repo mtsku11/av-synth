@@ -1,0 +1,122 @@
+name: Deploy Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Deploy target
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+      run_post_deploy_smoke:
+        description: Run Playwright smoke against the deployed URL
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: deploy-pages-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.target }}
+    outputs:
+      deployment_url: ${{ steps.capture.outputs.deployment_url }}
+      alias_url: ${{ steps.capture.outputs.alias_url }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Validate Cloudflare config
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing secret CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing secret CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          test -n "$CLOUDFLARE_PAGES_PROJECT" || { echo "Missing variable CLOUDFLARE_PAGES_PROJECT"; exit 1; }
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Deploy staging build
+        if: ${{ inputs.target == 'staging' }}
+        id: deploy_staging
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: pages deploy dist --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=${{ vars.CLOUDFLARE_PAGES_STAGING_BRANCH || 'staging' }}
+
+      - name: Deploy production build
+        if: ${{ inputs.target == 'production' }}
+        id: deploy_production
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: pages deploy dist --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=${{ vars.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || 'main' }}
+
+      - name: Capture deployment URLs
+        id: capture
+        run: |
+          echo "deployment_url=${{ steps.deploy_staging.outputs['deployment-url'] || steps.deploy_production.outputs['deployment-url'] }}" >> "$GITHUB_OUTPUT"
+          echo "alias_url=${{ steps.deploy_staging.outputs['pages-deployment-alias-url'] || steps.deploy_production.outputs['pages-deployment-alias-url'] || steps.deploy_staging.outputs['deployment-url'] || steps.deploy_production.outputs['deployment-url'] }}" >> "$GITHUB_OUTPUT"
+
+      - name: Summarize deployment
+        run: |
+          echo "## Cloudflare Pages deploy" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- target: ${{ inputs.target }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- deployment url: ${{ steps.capture.outputs.deployment_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- alias url: ${{ steps.capture.outputs.alias_url }}" >> "$GITHUB_STEP_SUMMARY"
+
+  post_deploy_smoke:
+    if: ${{ inputs.run_post_deploy_smoke }}
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ${{ inputs.target }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run post-deploy smoke
+        env:
+          CI: true
+          PLAYWRIGHT_BASE_URL: ${{ needs.deploy.outputs.alias_url || needs.deploy.outputs.deployment_url }}
+        run: npm run qa:smoke:external

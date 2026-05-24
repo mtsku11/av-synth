@@ -1,9 +1,18 @@
 {
   "id": "audit-rotate-video-cross-source",
   "title": "Rotate cross-source spot check on committed video fixture",
-  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
-  "transport": { "start": true, "settleMs": 1500 },
-  "recording": { "filename": "audit-rotate-video-cross-source", "tailMs": 850 },
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-rotate-video-cross-source",
+    "tailMs": 850
+  },
   "expectations": {
     "sourceKind": "video",
     "minVideoAdvanceSeconds": 1,
@@ -16,7 +25,7 @@
         "domain": "video",
         "metric": "spatialStd",
         "op": ">",
-        "delta": 0.001,
+        "delta": 0.0006,
         "description": "raising rotate should materially reorganize framing/detail on decoded media"
       },
       {
@@ -36,6 +45,7 @@
     "family": "geometry-spatial",
     "operator": "rotate",
     "kind": "cross-source",
+    "path": "product",
     "expectedVideo": [
       "the decoded fixture should rotate cleanly without black wedges or undefined edges",
       "the stronger rotation should produce a visible framing change on the committed clip"

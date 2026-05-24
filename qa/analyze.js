@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 
+import { findArtifact } from './artifacts.js';
+
 const ROOT = process.cwd();
 const CASES_DIR = path.join(ROOT, 'qa/cases');
 const RESULTS_DIR = path.join(ROOT, 'qa/results/playwright/test-results');
@@ -30,26 +32,6 @@ function defaultReferenceVideo(qaCase) {
   if (!qaCase.recording?.filename) return null;
   const candidate = path.join(ROOT, 'qa/references', `${qaCase.recording.filename}.webm`);
   return fs.existsSync(candidate) ? candidate : null;
-}
-
-function walk(dir) {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) files.push(...walk(fullPath));
-    else files.push(fullPath);
-  }
-  return files;
-}
-
-function findArtifact(caseId, filename) {
-  if (!fs.existsSync(RESULTS_DIR)) return null;
-  const expectedDirName = `smoke-${caseId}`;
-  const expectedPath = path.join(RESULTS_DIR, expectedDirName, filename);
-  if (fs.existsSync(expectedPath)) return expectedPath;
-  const matches = walk(RESULTS_DIR).filter((file) => path.basename(file) === filename);
-  return matches[0] ?? null;
 }
 
 function sha256File(filePath) {
@@ -506,7 +488,7 @@ function buildCaseAnalysis(qaCase, config) {
   }
 
   const webmName = `${qaCase.recording.filename}.webm`;
-  const webmPath = findArtifact(qaCase.id, webmName);
+  const webmPath = findArtifact(RESULTS_DIR, qaCase.id, webmName);
   if (!webmPath) {
     return {
       caseId: qaCase.id,
@@ -636,9 +618,38 @@ function main() {
       return acc;
     }, {}),
   ).sort((a, b) => a.family.localeCompare(b.family));
+  const PATH_PRIORITY = {
+    product: 0,
+    'operator-regression': 1,
+    'source-coverage': 2,
+    unclassified: 3,
+  };
+  const paths = Object.values(
+    results.reduce((acc, result) => {
+      const pathKey = result.audit?.path ?? 'unclassified';
+      if (!acc[pathKey]) {
+        acc[pathKey] = { path: pathKey, total: 0, ok: 0, families: {}, cases: [] };
+      }
+      const entry = acc[pathKey];
+      entry.total += 1;
+      if (result.status === 'ok') entry.ok += 1;
+      const fam = result.audit?.family ?? 'unclassified';
+      entry.families[fam] ??= 0;
+      entry.families[fam] += 1;
+      entry.cases.push({
+        caseId: result.caseId,
+        family: fam,
+        operator: result.audit?.operator ?? 'unclassified',
+        kind: result.audit?.kind ?? 'uncategorized',
+        status: result.status,
+      });
+      return acc;
+    }, {}),
+  ).sort((a, b) => (PATH_PRIORITY[a.path] ?? 99) - (PATH_PRIORITY[b.path] ?? 99));
   const summary = {
     generatedAt: new Date().toISOString(),
     cases: results,
+    paths,
     families,
   };
   const summaryPath = path.join(RESULTS_DIR, 'analysis-summary.json');

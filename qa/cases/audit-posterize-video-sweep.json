@@ -1,9 +1,18 @@
 {
   "id": "audit-posterize-video-sweep",
   "title": "Posterize sweep on decoded media",
-  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
-  "transport": { "start": true, "settleMs": 1500 },
-  "recording": { "filename": "audit-posterize-video-sweep", "tailMs": 850 },
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-posterize-video-sweep",
+    "tailMs": 850
+  },
   "expectations": {
     "sourceKind": "video",
     "audioActive": true,
@@ -13,6 +22,7 @@
     "family": "color-tonal",
     "operator": "posterize",
     "kind": "sweep",
+    "path": "product",
     "expectedVideo": ["lower bins should visibly reduce tonal resolution into deliberate steps"],
     "expectedAudio": ["lower bins should sound more stepped and gritty without dropping out"],
     "manualChecks": [

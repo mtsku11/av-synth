@@ -1,0 +1,82 @@
+{
+  "id": "audit-finish-imported-lut-video",
+  "title": "Imported LUT finish over loaded clip",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-finish-imported-lut-video",
+    "tailMs": 700
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "videoFeaturesActive": true,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "finish-baseline",
+        "to": "finish-imported-lut",
+        "domain": "video",
+        "metric": "meanB",
+        "op": ">",
+        "delta": 0.008,
+        "description": "loading the teal-lift .cube LUT should materially lift the rendered blue channel"
+      },
+      {
+        "from": "finish-baseline",
+        "to": "finish-imported-lut",
+        "domain": "video",
+        "metric": "meanR",
+        "op": "<",
+        "delta": -0.006,
+        "description": "the same imported LUT should cool the rendered frame enough to trim meanR vs baseline"
+      }
+    ]
+  },
+  "audit": {
+    "family": "finishes",
+    "kind": "baseline",
+    "path": "product",
+    "expectedVideo": [
+      "importing the teal-lift LUT should push the clip cooler with stronger cyan and blue lift while preserving motion"
+    ],
+    "manualChecks": [
+      "Does the imported LUT clearly read as a cooler grade rather than behaving like the built-in chrome look?",
+      "Does the clip stay clean rather than breaking into obvious 2x2 posterization from the small demo cube?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "wait",
+      "ms": 600,
+      "screenshot": "finish-baseline"
+    },
+    {
+      "type": "load-imported-lut",
+      "url": "/luts/teal-lift.cube",
+      "label": "teal-lift",
+      "screenshot": "finish-lut-loaded"
+    },
+    {
+      "type": "set-presentation-finish",
+      "look": "clean",
+      "quality": "standard",
+      "lut": "imported",
+      "postPreset": "none",
+      "lensDirt": "none",
+      "screenshot": "finish-lut-selected"
+    },
+    {
+      "type": "wait",
+      "ms": 700,
+      "screenshot": "finish-imported-lut"
+    }
+  ]
+}

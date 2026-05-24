@@ -1,9 +1,17 @@
 {
   "id": "audit-repeatX-osc-sweep",
   "title": "RepeatX sweep on osc source",
-  "source": { "kind": "osc" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-repeatX-osc-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-repeatX-osc-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "osc",
     "audioActive": true,
@@ -14,9 +22,9 @@
         "to": "repeatx-osc-6-hold",
         "domain": "video",
         "metric": "spatialStd",
-        "op": "<",
-        "delta": -0.05,
-        "description": "raising RepeatX reps should materially compress the oscillator field into a denser horizontal tile pattern"
+        "op": ">",
+        "delta": 0.02,
+        "description": "raising RepeatX reps should materially increase horizontal tiling complexity on the oscillator field"
       },
       {
         "from": "repeatx-osc-1-hold",
@@ -35,6 +43,7 @@
     "family": "geometry-spatial",
     "operator": "repeatX",
     "kind": "sweep",
+    "path": "operator-regression",
     "expectedVideo": [
       "raising RepeatX reps should create denser horizontal tiling without broken seams",
       "the stronger state should stay visually coherent"

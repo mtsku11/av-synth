@@ -1,0 +1,122 @@
+{
+  "id": "audit-hue-solid-sweep",
+  "title": "Hue rotation sweep on solid source",
+  "source": {
+    "kind": "solid"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-hue-solid-sweep",
+    "tailMs": 700
+  },
+  "expectations": {
+    "sourceKind": "solid",
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "hue-amount-000-hold",
+        "to": "hue-amount-033-hold",
+        "domain": "video",
+        "metric": "meanR",
+        "op": "<",
+        "delta": -0.2,
+        "description": "rotating hue by ~1/3 of a turn should rotate the red solid out of frame and drop meanR"
+      },
+      {
+        "from": "hue-amount-000-hold",
+        "to": "hue-amount-033-hold",
+        "domain": "video",
+        "metric": "meanG",
+        "op": ">",
+        "delta": 0.2,
+        "description": "rotating hue by ~1/3 of a turn should rotate green into the rendered frame and lift meanG"
+      }
+    ]
+  },
+  "audit": {
+    "family": "color-tonal",
+    "operator": "hue",
+    "kind": "sweep",
+    "path": "operator-regression",
+    "expectedVideo": [
+      "amount=0.33 should rotate the red solid to a green-leaning hue (meanR↓, meanG↑)",
+      "amount=1.0 should return close to the original red hue (full rotation)"
+    ],
+    "expectedAudio": [
+      "amount=0.333 should raise the rendered pitch by ~+400 cents (audible on the solid triad)",
+      "amount=1.0 sits at the pitch-shifter worklet edge (ratio=2); the +1-octave checkpoint stays manual-listen because the worklet degrades at the limit",
+      "amount=0 should be inaudibly identical to bypass",
+      "Audio side is MANUAL REVIEW ONLY (no hard gate): the solid source generates audio at the noise floor (~-173 dB on the exported WAV), so exported-audio metrics like zeroCrossingRate are dominated by quantisation noise rather than pitch content — observed ZCR delta sign-flipped between runs (+0.00126 then -0.00129) at the same operator settings, confirming it. Same precedent as audit-colorama-solid-sweep / audit-modulate-osc-sweep / audit-scrollX-osc-sweep. The .webm captures the full sweep for listening."
+    ],
+    "manualChecks": [
+      "Does the hue ring traverse smoothly without colour-banding artefacts at small amount?",
+      "Is the pitch shift musically intelligible across the ±1 octave range, or does the worklet introduce zipper/aliasing noise?",
+      "Do the visual hue motion and the audio pitch motion feel locked rather than co-incidental?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "r",
+      "value": 1,
+      "screenshot": "hue-solid-r-100"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "g",
+      "value": 0,
+      "screenshot": "hue-solid-g-000"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "b",
+      "value": 0,
+      "screenshot": "hue-solid-b-000"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "a",
+      "value": 1,
+      "screenshot": "hue-solid-a-100"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "hue",
+      "paramId": "amount",
+      "value": 0,
+      "screenshot": "hue-amount-000"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "hue-amount-000-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "hue",
+      "paramId": "amount",
+      "value": 0.333,
+      "screenshot": "hue-amount-033"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "hue-amount-033-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "hue",
+      "paramId": "amount",
+      "value": 1,
+      "screenshot": "hue-amount-100"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "hue-amount-100-hold"
+    }
+  ]
+}

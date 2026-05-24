@@ -1,9 +1,17 @@
 {
   "id": "audit-source-voronoi-sweep",
   "title": "Voronoi source sweep",
-  "source": { "kind": "voronoi" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-source-voronoi-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "voronoi"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-source-voronoi-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "voronoi",
     "audioActive": true,
@@ -26,6 +34,7 @@
     "family": "sources",
     "operator": "voronoi",
     "kind": "sweep",
+    "path": "source-coverage",
     "expectedVideo": [
       "higher scale should create denser cells without tearing or flicker collapse"
     ],

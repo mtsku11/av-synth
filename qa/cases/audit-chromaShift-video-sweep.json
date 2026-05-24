@@ -1,9 +1,18 @@
 {
   "id": "audit-chromaShift-video-sweep",
   "title": "ChromaShift sweep on decoded media",
-  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
-  "transport": { "start": true, "settleMs": 1500 },
-  "recording": { "filename": "audit-chromaShift-video-sweep", "tailMs": 850 },
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-chromaShift-video-sweep",
+    "tailMs": 850
+  },
   "expectations": {
     "sourceKind": "video",
     "audioActive": true,
@@ -24,6 +33,7 @@
     "family": "color-tonal",
     "operator": "chromaShift",
     "kind": "sweep",
+    "path": "product",
     "expectedVideo": [
       "higher chroma shift should visibly split channel edges without blanking the frame"
     ],

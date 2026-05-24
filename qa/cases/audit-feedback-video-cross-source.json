@@ -1,9 +1,18 @@
 {
   "id": "audit-feedback-video-cross-source",
   "title": "Feedback cross-source spot check on committed video fixture",
-  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
-  "transport": { "start": true, "settleMs": 1500 },
-  "recording": { "filename": "audit-feedback-video-cross-source", "tailMs": 850 },
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-feedback-video-cross-source",
+    "tailMs": 850
+  },
   "expectations": {
     "sourceKind": "video",
     "minVideoAdvanceSeconds": 1,
@@ -19,7 +28,7 @@
         "delta": 2,
         "source": "exported-audio",
         "segmentPaddingMs": 160,
-        "description": "feedback should retain more audible energy than the dry baseline on the exported mix"
+        "description": "the freeze-smear / feedback-PM mapping should retain more audible energy than the dry baseline on the exported mix"
       }
     ]
   },
@@ -27,12 +36,13 @@
     "family": "feedback-composition",
     "operator": "feedback",
     "kind": "cross-source",
+    "path": "product",
     "expectedVideo": [
       "video fixture should keep advancing while feedback introduces visible persistence and trail buildup",
       "high feedback should not pin the frame or crush motion into a static smear"
     ],
     "expectedAudio": [
-      "fixture audio should gain repeat tails without clipping or losing channel integrity",
+      "fixture audio should gain a smeared freeze tail without clipping or losing channel integrity",
       "wet feedback should remain intelligible at a strong setting on non-procedural material"
     ],
     "manualChecks": [

@@ -1,0 +1,52 @@
+{
+  "id": "video-bus-return-blend-smoke",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "video-bus-return-blend-smoke",
+    "tailMs": 750
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "steps": [
+    {
+      "type": "set-node-bus",
+      "op": "contrast",
+      "bus": 1,
+      "screenshot": "contrast-to-o1"
+    },
+    {
+      "type": "add-blend-node",
+      "op": "blend",
+      "screenshot": "blend-node-added"
+    },
+    {
+      "type": "add-node-input",
+      "op": "blend",
+      "input": "src(o1)",
+      "screenshot": "blend-src-o1"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "blend",
+      "paramId": "amount",
+      "value": 0.45,
+      "screenshot": "blend-045"
+    }
+  ],
+  "audit": {
+    "family": "output-buses",
+    "kind": "smoke",
+    "path": "product"
+  }
+}

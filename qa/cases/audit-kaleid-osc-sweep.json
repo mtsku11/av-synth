@@ -1,9 +1,17 @@
 {
   "id": "audit-kaleid-osc-sweep",
   "title": "Kaleid sweep on osc source",
-  "source": { "kind": "osc" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-kaleid-osc-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-kaleid-osc-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "osc",
     "audioActive": true,
@@ -26,6 +34,7 @@
     "family": "geometry-spatial",
     "operator": "kaleid",
     "kind": "sweep",
+    "path": "operator-regression",
     "expectedVideo": [
       "raising nSides should introduce stronger polar symmetry without blank wedges or unstable seams",
       "the oscillator field should stay phase-coherent as the fold count rises"

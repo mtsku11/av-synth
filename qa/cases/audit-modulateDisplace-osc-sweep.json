@@ -1,0 +1,111 @@
+{
+  "id": "audit-modulateDisplace-osc-sweep",
+  "title": "Routed modulateDisplace sweep on osc source",
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-modulateDisplace-osc-sweep",
+    "tailMs": 700
+  },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "modulateDisplace-osc-020-hold",
+        "to": "modulateDisplace-osc-062",
+        "domain": "video",
+        "metric": "temporalDiff",
+        "op": ">",
+        "delta": 0.002,
+        "description": "stronger routed displacement should materially reorganize the oscillator field"
+      },
+      {
+        "from": "modulateDisplace-osc-020-hold",
+        "to": "modulateDisplace-osc-062-hold",
+        "domain": "audio",
+        "metric": "spectralSpreadHz",
+        "op": ">",
+        "delta": 16,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "stronger routed displacement should widen the exported oscillator spectrum rather than leaving the audio static"
+      }
+    ]
+  },
+  "audit": {
+    "family": "feedback-composition",
+    "operator": "modulateDisplace",
+    "kind": "sweep",
+    "path": "operator-regression",
+    "expectedVideo": [
+      "the routed red-channel branch should shove the oscillator field into visibly stronger displacement at the higher amount",
+      "the image should stay coherent rather than collapsing into black frames or NaNs"
+    ],
+    "expectedAudio": [
+      "the same sweep should widen the audio texture as a recent-time smear rather than sounding like dry passthrough",
+      "the rendered mix should remain controlled and audible at the stronger setting"
+    ],
+    "manualChecks": [
+      "Does the explicit routed modulator feel different from the unary self-mod family?",
+      "Does the stronger setting stay abstract but usable rather than turning into accidental breakup?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "modulateDisplace-osc-frequency-110"
+    },
+    {
+      "type": "set-node-bus",
+      "op": "r",
+      "bus": 1,
+      "screenshot": "modulateDisplace-osc-r-bus1"
+    },
+    {
+      "type": "set-node-secondary-input",
+      "op": "modulateDisplace",
+      "input": "src(o1)",
+      "screenshot": "modulateDisplace-osc-src-o1"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "modulateDisplace",
+      "paramId": "amount",
+      "value": 0.2,
+      "screenshot": "modulateDisplace-osc-020"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "modulateDisplace-osc-020-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "modulateDisplace",
+      "paramId": "amount",
+      "value": 0.62,
+      "screenshot": "modulateDisplace-osc-062"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "modulateDisplace",
+      "paramId": "bias",
+      "value": -0.18,
+      "screenshot": "modulateDisplace-osc-bias--018"
+    },
+    {
+      "type": "wait",
+      "ms": 550,
+      "screenshot": "modulateDisplace-osc-062-hold"
+    }
+  ]
+}

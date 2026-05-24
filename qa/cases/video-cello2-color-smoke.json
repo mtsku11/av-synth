@@ -1,8 +1,17 @@
 {
   "id": "video-cello2-color-smoke",
-  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
-  "transport": { "start": true, "settleMs": 1500 },
-  "recording": { "filename": "video-cello2-color-smoke", "tailMs": 750 },
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "video-cello2-color-smoke",
+    "tailMs": 750
+  },
   "expectations": {
     "sourceKind": "video",
     "minVideoAdvanceSeconds": 1,
@@ -38,5 +47,8 @@
       "value": 2,
       "screenshot": "saturate-200"
     }
-  ]
+  ],
+  "audit": {
+    "path": "product"
+  }
 }

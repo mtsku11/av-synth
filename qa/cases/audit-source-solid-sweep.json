@@ -1,9 +1,17 @@
 {
   "id": "audit-source-solid-sweep",
   "title": "Solid source sweep",
-  "source": { "kind": "solid" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-source-solid-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "solid"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-source-solid-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "solid",
     "allowConsoleErrors": ["favicon.ico"],
@@ -34,6 +42,7 @@
     "family": "sources",
     "operator": "solid",
     "kind": "sweep",
+    "path": "source-coverage",
     "expectedVideo": ["higher channel values should clearly brighten the flat source"],
     "expectedAudio": [
       "higher channel values should raise the rendered chord amplitudes and master level"

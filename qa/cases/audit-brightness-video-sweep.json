@@ -1,9 +1,18 @@
 {
   "id": "audit-brightness-video-sweep",
   "title": "Brightness sweep on decoded media",
-  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
-  "transport": { "start": true, "settleMs": 1500 },
-  "recording": { "filename": "audit-brightness-video-sweep", "tailMs": 850 },
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-brightness-video-sweep",
+    "tailMs": 850
+  },
   "expectations": {
     "sourceKind": "video",
     "audioActive": true,
@@ -35,6 +44,7 @@
     "family": "color-tonal",
     "operator": "brightness",
     "kind": "sweep",
+    "path": "product",
     "expectedVideo": [
       "higher brightness should visibly lift the full image without flattening it completely"
     ],

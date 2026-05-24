@@ -1,9 +1,17 @@
 {
   "id": "audit-rotate-osc-sweep",
   "title": "Rotate sweep on osc source",
-  "source": { "kind": "osc" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-rotate-osc-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-rotate-osc-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "osc",
     "audioActive": true,
@@ -35,6 +43,7 @@
     "family": "geometry-spatial",
     "operator": "rotate",
     "kind": "sweep",
+    "path": "operator-regression",
     "expectedVideo": [
       "raising rotate should turn the oscillator frame cleanly without tearing or blank wedges",
       "the rotated image should stay coherent rather than showing unstable edge shimmer"

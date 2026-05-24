@@ -1,9 +1,18 @@
 {
   "id": "audit-saturate-video-sweep",
   "title": "Saturate sweep on decoded media",
-  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
-  "transport": { "start": true, "settleMs": 1500 },
-  "recording": { "filename": "audit-saturate-video-sweep", "tailMs": 850 },
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-saturate-video-sweep",
+    "tailMs": 850
+  },
   "expectations": {
     "sourceKind": "video",
     "audioActive": true,
@@ -24,15 +33,18 @@
     "family": "color-tonal",
     "operator": "saturate",
     "kind": "sweep",
+    "path": "product",
     "expectedVideo": [
       "higher saturate should visibly increase color intensity without posterizing the frame"
     ],
     "expectedAudio": [
-      "higher saturate should widen the stereo image without destabilizing the mix"
+      "higher saturate should add audible harmonic richness (soft-clip warmth, even+odd harmonics) and raise perceived loudness without exceeding 0 dBFS true-peak",
+      "amount=0 should mute (matches grayscale on video); amount=1 should sound clean (identity-ish); amount>1 should ramp into saturation progressively"
     ],
     "manualChecks": [
-      "Does the stereo widening feel related to the color intensity increase?",
-      "Does the high-saturation setting remain professional rather than gimmicky?"
+      "Does the harmonic saturation feel related to the color intensity increase (vivid colour ↔ warmer/richer tone)?",
+      "Is the saturation timbral (extra harmonics, tube-like) rather than dynamic (compression)? — contrast covers dynamics, saturate covers timbre.",
+      "Does the high-saturation setting remain musical rather than fuzzy/broken?"
     ]
   },
   "steps": [

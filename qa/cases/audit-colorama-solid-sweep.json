@@ -1,0 +1,114 @@
+{
+  "id": "audit-colorama-solid-sweep",
+  "title": "Colorama chaotic-scramble sweep on solid source",
+  "source": {
+    "kind": "solid"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-colorama-solid-sweep",
+    "tailMs": 700
+  },
+  "expectations": {
+    "sourceKind": "solid",
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "colorama-amount-000-hold",
+        "to": "colorama-amount-100-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": ">",
+        "delta": 0.1,
+        "description": "amount=1 should scramble per-pixel hue across the solid red field, raising the live spatial stddev across RGB channels (deterministic per-pixel from UV hash)"
+      }
+    ]
+  },
+  "audit": {
+    "family": "color-tonal",
+    "operator": "colorama",
+    "kind": "sweep",
+    "path": "operator-regression",
+    "expectedVideo": [
+      "amount=0 should be inaudibly identical to bypass (uniform red field)",
+      "amount=0.5 should show partial per-pixel hue dispersion — a noisy but still red-leaning field",
+      "amount=1 should fully scramble per-pixel hue (high spatialStd across RGB channels)"
+    ],
+    "expectedAudio": [
+      "amount=0 should be inaudibly identical to bypass",
+      "amount=0.5 should add audible ring-mod sidebands without dominating the dry signal",
+      "amount=1 should be fully wet ring-mod with a chaotically swept 50–350 Hz carrier",
+      "Audio side is MANUAL REVIEW ONLY (no hard gate): the solid source's exported-WAV baseline spectral metrics are not stable enough across fresh browser sessions to hard-gate. Precedent: audit-modulate-osc-sweep / audit-scrollX-osc-sweep. The .webm captures the full sweep for listening."
+    ],
+    "manualChecks": [
+      "Does the scramble read as colour chaos rather than visible per-frame noise / banding?",
+      "Is the ring-mod musically usable at intermediate amounts, or does it sound like a fault?",
+      "Do visual chaos depth and audible ring-mod depth track together as the slider moves?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "r",
+      "value": 1,
+      "screenshot": "colorama-solid-r-100"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "g",
+      "value": 0,
+      "screenshot": "colorama-solid-g-000"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "b",
+      "value": 0,
+      "screenshot": "colorama-solid-b-000"
+    },
+    {
+      "type": "set-source-param",
+      "paramId": "a",
+      "value": 1,
+      "screenshot": "colorama-solid-a-100"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "colorama",
+      "paramId": "amount",
+      "value": 0,
+      "screenshot": "colorama-amount-000"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "colorama-amount-000-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "colorama",
+      "paramId": "amount",
+      "value": 0.5,
+      "screenshot": "colorama-amount-050"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "colorama-amount-050-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "colorama",
+      "paramId": "amount",
+      "value": 1,
+      "screenshot": "colorama-amount-100"
+    },
+    {
+      "type": "wait",
+      "ms": 450,
+      "screenshot": "colorama-amount-100-hold"
+    }
+  ]
+}

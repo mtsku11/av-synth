@@ -1,0 +1,133 @@
+{
+  "id": "audit-grain-video-cross-source",
+  "title": "Grain cross-source spot check on committed video fixture",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-grain-video-cross-source",
+    "tailMs": 900
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "grain-video-dry-hold",
+        "to": "grain-video-wet-hold",
+        "domain": "video",
+        "metric": "temporalDiff",
+        "op": ">",
+        "delta": 0.002,
+        "description": "engaging grain should materially increase held-sample motion on the decoded fixture instead of leaving the video unchanged"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "grain",
+    "kind": "cross-source",
+    "path": "product",
+    "expectedVideo": [
+      "the decoded fixture should break into animated held-sample grains rather than staying visually pass-through",
+      "larger grains and higher density should read as the same texture family as the audio granulation, not as a disconnected glitch overlay"
+    ],
+    "expectedAudio": [
+      "fixture audio should still pick up the granular cloud texture without dropping out or flattening",
+      "the same parameter move should feel like one AV gesture rather than independent audio and video effects"
+    ],
+    "manualChecks": [
+      "Does grain now have an obvious visual analogue on uploaded video rather than behaving like an audio-only op?",
+      "Do the held-sample tiles stay intentional and legible instead of turning into generic corruption?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "grain",
+      "paramId": "mix",
+      "value": 0,
+      "screenshot": "grain-video-dry-mix"
+    },
+    {
+      "type": "wait",
+      "ms": 320,
+      "screenshot": "grain-video-dry-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grain",
+      "paramId": "mix",
+      "value": 0.74,
+      "screenshot": "grain-video-wet-mix"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grain",
+      "paramId": "size",
+      "value": 0.16,
+      "screenshot": "grain-video-size"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grain",
+      "paramId": "density",
+      "value": 24,
+      "screenshot": "grain-video-density"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grain",
+      "paramId": "position",
+      "value": 0.68,
+      "screenshot": "grain-video-position"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grain",
+      "paramId": "spray",
+      "value": 0.78,
+      "screenshot": "grain-video-spray"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grain",
+      "paramId": "pitch",
+      "value": 0.42,
+      "screenshot": "grain-video-pitch"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grain",
+      "paramId": "reverse",
+      "value": 0.4,
+      "screenshot": "grain-video-reverse"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grain",
+      "paramId": "shape",
+      "value": 0.74,
+      "screenshot": "grain-video-shape"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grain",
+      "paramId": "spread",
+      "value": 0.62,
+      "screenshot": "grain-video-spread"
+    },
+    {
+      "type": "wait",
+      "ms": 620,
+      "screenshot": "grain-video-wet-hold"
+    }
+  ]
+}

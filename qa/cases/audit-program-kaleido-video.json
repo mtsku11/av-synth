@@ -1,0 +1,68 @@
+{
+  "id": "audit-program-kaleido-video",
+  "title": "Kaleido video-first program over loaded clip",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-program-kaleido-video",
+    "tailMs": 850
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "videoFeaturesActive": true,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "kaleido-baseline-hold",
+        "to": "kaleido-program-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": "<",
+        "delta": -0.05,
+        "description": "kaleido program (nSides=9) folds the clip into 9-way reflective symmetry — the mirroring averages regional contrast, so spatialStd should DECREASE vs the raw video baseline (observed ~-0.12 over two runs; threshold -0.05 with ~2x margin)"
+      }
+    ]
+  },
+  "audit": {
+    "family": "programs",
+    "operator": "kaleido",
+    "kind": "baseline",
+    "path": "product",
+    "expectedVideo": [
+      "applying kaleido should fold the clip into a 9-sided prism with restrained motion feedback"
+    ],
+    "expectedAudio": [
+      "the coupled motion should read as prismatic widening rather than pure delay wash",
+      "audio side is MANUAL REVIEW ONLY: program-level exported-audio gates land with M5.7-143"
+    ],
+    "manualChecks": [
+      "Does the 9-sided fold preserve enough of the source's gestural motion to feel like a video treatment rather than abstract symmetry?",
+      "Does the modulated delay add prismatic widening rather than just blur?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "wait",
+      "ms": 600,
+      "screenshot": "kaleido-baseline-hold"
+    },
+    {
+      "type": "apply-program",
+      "name": "kaleido",
+      "screenshot": "kaleido-applied"
+    },
+    {
+      "type": "wait",
+      "ms": 800,
+      "screenshot": "kaleido-program-hold"
+    }
+  ]
+}

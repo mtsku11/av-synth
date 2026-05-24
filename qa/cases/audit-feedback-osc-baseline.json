@@ -1,9 +1,17 @@
 {
   "id": "audit-feedback-osc-baseline",
   "title": "Feedback baseline on osc source",
-  "source": { "kind": "osc" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-feedback-osc-baseline", "tailMs": 600 },
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-feedback-osc-baseline",
+    "tailMs": 600
+  },
   "expectations": {
     "sourceKind": "osc",
     "audioActive": true,
@@ -13,6 +21,7 @@
     "family": "feedback-composition",
     "operator": "feedback",
     "kind": "baseline",
+    "path": "operator-regression",
     "expectedVideo": [
       "osc source should animate cleanly with no visible frame persistence from feedback",
       "capture should establish the neutral visual reference before any wet feedback cases"

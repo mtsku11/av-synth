@@ -1,0 +1,66 @@
+{
+  "id": "audit-program-pixelscape-video",
+  "title": "Pixelscape Hydra port over loaded clip",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-program-pixelscape-video",
+    "tailMs": 850
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "videoFeaturesActive": true,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "pixelscape-baseline-hold",
+        "to": "pixelscape-program-hold",
+        "domain": "video",
+        "metric": "temporalDiff",
+        "op": ">",
+        "delta": 0.003,
+        "description": "Pixelscape's routed scale-plus-hue matte should materially increase frame-to-frame motion over the dry fixture baseline (observed ~+0.0062 on ci-smoke.mp4; threshold set at +0.003 for margin)"
+      }
+    ]
+  },
+  "audit": {
+    "family": "programs",
+    "operator": "modulateScaleRouted",
+    "kind": "smoke",
+    "path": "product",
+    "expectedVideo": [
+      "the clip should stretch into a routed scale-and-hue matte treatment instead of remaining a polite color wash"
+    ],
+    "expectedAudio": [
+      "the coupled sound should widen and shimmer through the routed motion branch instead of reading as a flat detune"
+    ],
+    "manualChecks": [
+      "Does the tinted overprint feel like a composited moving branch rather than a whole-frame color wash?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "wait",
+      "ms": 600,
+      "screenshot": "pixelscape-baseline-hold"
+    },
+    {
+      "type": "apply-program",
+      "name": "pixelscape",
+      "screenshot": "pixelscape-applied"
+    },
+    {
+      "type": "wait",
+      "ms": 800,
+      "screenshot": "pixelscape-program-hold"
+    }
+  ]
+}

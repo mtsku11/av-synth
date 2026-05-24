@@ -1,0 +1,55 @@
+{
+  "id": "audit-program-nelson-twist-video",
+  "title": "Nelson Twist Hydra port over loaded clip",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-program-nelson-twist-video",
+    "tailMs": 850
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "videoFeaturesActive": true,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "audit": {
+    "family": "programs",
+    "operator": "modulateRepeatRouted",
+    "kind": "smoke",
+    "path": "product",
+    "expectedVideo": [
+      "the loaded clip should invert into a hard-edged routed repeat twist rather than a plain feedback blur"
+    ],
+    "expectedAudio": [
+      "the coupled sound should pick up tiled routed pressure rather than staying close to the dry clip"
+    ],
+    "manualChecks": [
+      "Does the repeated routed branch read as a deliberate warp field rather than generic smearing?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "wait",
+      "ms": 600,
+      "screenshot": "nelson-baseline-hold"
+    },
+    {
+      "type": "apply-program",
+      "name": "nelsonTwist",
+      "screenshot": "nelson-applied"
+    },
+    {
+      "type": "wait",
+      "ms": 800,
+      "screenshot": "nelson-program-hold"
+    }
+  ]
+}

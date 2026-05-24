@@ -1,0 +1,91 @@
+{
+  "id": "audit-thresh-osc-sweep",
+  "title": "Threshold sweep on osc source",
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-thresh-osc-sweep",
+    "tailMs": 700
+  },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "thresh-amount-000-hold",
+        "to": "thresh-amount-100-hold",
+        "domain": "video",
+        "metric": "spatialStd",
+        "op": ">",
+        "delta": 0.02,
+        "description": "engaging the comparator should snap the sine stripes to hard b/w edges and raise spatial std"
+      },
+      {
+        "from": "thresh-amount-000-hold",
+        "to": "thresh-amount-100-hold",
+        "domain": "audio",
+        "metric": "spectralCentroidHz",
+        "op": ">",
+        "delta": 80,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "the sine should become harmonic-rich (squarer) when the comparator engages, lifting spectral centroid"
+      }
+    ]
+  },
+  "audit": {
+    "family": "color-tonal",
+    "operator": "thresh",
+    "kind": "sweep",
+    "path": "operator-regression",
+    "expectedVideo": [
+      "amount=1 should turn the oscillator stripes into hard b/w edges with much higher spatial std"
+    ],
+    "expectedAudio": [
+      "amount=1 should convert the sine into a brighter, square-leaning waveform with audibly higher harmonics"
+    ],
+    "manualChecks": [
+      "Is the harmonic step still musical or does the rendered tone get nasty/aliased at small tolerance?",
+      "Does the image quantisation read as intentional rather than broken at amount=1?",
+      "Threshold sweeps move the b/w cut and the audio comparator point consistently?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 90,
+      "screenshot": "thresh-frequency-90"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "thresh",
+      "paramId": "amount",
+      "value": 0,
+      "screenshot": "thresh-amount-000"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "thresh-amount-000-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "thresh",
+      "paramId": "amount",
+      "value": 1,
+      "screenshot": "thresh-amount-100"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "thresh-amount-100-hold"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "id": "audit-program-velasco-video",
+  "title": "Velasco Hydra port over loaded clip",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-program-velasco-video",
+    "tailMs": 850
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "videoFeaturesActive": true,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "audit": {
+    "family": "programs",
+    "operator": "modulateRotateRouted",
+    "kind": "smoke",
+    "path": "product",
+    "expectedVideo": [
+      "the split-bus lattice should pick up a routed rotation field from the main branch rather than staying a self-spun side texture"
+    ],
+    "expectedAudio": [
+      "the coupled sound should feel rhythmically twisted by the routed main bus instead of a static stereo widener"
+    ],
+    "manualChecks": [
+      "Does the routed rotation keep the side branch visibly tied to the main repeated field?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "wait",
+      "ms": 600,
+      "screenshot": "velasco-baseline-hold"
+    },
+    {
+      "type": "apply-program",
+      "name": "velasco",
+      "screenshot": "velasco-applied"
+    },
+    {
+      "type": "wait",
+      "ms": 800,
+      "screenshot": "velasco-program-hold"
+    }
+  ]
+}

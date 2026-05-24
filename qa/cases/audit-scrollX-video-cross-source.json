@@ -1,9 +1,18 @@
 {
   "id": "audit-scrollX-video-cross-source",
   "title": "ScrollX cross-source spot check on committed video fixture",
-  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
-  "transport": { "start": true, "settleMs": 1500 },
-  "recording": { "filename": "audit-scrollX-video-cross-source", "tailMs": 850 },
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-scrollX-video-cross-source",
+    "tailMs": 850
+  },
   "expectations": {
     "sourceKind": "video",
     "minVideoAdvanceSeconds": 1,
@@ -36,6 +45,7 @@
     "family": "geometry-spatial",
     "operator": "scrollX",
     "kind": "cross-source",
+    "path": "product",
     "expectedVideo": [
       "the decoded fixture should drift horizontally without freezing or exposing undefined edges",
       "the moving state should visibly differ from the static state on the committed clip"

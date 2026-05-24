@@ -1,0 +1,68 @@
+{
+  "id": "audit-program-tunnel-video",
+  "title": "Tunnel video-first program over loaded clip",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-program-tunnel-video",
+    "tailMs": 850
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "videoFeaturesActive": true,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "tunnel-baseline-hold",
+        "to": "tunnel-program-hold",
+        "domain": "video",
+        "metric": "temporalDiff",
+        "op": "<",
+        "delta": -0.001,
+        "description": "tunnel program's heavy feedback (0.92) with only light modulate (0.1) should hold frames longer than the raw video baseline, reducing frame-to-frame temporal diff (observed ~-0.0035 on ci-smoke.mp4 over two runs; threshold set at -0.001 with ~3x margin)"
+      }
+    ]
+  },
+  "audit": {
+    "family": "programs",
+    "operator": "tunnel",
+    "kind": "baseline",
+    "path": "product",
+    "expectedVideo": [
+      "applying tunnel should pull the clip into a receding feedback tunnel with light rotation and slight scale-up"
+    ],
+    "expectedAudio": [
+      "feedback delay (0.18s) and gentle modulation should add a receding, hollow persistence without washing transients",
+      "audio side is MANUAL REVIEW ONLY: program-level exported-audio gates land with M5.7-143 (video-first QA manifest reorder)"
+    ],
+    "manualChecks": [
+      "Does the program clearly feel like a receding tunnel rather than a static effect chain layered on top?",
+      "Is the audio feedback musical and locked to the visual persistence?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "wait",
+      "ms": 600,
+      "screenshot": "tunnel-baseline-hold"
+    },
+    {
+      "type": "apply-program",
+      "name": "tunnel",
+      "screenshot": "tunnel-applied"
+    },
+    {
+      "type": "wait",
+      "ms": 800,
+      "screenshot": "tunnel-program-hold"
+    }
+  ]
+}

@@ -1,9 +1,17 @@
 {
   "id": "audit-source-shape-sweep",
   "title": "Shape source sweep",
-  "source": { "kind": "shape" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-source-shape-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "shape"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-source-shape-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "shape",
     "audioActive": true,
@@ -14,6 +22,7 @@
     "family": "sources",
     "operator": "shape",
     "kind": "sweep",
+    "path": "source-coverage",
     "expectedVideo": ["lower smoothing should visibly sharpen the polygon edges"],
     "expectedAudio": [
       "lower smoothing should materially change the rendered timbre through the cutoff mapping"

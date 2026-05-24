@@ -1,9 +1,18 @@
 {
   "id": "audit-scale-video-cross-source",
   "title": "Scale cross-source spot check on committed video fixture",
-  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
-  "transport": { "start": true, "settleMs": 1500 },
-  "recording": { "filename": "audit-scale-video-cross-source", "tailMs": 850 },
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-scale-video-cross-source",
+    "tailMs": 850
+  },
   "expectations": {
     "sourceKind": "video",
     "minVideoAdvanceSeconds": 1,
@@ -36,6 +45,7 @@
     "family": "geometry-spatial",
     "operator": "scale",
     "kind": "cross-source",
+    "path": "product",
     "expectedVideo": [
       "the decoded fixture should zoom cleanly without freezing or exposing undefined edges",
       "larger scale values should materially change framing on the committed clip"

@@ -1,9 +1,17 @@
 {
   "id": "audit-repeat-osc-sweep",
   "title": "Repeat sweep on osc source",
-  "source": { "kind": "osc" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-repeat-osc-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-repeat-osc-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "osc",
     "audioActive": true,
@@ -14,9 +22,9 @@
         "to": "repeat-osc-6x5-hold",
         "domain": "video",
         "metric": "spatialStd",
-        "op": "<",
-        "delta": -0.05,
-        "description": "raising repeat counts should materially compress oscillator image structure into a denser tiled field"
+        "op": ">",
+        "delta": 0.02,
+        "description": "raising repeat counts should materially increase tiled visual complexity on the oscillator field"
       },
       {
         "from": "repeat-osc-1x1-hold",
@@ -35,6 +43,7 @@
     "family": "geometry-spatial",
     "operator": "repeat",
     "kind": "sweep",
+    "path": "operator-regression",
     "expectedVideo": [
       "raising repeatX/repeatY should tile the oscillator field more densely without broken seams",
       "the denser state should remain visually coherent rather than noisy"

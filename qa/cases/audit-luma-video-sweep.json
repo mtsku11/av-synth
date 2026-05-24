@@ -1,0 +1,86 @@
+{
+  "id": "audit-luma-video-sweep",
+  "title": "Luma key sweep on decoded media",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-luma-video-sweep",
+    "tailMs": 850
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "luma-amount-000-hold",
+        "to": "luma-amount-100-hold",
+        "domain": "video",
+        "metric": "meanLuma",
+        "op": "<",
+        "delta": -0.03,
+        "description": "engaging the luma key should drop output mean luma as dark pixels become transparent against black"
+      },
+      {
+        "from": "luma-amount-000-hold",
+        "to": "luma-amount-100-hold",
+        "domain": "audio",
+        "metric": "meanVolumeDb",
+        "op": "<",
+        "delta": -1.5,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "engaging the noise gate should drop rendered level on dim/quiet segments"
+      }
+    ]
+  },
+  "audit": {
+    "family": "color-tonal",
+    "operator": "luma",
+    "kind": "sweep",
+    "path": "product",
+    "expectedVideo": [
+      "amount=1 should soft-key out the darker regions of the fixture and leave bright regions intact"
+    ],
+    "expectedAudio": [
+      "amount=1 should pull rendered level down by attenuating low-amplitude content via the noise gate"
+    ],
+    "manualChecks": [
+      "Does the soft-knee width feel musical for both image and audio?",
+      "At amount=1 with default threshold=0.5, does the gated audio still have a usable signal or is it stripped to silence?",
+      "Threshold/tolerance sliders move the key plausibly in both domains?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "luma",
+      "paramId": "amount",
+      "value": 0,
+      "screenshot": "luma-amount-000"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "luma-amount-000-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "luma",
+      "paramId": "amount",
+      "value": 1,
+      "screenshot": "luma-amount-100"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "luma-amount-100-hold"
+    }
+  ]
+}

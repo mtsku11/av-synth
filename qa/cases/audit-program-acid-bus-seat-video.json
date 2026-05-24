@@ -1,0 +1,75 @@
+{
+  "id": "audit-program-acid-bus-seat-video",
+  "title": "Acid Bus Seat Hydra port over loaded clip",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-program-acid-bus-seat-video",
+    "tailMs": 850
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "videoFeaturesActive": true,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "acid-baseline-hold",
+        "to": "acid-program-hold",
+        "domain": "video",
+        "metric": "temporalDiff",
+        "op": ">",
+        "delta": 0.02,
+        "description": "Acid Bus Seat's routed held-window side bus should drive far more visible motion pressure than the raw fixture baseline (observed ~+0.033 on ci-smoke.mp4; threshold set at +0.02 with margin)"
+      },
+      {
+        "from": "acid-baseline-hold",
+        "to": "acid-program-hold",
+        "domain": "video",
+        "metric": "edgeDensity",
+        "op": ">",
+        "delta": 0.01,
+        "description": "the acid side-bus treatment should materially increase edge breakup and composited structure instead of collapsing into a flat tint"
+      }
+    ]
+  },
+  "audit": {
+    "family": "programs",
+    "operator": "modulatePixelateRouted",
+    "kind": "smoke",
+    "path": "product",
+    "expectedVideo": [
+      "the split-bus treatment should keep a dirty pixel-torn branch fighting the main line instead of collapsing into one blur"
+    ],
+    "expectedAudio": [
+      "the coupled sound should feel pushed by the internal bus branch rather than merely doubled"
+    ],
+    "manualChecks": [
+      "Does the cyan acid branch stay intentional and legible instead of muddying the whole frame?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "wait",
+      "ms": 600,
+      "screenshot": "acid-baseline-hold"
+    },
+    {
+      "type": "apply-program",
+      "name": "acidBusSeat",
+      "screenshot": "acid-applied"
+    },
+    {
+      "type": "wait",
+      "ms": 800,
+      "screenshot": "acid-program-hold"
+    }
+  ]
+}

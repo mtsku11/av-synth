@@ -1,22 +1,29 @@
 {
-  "generatedAt": "2026-05-17T21:46:53.362Z",
-  "count": 37,
+  "generatedAt": "2026-05-18T15:19:07.203Z",
+  "count": 45,
   "files": [
     "qa/references/audit-brightness-video-sweep.webm",
     "qa/references/audit-chromaShift-video-sweep.webm",
     "qa/references/audit-color-solid-band-sweep.webm",
+    "qa/references/audit-colorama-solid-sweep.webm",
     "qa/references/audit-contrast-osc-sweep.webm",
     "qa/references/audit-feedback-osc-baseline.webm",
     "qa/references/audit-feedback-osc-sweep.webm",
     "qa/references/audit-feedback-video-cross-source.webm",
+    "qa/references/audit-hue-solid-sweep.webm",
+    "qa/references/audit-invert-video-sweep.webm",
     "qa/references/audit-kaleid-osc-sweep.webm",
     "qa/references/audit-kaleid-video-cross-source.webm",
+    "qa/references/audit-luma-video-sweep.webm",
     "qa/references/audit-modulate-osc-baseline.webm",
     "qa/references/audit-modulate-osc-sweep.webm",
     "qa/references/audit-modulate-video-cross-source.webm",
     "qa/references/audit-pixelate-osc-sweep.webm",
     "qa/references/audit-pixelate-video-cross-source.webm",
     "qa/references/audit-posterize-video-sweep.webm",
+    "qa/references/audit-program-bloom-video.webm",
+    "qa/references/audit-program-kaleido-video.webm",
+    "qa/references/audit-program-tunnel-video.webm",
     "qa/references/audit-repeat-osc-sweep.webm",
     "qa/references/audit-repeat-video-cross-source.webm",
     "qa/references/audit-repeatX-osc-sweep.webm",
@@ -38,6 +45,7 @@
     "qa/references/audit-source-shape-sweep.webm",
     "qa/references/audit-source-solid-sweep.webm",
     "qa/references/audit-source-video-baseline.webm",
-    "qa/references/audit-source-voronoi-sweep.webm"
+    "qa/references/audit-source-voronoi-sweep.webm",
+    "qa/references/audit-thresh-osc-sweep.webm"
   ]
 }

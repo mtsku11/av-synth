@@ -1,0 +1,55 @@
+{
+  "id": "audit-program-disintegration-video",
+  "title": "Disintegration Hydra port over loaded clip",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-program-disintegration-video",
+    "tailMs": 850
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "videoFeaturesActive": true,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "audit": {
+    "family": "programs",
+    "operator": "modulateScrollYRouted",
+    "kind": "smoke",
+    "path": "product",
+    "expectedVideo": [
+      "the loaded clip should break into routed drift and collapse rather than staying a steady scaled image"
+    ],
+    "expectedAudio": [
+      "the coupled sound should dissolve into a moving stereo tear instead of a static wash"
+    ],
+    "manualChecks": [
+      "Does the vertical routed branch feel like directional disintegration rather than random jitter?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "wait",
+      "ms": 600,
+      "screenshot": "disintegration-baseline-hold"
+    },
+    {
+      "type": "apply-program",
+      "name": "disintegration",
+      "screenshot": "disintegration-applied"
+    },
+    {
+      "type": "wait",
+      "ms": 800,
+      "screenshot": "disintegration-program-hold"
+    }
+  ]
+}

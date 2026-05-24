@@ -1,9 +1,18 @@
 {
   "id": "audit-pixelate-video-cross-source",
   "title": "Pixelate cross-source spot check on committed video fixture",
-  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
-  "transport": { "start": true, "settleMs": 1500 },
-  "recording": { "filename": "audit-pixelate-video-cross-source", "tailMs": 850 },
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-pixelate-video-cross-source",
+    "tailMs": 850
+  },
   "expectations": {
     "sourceKind": "video",
     "minVideoAdvanceSeconds": 1,
@@ -19,7 +28,7 @@
         "delta": 220,
         "source": "exported-audio",
         "segmentPaddingMs": 180,
-        "description": "the higher hold factor should push the exported decoded-media pixelate spectrum materially harder than the lighter setting"
+        "description": "the coarser held-window replay setting should push the exported decoded-media pixelate spectrum materially harder than the lighter setting"
       }
     ]
   },
@@ -27,17 +36,18 @@
     "family": "geometry-spatial",
     "operator": "pixelate",
     "kind": "cross-source",
+    "path": "product",
     "expectedVideo": [
       "the decoded fixture should visibly quantise into larger blocks as pixel counts drop",
       "motion should remain continuous while fine detail is intentionally reduced"
     ],
     "expectedAudio": [
-      "fixture audio should pick up the same decimation texture law heard on the osc case",
+      "fixture audio should pick up the same held-window replay law heard on the osc case",
       "the rendered mix should remain audible and controlled across the stronger setting"
     ],
     "manualChecks": [
       "Does pixelate stay legible and usable on decoded media rather than looking like a broken upload?",
-      "Does the audio texture change feel like the same operator family as the visual blockiness?"
+      "Does the audio texture change feel like the same operator family as the visual blockiness, not like a generic bitcrusher?"
     ]
   },
   "steps": [

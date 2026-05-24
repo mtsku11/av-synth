@@ -1,9 +1,17 @@
 {
   "id": "audit-repeatY-osc-sweep",
   "title": "RepeatY sweep on osc source",
-  "source": { "kind": "osc" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-repeatY-osc-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-repeatY-osc-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "osc",
     "audioActive": true,
@@ -26,6 +34,7 @@
     "family": "geometry-spatial",
     "operator": "repeatY",
     "kind": "sweep",
+    "path": "operator-regression",
     "expectedVideo": [
       "raising RepeatY reps should create denser vertical tiling without broken seams",
       "the stronger state should stay visually coherent"

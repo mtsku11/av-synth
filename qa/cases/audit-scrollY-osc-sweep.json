@@ -1,9 +1,17 @@
 {
   "id": "audit-scrollY-osc-sweep",
   "title": "ScrollY sweep on osc source",
-  "source": { "kind": "osc" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-scrollY-osc-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-scrollY-osc-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "osc",
     "audioActive": true,
@@ -26,6 +34,7 @@
     "family": "geometry-spatial",
     "operator": "scrollY",
     "kind": "sweep",
+    "path": "operator-regression",
     "expectedVideo": [
       "raising Y amount should shift the oscillator frame vertically without tearing",
       "the high setting should visibly reframe the motion rather than leaving the image unchanged"

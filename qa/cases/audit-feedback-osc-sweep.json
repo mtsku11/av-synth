@@ -1,9 +1,17 @@
 {
   "id": "audit-feedback-osc-sweep",
   "title": "Feedback sweep on osc source",
-  "source": { "kind": "osc" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-feedback-osc-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-feedback-osc-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "osc",
     "audioActive": true,
@@ -13,17 +21,18 @@
     "family": "feedback-composition",
     "operator": "feedback",
     "kind": "sweep",
+    "path": "operator-regression",
     "expectedVideo": [
       "raising feedback should increase visible frame persistence without collapsing into blank or frozen output",
       "higher delay settings should preserve motion continuity rather than producing unstable flashes"
     ],
     "expectedAudio": [
-      "raising feedback should introduce a controlled echo tail with no runaway gain",
-      "longer delay should space repeats further apart while keeping the tone intelligible"
+      "raising feedback should deepen the freeze-smear / feedback-PM texture without runaway gain",
+      "longer delay should widen the recirculating smear while keeping the tone intelligible"
     ],
     "manualChecks": [
       "Does persistence increase in a controlled way across the sweep?",
-      "Do repeats remain musically usable rather than turning harsh or muddy?"
+      "Does the audio stay musically usable rather than turning harsh, muddy, or pinned?"
     ]
   },
   "steps": [

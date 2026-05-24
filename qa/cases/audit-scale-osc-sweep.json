@@ -1,9 +1,17 @@
 {
   "id": "audit-scale-osc-sweep",
   "title": "Scale sweep on osc source",
-  "source": { "kind": "osc" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-scale-osc-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-scale-osc-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "osc",
     "audioActive": true,
@@ -35,6 +43,7 @@
     "family": "geometry-spatial",
     "operator": "scale",
     "kind": "sweep",
+    "path": "operator-regression",
     "expectedVideo": [
       "changing scale should zoom the oscillator field without blank frames or tearing",
       "larger scale values should keep the motion coherent rather than introducing random jitter"

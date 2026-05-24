@@ -1,9 +1,17 @@
 {
   "id": "audit-source-osc-sweep",
   "title": "Osc source sweep",
-  "source": { "kind": "osc" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-source-osc-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-source-osc-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "osc",
     "audioActive": true,
@@ -26,6 +34,7 @@
     "family": "sources",
     "operator": "osc",
     "kind": "sweep",
+    "path": "source-coverage",
     "expectedVideo": [
       "sync should increase visible motion while frequency increases stripe density",
       "the oscillator field should stay coherent with no frozen or torn frames"

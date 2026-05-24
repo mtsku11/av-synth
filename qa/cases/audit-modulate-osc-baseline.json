@@ -1,9 +1,17 @@
 {
   "id": "audit-modulate-osc-baseline",
   "title": "Modulate baseline on osc source",
-  "source": { "kind": "osc" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-modulate-osc-baseline", "tailMs": 600 },
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-modulate-osc-baseline",
+    "tailMs": 600
+  },
   "expectations": {
     "sourceKind": "osc",
     "audioActive": true,
@@ -13,6 +21,7 @@
     "family": "feedback-composition",
     "operator": "modulate",
     "kind": "baseline",
+    "path": "operator-regression",
     "expectedVideo": [
       "osc source should render with no UV warp at the neutral modulate default",
       "capture should establish the clean spatial reference before PM depth is added"

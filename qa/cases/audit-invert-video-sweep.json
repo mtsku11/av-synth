@@ -1,0 +1,64 @@
+{
+  "id": "audit-invert-video-sweep",
+  "title": "Invert sweep on decoded media",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-invert-video-sweep",
+    "tailMs": 850
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "audit": {
+    "family": "color-tonal",
+    "operator": "invert",
+    "kind": "sweep",
+    "path": "product",
+    "expectedVideo": [
+      "raising amount toward 1 should visibly invert the decoded fixture's RGB while keeping motion intact"
+    ],
+    "expectedAudio": [
+      "single-channel phase invert is inaudible by itself; level and timbre should be unchanged"
+    ],
+    "manualChecks": [
+      "Does the inversion read as a clean tonal flip rather than introducing posterised artefacts?",
+      "Listen at full invert — is the signal genuinely unchanged in mono, or has something else drifted?",
+      "When mixed against a feedback chain that sums channels (future), does invert null correctly?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "invert",
+      "paramId": "amount",
+      "value": 0,
+      "screenshot": "invert-000"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "invert-000-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "invert",
+      "paramId": "amount",
+      "value": 1,
+      "screenshot": "invert-100"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "invert-100-hold"
+    }
+  ]
+}

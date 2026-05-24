@@ -1,9 +1,18 @@
 {
   "id": "audit-repeatX-video-cross-source",
   "title": "RepeatX cross-source spot check on committed video fixture",
-  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
-  "transport": { "start": true, "settleMs": 1500 },
-  "recording": { "filename": "audit-repeatX-video-cross-source", "tailMs": 850 },
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-repeatX-video-cross-source",
+    "tailMs": 850
+  },
   "expectations": {
     "sourceKind": "video",
     "minVideoAdvanceSeconds": 1,
@@ -36,6 +45,7 @@
     "family": "geometry-spatial",
     "operator": "repeatX",
     "kind": "cross-source",
+    "path": "product",
     "expectedVideo": [
       "the decoded fixture should gain stronger horizontal tiling as reps rise without seam corruption",
       "the stronger setting should remain legible on the committed clip"

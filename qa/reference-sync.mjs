@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { findArtifact } from './artifacts.js';
+
 const ROOT = process.cwd();
 const CASES_DIR = path.join(ROOT, 'qa/cases');
 const RESULTS_DIR = path.join(ROOT, 'qa/results/playwright/test-results');
@@ -8,25 +10,6 @@ const REFERENCES_DIR = path.join(ROOT, 'qa/references');
 
 function loadJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-}
-
-function walk(dir) {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) files.push(...walk(fullPath));
-    else files.push(fullPath);
-  }
-  return files;
-}
-
-function findArtifact(caseId, filename) {
-  const expectedDirName = `smoke-${caseId}`;
-  const expectedPath = path.join(RESULTS_DIR, expectedDirName, filename);
-  if (fs.existsSync(expectedPath)) return expectedPath;
-  const matches = walk(RESULTS_DIR).filter((file) => path.basename(file) === filename);
-  return matches[0] ?? null;
 }
 
 const qaCases = fs
@@ -40,7 +23,7 @@ fs.mkdirSync(REFERENCES_DIR, { recursive: true });
 const copied = [];
 for (const qaCase of qaCases) {
   const filename = `${qaCase.recording.filename}.webm`;
-  const source = findArtifact(qaCase.id, filename);
+  const source = findArtifact(RESULTS_DIR, qaCase.id, filename);
   if (!source) {
     console.warn(`Skipping ${qaCase.id}: missing artifact ${filename}`);
     continue;

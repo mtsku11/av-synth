@@ -1,9 +1,17 @@
 {
   "id": "audit-color-solid-band-sweep",
   "title": "Color band sweep on solid source",
-  "source": { "kind": "solid" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-color-solid-band-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "solid"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-color-solid-band-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "solid",
     "allowConsoleErrors": ["favicon.ico"],
@@ -23,6 +31,7 @@
     "family": "color-tonal",
     "operator": "color",
     "kind": "sweep",
+    "path": "operator-regression",
     "expectedVideo": ["changing channel emphasis should shift the rendered color balance clearly"],
     "expectedAudio": [
       "changing from red/low to blue/high emphasis should brighten the rendered audio balance"

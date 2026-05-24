@@ -1,9 +1,17 @@
 {
   "id": "audit-source-gradient-sweep",
   "title": "Gradient source sweep",
-  "source": { "kind": "gradient" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-source-gradient-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "gradient"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-source-gradient-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "gradient",
     "audioActive": true,
@@ -14,6 +22,7 @@
     "family": "sources",
     "operator": "gradient",
     "kind": "sweep",
+    "path": "source-coverage",
     "expectedVideo": ["higher speed should produce clearly faster gradient movement"],
     "expectedAudio": [
       "higher speed should make the filter movement more obvious without breaking the output"

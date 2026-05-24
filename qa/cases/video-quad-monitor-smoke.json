@@ -1,0 +1,50 @@
+{
+  "id": "video-quad-monitor-smoke",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "video-quad-monitor-smoke",
+    "tailMs": 750
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "steps": [
+    {
+      "type": "set-node-bus",
+      "op": "contrast",
+      "bus": 1,
+      "screenshot": "contrast-bus-o1"
+    },
+    {
+      "type": "set-node-bus",
+      "op": "hue",
+      "bus": 2,
+      "screenshot": "hue-bus-o2"
+    },
+    {
+      "type": "set-monitor-bus",
+      "bus": 1,
+      "screenshot": "monitor-o1"
+    },
+    {
+      "type": "set-preview-mode",
+      "mode": "quad",
+      "screenshot": "quad-monitor"
+    }
+  ],
+  "audit": {
+    "family": "output-buses",
+    "kind": "smoke",
+    "path": "product"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "id": "audit-program-glitchy-slit-scan-video",
+  "title": "Glitchy Slit Scan Hydra port over loaded clip",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-program-glitchy-slit-scan-video",
+    "tailMs": 850
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "videoFeaturesActive": true,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "slitscan-baseline-hold",
+        "to": "slitscan-program-hold",
+        "domain": "video",
+        "metric": "temporalDiff",
+        "op": ">",
+        "delta": 0.003,
+        "description": "Glitchy Slit Scan's moving slit-memory branch should add visible motion-memory drift over the dry fixture baseline (observed ~+0.0055 on ci-smoke.mp4; threshold set at +0.003 for margin)"
+      }
+    ]
+  },
+  "audit": {
+    "family": "programs",
+    "operator": "modulatePixelateRouted",
+    "kind": "smoke",
+    "path": "product",
+    "expectedVideo": [
+      "the clip should cut into a moving slit-memory layer rather than reading as a generic mask or blur"
+    ],
+    "expectedAudio": [
+      "the coupled sound should feel like a thin moving spectral cut with persistence and scrape more than obvious detune"
+    ],
+    "manualChecks": [
+      "Does the slit layer read as motion memory instead of a noisy mask artifact?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "wait",
+      "ms": 600,
+      "screenshot": "slitscan-baseline-hold"
+    },
+    {
+      "type": "apply-program",
+      "name": "glitchySlitScan",
+      "screenshot": "slitscan-applied"
+    },
+    {
+      "type": "wait",
+      "ms": 800,
+      "screenshot": "slitscan-program-hold"
+    }
+  ]
+}

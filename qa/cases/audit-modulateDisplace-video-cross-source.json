@@ -1,0 +1,107 @@
+{
+  "id": "audit-modulateDisplace-video-cross-source",
+  "title": "Routed modulateDisplace cross-source spot check on committed video fixture",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-modulateDisplace-video-cross-source",
+    "tailMs": 850
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "modulateDisplace-video-022-hold",
+        "to": "modulateDisplace-video-068",
+        "domain": "video",
+        "metric": "temporalDiff",
+        "op": ">",
+        "delta": 0.001,
+        "description": "stronger routed displacement should drive more visible frame-to-frame warp on the decoded fixture"
+      },
+      {
+        "from": "modulateDisplace-video-022-hold",
+        "to": "modulateDisplace-video-068-hold",
+        "domain": "audio",
+        "metric": "spectralSpreadHz",
+        "op": ">",
+        "delta": 12,
+        "source": "exported-audio",
+        "segmentPaddingMs": 180,
+        "description": "stronger routed displacement should widen the exported fixture spectrum instead of leaving the audio static"
+      }
+    ]
+  },
+  "audit": {
+    "family": "feedback-composition",
+    "operator": "modulateDisplace",
+    "kind": "cross-source",
+    "path": "product",
+    "expectedVideo": [
+      "the decoded fixture should stay legible while the routed red-channel branch drives stronger displacement",
+      "higher displacement depth should smear and shove motion, not freeze the frame or explode into NaNs"
+    ],
+    "expectedAudio": [
+      "fixture audio should pick up the same routed displacement law as a recent-time smear rather than staying dry",
+      "the stronger setting should widen and roughen the texture without clipping or losing channel integrity"
+    ],
+    "manualChecks": [
+      "Does the routed secondary branch feel materially different from unary self-modulation?",
+      "Does the decoded-media result stay intentional and controllable at the stronger setting?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-node-bus",
+      "op": "r",
+      "bus": 1,
+      "screenshot": "modulateDisplace-r-bus1"
+    },
+    {
+      "type": "set-node-secondary-input",
+      "op": "modulateDisplace",
+      "input": "src(o1)",
+      "screenshot": "modulateDisplace-src-o1"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "modulateDisplace",
+      "paramId": "amount",
+      "value": 0.22,
+      "screenshot": "modulateDisplace-video-022"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "modulateDisplace-video-022-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "modulateDisplace",
+      "paramId": "amount",
+      "value": 0.68,
+      "screenshot": "modulateDisplace-video-068"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "modulateDisplace",
+      "paramId": "bias",
+      "value": 0.2,
+      "screenshot": "modulateDisplace-bias-020"
+    },
+    {
+      "type": "wait",
+      "ms": 550,
+      "screenshot": "modulateDisplace-video-068-hold"
+    }
+  ]
+}

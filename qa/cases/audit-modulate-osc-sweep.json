@@ -1,9 +1,17 @@
 {
   "id": "audit-modulate-osc-sweep",
   "title": "Modulate sweep on osc source",
-  "source": { "kind": "osc" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-modulate-osc-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-modulate-osc-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "osc",
     "audioActive": true,
@@ -33,6 +41,7 @@
     "family": "feedback-composition",
     "operator": "modulate",
     "kind": "sweep",
+    "path": "operator-regression",
     "expectedVideo": [
       "raising modulate amount should increase UV warp without tearing or black frames",
       "the visual motion should remain phase-coherent rather than jittering randomly"

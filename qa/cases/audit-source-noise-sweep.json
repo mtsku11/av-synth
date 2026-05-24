@@ -1,9 +1,17 @@
 {
   "id": "audit-source-noise-sweep",
   "title": "Noise source sweep",
-  "source": { "kind": "noise" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "audit-source-noise-sweep", "tailMs": 700 },
+  "source": {
+    "kind": "noise"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-source-noise-sweep",
+    "tailMs": 700
+  },
   "expectations": {
     "sourceKind": "noise",
     "audioActive": true,
@@ -14,6 +22,7 @@
     "family": "sources",
     "operator": "noise",
     "kind": "sweep",
+    "path": "source-coverage",
     "expectedVideo": [
       "higher scale should produce visibly denser noise detail",
       "the noise field should keep moving rather than freezing or banding"

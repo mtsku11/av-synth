@@ -1,8 +1,16 @@
 {
   "id": "procedural-osc-smoke",
-  "source": { "kind": "osc" },
-  "transport": { "start": true, "settleMs": 1200 },
-  "recording": { "filename": "procedural-osc-smoke", "tailMs": 500 },
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "procedural-osc-smoke",
+    "tailMs": 500
+  },
   "expectations": {
     "sourceKind": "osc",
     "audioActive": true,
@@ -29,5 +37,8 @@
       "value": 1.5,
       "screenshot": "osc-scale-150"
     }
-  ]
+  ],
+  "audit": {
+    "path": "operator-regression"
+  }
 }
