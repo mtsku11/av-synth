@@ -175,7 +175,6 @@ test.describe('B2.2 — video fps (gate #2a)', () => {
     fs.mkdirSync(outDir, { recursive: true });
     fs.writeFileSync(path.join(outDir, 'granulator-fps.json'), JSON.stringify(result, null, 2));
 
-    // eslint-disable-next-line no-console
     console.log(
       `[B2.2] fps median ${result.fps.median.toFixed(1)}, p5 ${result.fps.p5.toFixed(1)}, ` +
         `p1 ${result.fps.p1.toFixed(1)}, worst ${result.fps.worst.toFixed(1)} ` +

@@ -11,6 +11,18 @@
 import type { GrainBufferPlan } from '../video/grain-buffer';
 
 export const ENV_TABLE_LEN = 2048;
+const GRAIN_EVENT_RING_FIELDS = 10;
+const GRAIN_EVENT_WRITE_SEQ_IDX = 0;
+const GRAIN_EVENT_F_VOICE_ID = 0;
+const GRAIN_EVENT_F_SEED = 1;
+const GRAIN_EVENT_F_SPAWN_TIME = 2;
+const GRAIN_EVENT_F_DURATION_SEC = 3;
+const GRAIN_EVENT_F_POSITION_SEC = 4;
+const GRAIN_EVENT_F_PITCH_RATIO = 5;
+const GRAIN_EVENT_F_PAN_X = 6;
+const GRAIN_EVENT_F_PAN_Y = 7;
+const GRAIN_EVENT_F_REVERSE = 8;
+const GRAIN_EVENT_F_ENVELOPE_INDEX = 9;
 export const ENV_HANN = 0;
 export const ENV_TUKEY25 = 1;
 export const ENV_GAUSSIAN = 2;
@@ -167,22 +179,97 @@ interface WorkletNodeLike {
   readonly port: MessagePortLike;
 }
 
+export interface GrainEventRingTransport {
+  readonly capacity: number;
+  readonly header: SharedArrayBuffer;
+  readonly data: SharedArrayBuffer;
+}
+
 export class GrainScheduler {
   #events: GrainEvent[] = [];
   #node: WorkletNodeLike;
   #prevHandler: ((ev: MessageEvent) => void) | null;
   #disposed = false;
+  #ringHeader: Int32Array | null = null;
+  #ringData: Float64Array | null = null;
+  #ringCapacity = 0;
+  #ringReadSeq = 0;
 
-  constructor(node: WorkletNodeLike) {
+  constructor(node: WorkletNodeLike, ringTransport?: GrainEventRingTransport | null) {
     this.#node = node;
     this.#prevHandler = node.port.onmessage;
+    if (ringTransport) {
+      this.#attachRing(ringTransport.capacity, ringTransport.header, ringTransport.data);
+    }
     node.port.onmessage = (ev: MessageEvent): void => {
-      const data = ev.data as { type?: string } | null;
-      if (data && data.type === 'grain') {
+      const data = ev.data as {
+        type?: string;
+        capacity?: number;
+        header?: SharedArrayBuffer;
+        data?: SharedArrayBuffer;
+      } | null;
+      if (data && data.type === 'grainRing') {
+        this.#attachRing(data.capacity, data.header, data.data);
+      } else if (data && data.type === 'grain') {
         this.#events.push(data as unknown as GrainEvent);
       }
       this.#prevHandler?.(ev);
     };
+  }
+
+  #attachRing(
+    capacity: number | undefined,
+    headerBuffer: SharedArrayBuffer | undefined,
+    dataBuffer: SharedArrayBuffer | undefined,
+  ): void {
+    if (
+      typeof capacity !== 'number' ||
+      !Number.isInteger(capacity) ||
+      !headerBuffer ||
+      !dataBuffer
+    ) {
+      return;
+    }
+    const cap = capacity;
+    if (
+      !(headerBuffer instanceof SharedArrayBuffer) ||
+      !(dataBuffer instanceof SharedArrayBuffer)
+    ) {
+      return;
+    }
+    if (cap <= 0) return;
+    this.#ringCapacity = cap;
+    this.#ringHeader = new Int32Array(headerBuffer);
+    this.#ringData = new Float64Array(dataBuffer);
+    this.#ringReadSeq = Atomics.load(this.#ringHeader, GRAIN_EVENT_WRITE_SEQ_IDX);
+  }
+
+  #drainRing(): void {
+    const header = this.#ringHeader;
+    const ring = this.#ringData;
+    const capacity = this.#ringCapacity;
+    if (!header || !ring || capacity <= 0) return;
+    const writeSeq = Atomics.load(header, GRAIN_EVENT_WRITE_SEQ_IDX);
+    let readSeq = this.#ringReadSeq;
+    if (writeSeq - readSeq > capacity) {
+      readSeq = writeSeq - capacity;
+    }
+    for (; readSeq < writeSeq; readSeq++) {
+      const off = (readSeq % capacity) * GRAIN_EVENT_RING_FIELDS;
+      this.#events.push({
+        voiceId: ring[off + GRAIN_EVENT_F_VOICE_ID]! | 0,
+        seed: ring[off + GRAIN_EVENT_F_SEED]! >>> 0,
+        spawnTime: ring[off + GRAIN_EVENT_F_SPAWN_TIME]!,
+        durationSec: ring[off + GRAIN_EVENT_F_DURATION_SEC]!,
+        positionSec: ring[off + GRAIN_EVENT_F_POSITION_SEC]!,
+        pitchRatio: ring[off + GRAIN_EVENT_F_PITCH_RATIO]!,
+        panX: ring[off + GRAIN_EVENT_F_PAN_X]!,
+        panY: ring[off + GRAIN_EVENT_F_PAN_Y]!,
+        reverse: ring[off + GRAIN_EVENT_F_REVERSE]! | 0,
+        envelopeIndex: ring[off + GRAIN_EVENT_F_ENVELOPE_INDEX]! | 0,
+      });
+    }
+    this.#ringReadSeq = writeSeq;
   }
 
   ingest(event: GrainEvent): void {
@@ -190,6 +277,7 @@ export class GrainScheduler {
   }
 
   prune(now: number): void {
+    this.#drainRing();
     let w = 0;
     for (let r = 0; r < this.#events.length; r++) {
       const e = this.#events[r]!;
@@ -214,6 +302,7 @@ export class GrainScheduler {
   }
 
   get activeCount(): number {
+    this.#drainRing();
     return this.#events.length;
   }
 

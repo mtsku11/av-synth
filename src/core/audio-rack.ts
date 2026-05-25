@@ -24,7 +24,7 @@ export interface AudioRackControlView {
   readonly lfo: ParamLfoAssignmentView;
 }
 
-export type AudioRackModulationSource = 'v.luma' | 'v.flux' | 'v.edge';
+export type AudioRackModulationSource = 'v.luma' | 'v.flux' | 'v.edge' | 'v.motion';
 
 export interface AudioRackModulation {
   readonly id: string;
@@ -622,7 +622,7 @@ export function createAudioRackModulation(instance: AudioRackInstance): AudioRac
 }
 
 export function listAudioRackModulationSources(): readonly AudioRackModulationSource[] {
-  return ['v.luma', 'v.flux', 'v.edge'];
+  return ['v.luma', 'v.flux', 'v.edge', 'v.motion'];
 }
 
 export function listAudioRackModulationTargetViews(
@@ -642,6 +642,7 @@ function readModulationSource(source: AudioRackModulationSource, ctx: CouplingCo
   if (!ctx.videoFeatures.available) return 0;
   if (source === 'v.flux') return ctx.videoFeatures.flux;
   if (source === 'v.luma') return ctx.videoFeatures.luma - 0.5;
+  if (source === 'v.motion') return ctx.videoFeatures.motion;
   return ctx.videoFeatures.edge - 0.5;
 }
 

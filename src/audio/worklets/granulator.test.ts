@@ -7,10 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const source = readFileSync(
-  resolve(process.cwd(), 'public/worklets/granulator.js'),
-  'utf-8',
-);
+const source = readFileSync(resolve(process.cwd(), 'public/worklets/granulator.js'), 'utf-8');
 
 interface WorkletInstance {
   port: {
@@ -23,7 +20,7 @@ interface WorkletInstance {
     parameters: Record<string, Float32Array>,
   ): boolean;
 }
-type WorkletCtor = new () => WorkletInstance;
+type WorkletCtor = new (options?: unknown) => WorkletInstance;
 
 class FakeAudioWorkletProcessor {
   port = {
@@ -37,13 +34,12 @@ const registerProcessor = (_name: string, cls: WorkletCtor) => {
   RegisteredCtor = cls;
 };
 
-new Function(
-  'AudioWorkletProcessor',
-  'registerProcessor',
-  'sampleRate',
-  'currentTime',
-  source,
-)(FakeAudioWorkletProcessor, registerProcessor, 48000, 0);
+new Function('AudioWorkletProcessor', 'registerProcessor', 'sampleRate', 'currentTime', source)(
+  FakeAudioWorkletProcessor,
+  registerProcessor,
+  48000,
+  0,
+);
 
 if (!RegisteredCtor) throw new Error('granulator-v1 processor did not register');
 const ProcessorCtor: WorkletCtor = RegisteredCtor;
@@ -79,6 +75,64 @@ function defaultParams(
   };
 }
 
+function makeSharedControls(overrides: Partial<Record<string, number>> = {}): {
+  header: SharedArrayBuffer;
+  data: SharedArrayBuffer;
+} {
+  const values = [
+    overrides.position ?? 0.1,
+    overrides.positionJitter ?? 0,
+    overrides.pitch ?? 0,
+    overrides.pitchJitter ?? 0,
+    overrides.duration ?? 40,
+    overrides.durationJitter ?? 0,
+    overrides.density ?? 50,
+    overrides.distribution ?? 0,
+    overrides.envelope ?? 0,
+    overrides.panSpread ?? 0,
+    overrides.ySpread ?? 0,
+    overrides.reverseProbability ?? 0,
+    overrides.voiceCount ?? 32,
+    overrides.mode ?? 0,
+    overrides.gain ?? 1.0,
+  ];
+  const header = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
+  const data = new SharedArrayBuffer(Float32Array.BYTES_PER_ELEMENT * values.length);
+  new Float32Array(data).set(values);
+  return { header, data };
+}
+
+function makeSharedGrainRing(capacity = 2048): {
+  capacity: number;
+  header: SharedArrayBuffer;
+  data: SharedArrayBuffer;
+} {
+  return {
+    capacity,
+    header: new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT),
+    data: new SharedArrayBuffer(Float64Array.BYTES_PER_ELEMENT * capacity * 10),
+  };
+}
+
+function makeSharedRuntimeDiag(capacity = 256): {
+  capacity: number;
+  header: SharedArrayBuffer;
+  data: SharedArrayBuffer;
+} {
+  return {
+    capacity,
+    header: new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT),
+    data: new SharedArrayBuffer(Float64Array.BYTES_PER_ELEMENT * capacity * 13),
+  };
+}
+
+function makeSharedSource(seconds: number, freq: number, sr = SR): SharedArrayBuffer {
+  const src = makeSineSource(seconds, freq, sr);
+  const buffer = new SharedArrayBuffer(Float32Array.BYTES_PER_ELEMENT * src.length);
+  new Float32Array(buffer).set(src);
+  return buffer;
+}
+
 function makeSineSource(seconds: number, freq: number, sr = SR): Float32Array {
   const len = Math.floor(seconds * sr);
   const buf = new Float32Array(len);
@@ -102,12 +156,24 @@ function workletState(inst: WorkletInstance): {
   readonly vRatio: Float32Array;
   readonly vMidiCh: Uint8Array;
   readonly interpMode: number;
+  readonly pendingNoteCount: number;
+  readonly grainRingHeader: Int32Array | null;
+  readonly grainRingData: Float64Array | null;
+  readonly runtimeDiagHeader: Int32Array | null;
+  readonly runtimeDiagData: Float64Array | null;
+  readonly runtimeDiagWriteSeq: number;
 } {
   return inst as unknown as {
     readonly vActive: Uint8Array;
     readonly vRatio: Float32Array;
     readonly vMidiCh: Uint8Array;
     readonly interpMode: number;
+    readonly pendingNoteCount: number;
+    readonly grainRingHeader: Int32Array | null;
+    readonly grainRingData: Float64Array | null;
+    readonly runtimeDiagHeader: Int32Array | null;
+    readonly runtimeDiagData: Float64Array | null;
+    readonly runtimeDiagWriteSeq: number;
   };
 }
 
@@ -159,6 +225,68 @@ describe('granulator-v1 worklet (sinc + envelopes + modes + full controls)', () 
     expect(rms(outs[0]![0]!)).toBe(0);
   });
 
+  it('initialises a shared grain-event ring and avoids per-grain port traffic when available', () => {
+    const ring = makeSharedGrainRing();
+    const runtimeDiag = makeSharedRuntimeDiag();
+    const inst = new ProcessorCtor({
+      processorOptions: {
+        grainRingCapacity: ring.capacity,
+        grainRingHeader: ring.header,
+        grainRingData: ring.data,
+        runtimeDiagCapacity: runtimeDiag.capacity,
+        runtimeDiagHeader: runtimeDiag.header,
+        runtimeDiagData: runtimeDiag.data,
+      },
+    });
+    const msgs: unknown[] = [];
+    inst.port.postMessage = (msg: unknown) => {
+      msgs.push(msg);
+    };
+    postLoadAndEnable(inst, makeSineSource(1.0, 220));
+    inst.process([], [[new Float32Array(BLOCK), new Float32Array(BLOCK)]], defaultParams());
+    const state = workletState(inst);
+    expect(state.grainRingHeader).toBeTruthy();
+    expect(state.grainRingData).toBeTruthy();
+    expect(state.runtimeDiagHeader).toBeTruthy();
+    expect(state.runtimeDiagData).toBeTruthy();
+    expect(msgs.filter((msg) => (msg as { type?: string }).type === 'grain')).toEqual([]);
+  });
+
+  it('reads k-rate controls from the shared control snapshot when provided', () => {
+    const controls = makeSharedControls({ pitch: 12, density: 80, duration: 40, gain: 1.0 });
+    const inst = new ProcessorCtor({
+      processorOptions: {
+        controlHeader: controls.header,
+        controlData: controls.data,
+      },
+    });
+    postLoadAndEnable(inst, makeSineSource(1.0, 220));
+    const r = runBlocks(inst, {}, 16);
+    expect(r.hasNaN).toBe(false);
+    expect(r.energyL).toBeGreaterThan(0);
+    expect(r.energyR).toBeGreaterThan(0);
+  });
+
+  it('accepts shared source buffers for the clip-load handoff', () => {
+    const inst = new ProcessorCtor();
+    const left = makeSharedSource(1.0, 220);
+    const right = makeSharedSource(1.0, 330);
+    inst.port.onmessage?.({
+      data: {
+        type: 'loadShared',
+        samples: SR,
+        channels: 2,
+        left,
+        right,
+      },
+    });
+    inst.port.onmessage?.({ data: { type: 'enable', value: true } });
+    const r = runBlocks(inst, defaultParams({ density: 80, duration: 40 }), 16);
+    expect(r.hasNaN).toBe(false);
+    expect(r.energyL).toBeGreaterThan(0);
+    expect(r.energyR).toBeGreaterThan(0);
+  });
+
   it('produces non-silent output once enabled with a loaded source', () => {
     const inst = new ProcessorCtor();
     postLoadAndEnable(inst, makeSineSource(1.0, 220));
@@ -199,11 +327,7 @@ describe('granulator-v1 worklet (sinc + envelopes + modes + full controls)', () 
     for (let envIdx = 0; envIdx < 5; envIdx++) {
       const inst = new ProcessorCtor();
       postLoadAndEnable(inst, makeSineSource(1.0, 220));
-      const r = runBlocks(
-        inst,
-        defaultParams({ envelope: envIdx, density: 50, duration: 40 }),
-        16,
-      );
+      const r = runBlocks(inst, defaultParams({ envelope: envIdx, density: 50, duration: 40 }), 16);
       expect(r.hasNaN, `envelope ${envIdx} produced NaN`).toBe(false);
       expect(r.energyL, `envelope ${envIdx} silent`).toBeGreaterThan(0);
     }
@@ -247,8 +371,8 @@ describe('granulator-v1 worklet (sinc + envelopes + modes + full controls)', () 
     const len = SR * 2;
     const src = new Float32Array(len);
     for (let i = 0; i < len; i++) {
-      src[i] = 0.5 * Math.sin((2 * Math.PI * 110 * i) / SR) +
-               0.5 * Math.sin((2 * Math.PI * 660 * i) / SR);
+      src[i] =
+        0.5 * Math.sin((2 * Math.PI * 110 * i) / SR) + 0.5 * Math.sin((2 * Math.PI * 660 * i) / SR);
     }
     const inst = new ProcessorCtor();
     postLoadAndEnable(inst, src);
@@ -296,11 +420,19 @@ describe('granulator-v1 worklet (sinc + envelopes + modes + full controls)', () 
     postLoadAndEnable(inst, makeSineSource(2.0, 220));
     inst.port.onmessage?.({ data: { type: 'noteOn', channel: 2, pitch: 0, velocity: 127 } });
     inst.port.onmessage?.({ data: { type: 'noteOn', channel: 3, pitch: 7, velocity: 127 } });
-    inst.process([], [[new Float32Array(BLOCK), new Float32Array(BLOCK)]], defaultParams({ duration: 400 }));
+    inst.process(
+      [],
+      [[new Float32Array(BLOCK), new Float32Array(BLOCK)]],
+      defaultParams({ duration: 400 }),
+    );
 
     const state = workletState(inst);
-    const ch2 = Array.from(state.vMidiCh).findIndex((ch, idx) => ch === 2 && state.vActive[idx] === 1);
-    const ch3 = Array.from(state.vMidiCh).findIndex((ch, idx) => ch === 3 && state.vActive[idx] === 1);
+    const ch2 = Array.from(state.vMidiCh).findIndex(
+      (ch, idx) => ch === 2 && state.vActive[idx] === 1,
+    );
+    const ch3 = Array.from(state.vMidiCh).findIndex(
+      (ch, idx) => ch === 3 && state.vActive[idx] === 1,
+    );
     expect(ch2).toBeGreaterThanOrEqual(0);
     expect(ch3).toBeGreaterThanOrEqual(0);
 
@@ -312,6 +444,23 @@ describe('granulator-v1 worklet (sinc + envelopes + modes + full controls)', () 
 
     inst.port.onmessage?.({ data: { type: 'noteOff', channel: 2, note: 60 } });
     expect(state.vMidiCh[ch2]!).toBe(0);
+  });
+
+  it('caps pending note triggers without growing an object queue', () => {
+    const inst = new ProcessorCtor();
+    postLoadAndEnable(inst, makeSineSource(2.0, 220));
+    for (let i = 0; i < 160; i++) {
+      inst.port.onmessage?.({
+        data: { type: 'noteOn', channel: (i % 4) + 1, pitch: i % 12, velocity: 100 },
+      });
+    }
+    expect(workletState(inst).pendingNoteCount).toBe(128);
+    inst.process(
+      [],
+      [[new Float32Array(BLOCK), new Float32Array(BLOCK)]],
+      defaultParams({ duration: 400 }),
+    );
+    expect(workletState(inst).pendingNoteCount).toBe(0);
   });
 
   it('falls back to Hermite under heavy voice and pitch load', () => {
@@ -336,6 +485,31 @@ describe('granulator-v1 worklet (sinc + envelopes + modes + full controls)', () 
     expect(msgs).toContainEqual({ type: 'interpMode', mode: 'hermite' });
   });
 
+  it('can suppress interp-mode port messages for soak runs', () => {
+    const inst = new ProcessorCtor({
+      processorOptions: {
+        emitInterpModeMessages: false,
+      },
+    });
+    const msgs: unknown[] = [];
+    inst.port.postMessage = (msg: unknown) => {
+      msgs.push(msg);
+    };
+    postLoadAndEnable(inst, makeSineSource(3.0, 220));
+    runBlocks(
+      inst,
+      defaultParams({
+        density: 200,
+        duration: 500,
+        voiceCount: 64,
+        pitch: 24,
+      }),
+      32,
+    );
+    expect(workletState(inst).interpMode).toBe(1);
+    expect(msgs).not.toContainEqual({ type: 'interpMode', mode: 'hermite' });
+  });
+
   it('stays on sinc at moderate load', () => {
     const inst = new ProcessorCtor();
     postLoadAndEnable(inst, makeSineSource(1.0, 220));
@@ -350,6 +524,36 @@ describe('granulator-v1 worklet (sinc + envelopes + modes + full controls)', () 
       16,
     );
     expect(workletState(inst).interpMode).toBe(0);
+  });
+
+  it('records shared runtime snapshots without message traffic', () => {
+    const runtimeDiag = makeSharedRuntimeDiag(32);
+    const inst = new ProcessorCtor({
+      processorOptions: {
+        runtimeDiagCapacity: runtimeDiag.capacity,
+        runtimeDiagHeader: runtimeDiag.header,
+        runtimeDiagData: runtimeDiag.data,
+      },
+    });
+    postLoadAndEnable(inst, makeSineSource(2.0, 220));
+    runBlocks(
+      inst,
+      defaultParams({
+        density: 120,
+        duration: 400,
+        voiceCount: 64,
+        pitch: 24,
+      }),
+      64,
+    );
+    const state = workletState(inst);
+    expect(state.runtimeDiagWriteSeq).toBeGreaterThan(0);
+    const headerSeq = Atomics.load(new Int32Array(runtimeDiag.header), 0);
+    expect(headerSeq).toBe(state.runtimeDiagWriteSeq);
+    const data = new Float64Array(runtimeDiag.data);
+    expect(data[0]).toBeGreaterThanOrEqual(0);
+    expect(data[1]).toBeGreaterThan(0);
+    expect(data[3]).toBeGreaterThan(0);
   });
 
   it('clear() silences output and resets voice state', () => {

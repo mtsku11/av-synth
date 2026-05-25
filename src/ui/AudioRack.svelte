@@ -27,7 +27,7 @@
     onSetModulationSource?: (
       id: string,
       modulationId: string,
-      source: 'v.luma' | 'v.flux' | 'v.edge',
+      source: 'v.luma' | 'v.flux' | 'v.edge' | 'v.motion',
     ) => void;
     onSetModulationTarget?: (id: string, modulationId: string, target: string) => void;
   }
@@ -181,7 +181,7 @@
             <details class="advanced modulation-panel">
               <summary>reactive routes · {instance.modulations.length}</summary>
               <div class="modulation-copy">
-                <span>route `v.luma`, `v.flux`, or `v.edge` into this engine without reopening debug monitors</span>
+                <span>route `v.luma`, `v.flux`, `v.edge`, or `v.motion` into this engine without reopening debug monitors</span>
                 <button class="add-route" onclick={() => onAddModulation?.(instance.id)}>add route</button>
               </div>
               {#if instance.modulations.length === 0}
@@ -203,7 +203,8 @@
                                 (event.currentTarget as HTMLSelectElement).value as
                                   | 'v.luma'
                                   | 'v.flux'
-                                  | 'v.edge',
+                                  | 'v.edge'
+                                  | 'v.motion',
                               )}
                           >
                             {#each modulationSources as source (source)}

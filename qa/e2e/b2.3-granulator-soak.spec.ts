@@ -25,9 +25,26 @@ import path from 'node:path';
 
 import { resolveFixturePath } from './manifest';
 
+interface RuntimeSnapshot {
+  relTimeSec: number;
+  activeVoices: number;
+  fadingVoices: number;
+  pitchLoad: number;
+  interpMode: 'sinc' | 'hermite';
+  samplesUntilNextSpawn: number;
+  nextVoiceId: number;
+  spawnCount: number;
+  stealCount: number;
+  normGain: number;
+  density: number;
+  voiceCount: number;
+  meanSamplesPerGrain: number;
+}
+
 const WARMUP_MS = 2_000;
 const SOAK_S = Number.parseInt(process.env.GRANULATOR_SOAK_S ?? '60', 10);
 const SOAK_MS = SOAK_S * 1000;
+const INSPECTION_POINTS_SEC = [14, 15, 15.337, 15.942, 16, 18];
 
 test.describe('B2.3 — granulator long soak (gate #4)', () => {
   // Attribution: Chromium's tracing system emits 'thread_name' metadata events
@@ -84,18 +101,46 @@ test.describe('B2.3 — granulator long soak (gate #4)', () => {
         window as Window & {
           __AV_SYNTH_QA__?: {
             applyProgram(name: string): Promise<boolean>;
-            setGranulatorParam(name: string, value: number): Promise<boolean>;
+            setGranulatorDiagnostics(options: {
+              emitInterpModeMessages?: boolean;
+              emitDiagnosticMessages?: boolean;
+            }): Promise<boolean>;
+            getGranulatorRuntimeDiagnostics(): RuntimeSnapshot[];
             startTransport(): Promise<boolean>;
+            ensureGrainAudioLoaded(): Promise<boolean>;
           };
         }
       ).__AV_SYNTH_QA__;
       if (!bridge) return false;
+      const qa = await bridge.setGranulatorDiagnostics({
+        emitInterpModeMessages: false,
+        emitDiagnosticMessages: false,
+      });
       const a = await bridge.applyProgram('grainField');
-      const b = await bridge.setGranulatorParam('voiceCount', 64);
       const c = await bridge.startTransport();
-      return a && b && c;
+      const d = await bridge.ensureGrainAudioLoaded();
+      return qa && a && c && d;
     });
     expect(programOk).toBe(true);
+
+    // setGranulatorParam returns false until the transport has instantiated
+    // the granulator worklet; poll until the call is accepted.
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(async () => {
+            const bridge = (
+              window as Window & {
+                __AV_SYNTH_QA__?: {
+                  setGranulatorParam(name: string, value: number): Promise<boolean>;
+                };
+              }
+            ).__AV_SYNTH_QA__;
+            return bridge ? await bridge.setGranulatorParam('voiceCount', 64) : false;
+          }),
+        { timeout: 10_000 },
+      )
+      .toBe(true);
 
     // Warm up before starting the trace so worklet/voice-pool init isn't
     // counted as "in-soak" allocation noise.
@@ -130,6 +175,17 @@ test.describe('B2.3 — granulator long soak (gate #4)', () => {
 
     // Soak.
     await page.waitForTimeout(SOAK_MS);
+
+    const runtimeDiagnostics = await page.evaluate(() => {
+      const bridge = (
+        window as Window & {
+          __AV_SYNTH_QA__?: {
+            getGranulatorRuntimeDiagnostics(): RuntimeSnapshot[];
+          };
+        }
+      ).__AV_SYNTH_QA__;
+      return bridge?.getGranulatorRuntimeDiagnostics() ?? [];
+    });
 
     // Stop tracing and wait for the buffer drain to complete.
     const traceComplete = new Promise<void>((resolve) => {
@@ -178,8 +234,7 @@ test.describe('B2.3 — granulator long soak (gate #4)', () => {
       const e = evt as { name?: string; dur?: number; pid?: number; tid?: number };
       if (!e?.name) continue;
       const durMs = (e.dur ?? 0) / 1000;
-      const onWorklet =
-        e.pid != null && e.tid != null && workletThreads.has(`${e.pid}:${e.tid}`);
+      const onWorklet = e.pid != null && e.tid != null && workletThreads.has(`${e.pid}:${e.tid}`);
       if (majorNames.has(e.name)) {
         majorCountPageWide += 1;
         if (onWorklet) {
@@ -198,6 +253,47 @@ test.describe('B2.3 — granulator long soak (gate #4)', () => {
     // If no AudioWorklet thread metadata was captured, the attribution layer
     // has nothing to filter on and a zero count would be a false PASS.
     const attributionOk = workletThreads.size > 0;
+    const runtimeStats = runtimeDiagnostics.length
+      ? {
+          samples: runtimeDiagnostics.length,
+          maxActiveVoices: runtimeDiagnostics.reduce(
+            (max, sample) => Math.max(max, sample.activeVoices),
+            0,
+          ),
+          maxFadingVoices: runtimeDiagnostics.reduce(
+            (max, sample) => Math.max(max, sample.fadingVoices),
+            0,
+          ),
+          maxPitchLoad: runtimeDiagnostics.reduce(
+            (max, sample) => Math.max(max, sample.pitchLoad),
+            0,
+          ),
+          maxSpawnCount: runtimeDiagnostics.reduce(
+            (max, sample) => Math.max(max, sample.spawnCount),
+            0,
+          ),
+          maxStealCount: runtimeDiagnostics.reduce(
+            (max, sample) => Math.max(max, sample.stealCount),
+            0,
+          ),
+        }
+      : null;
+    const diagnosticsAtInspectionPoints = INSPECTION_POINTS_SEC.map((targetSec) => {
+      let closest: RuntimeSnapshot | null = null;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      for (const sample of runtimeDiagnostics) {
+        const distance = Math.abs(sample.relTimeSec - targetSec);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          closest = sample;
+        }
+      }
+      return {
+        targetSec,
+        nearestSampleDistanceMs: Number((bestDistance * 1000).toFixed(3)),
+        snapshot: closest,
+      };
+    });
 
     const summary = {
       gate: '§13 #4 (zero major-GC over 4-hour soak, 64 voices)',
@@ -211,6 +307,10 @@ test.describe('B2.3 — granulator long soak (gate #4)', () => {
         workletThreadKeys: Array.from(workletThreads),
         totalThreads: threadNames.size,
       },
+      runtimeDiagnostics: {
+        stats: runtimeStats,
+        inspectionPoints: diagnosticsAtInspectionPoints,
+      },
       majorGC: { count: majorCount, max_ms: majorMaxMs, pageWide: majorCountPageWide },
       minorGC: { count: minorCount, max_ms: minorMaxMs, pageWide: minorCountPageWide },
       verdict: !attributionOk
@@ -222,13 +322,9 @@ test.describe('B2.3 — granulator long soak (gate #4)', () => {
           : `FAIL — ${majorCount} major-GC event(s) on the worklet thread over ${SOAK_S}s`,
     };
 
-    const summaryPath = path.join(
-      path.dirname(tracePath),
-      'granulator-soak-summary.json',
-    );
+    const summaryPath = path.join(path.dirname(tracePath), 'granulator-soak-summary.json');
     fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
 
-    // eslint-disable-next-line no-console
     console.log(
       `[B2.3] ${summary.verdict} ` +
         `(worklet major=${majorCount}, minor=${minorCount}; ` +

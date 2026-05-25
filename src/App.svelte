@@ -21,7 +21,12 @@
   } from './video/renderer';
   import { PlaceholderSource, VideoElementSource } from './video/sources';
   import { SilentSource, VideoElementAudioSource } from './audio/sources';
-  import { Granulator, type GranulatorEnvelope, type GranulatorMode } from './audio/granulator';
+  import {
+    Granulator,
+    type GranulatorEnvelope,
+    type GranulatorMode,
+    type GranulatorRuntimeSnapshot,
+  } from './audio/granulator';
   import { FeedbackDelay } from './audio/feedback-delay';
   import {
     FEEDBACK_DELAY_DEFAULTS,
@@ -66,10 +71,14 @@
   import {
     loadPrograms,
     applyProgram,
-    applyProgramAudio,
+    applyProgramAudioState,
     applyProgramAutomation,
+    getResolvedProgramSharedFeedback,
     getOrderedProgramOps,
+    getProgramMacroDefaults,
     programHasAutomation,
+    programHasMacros,
+    resolveProgramState,
     type ProgramAutomationRuntime,
     type VideoEffectProgramBank,
     type VideoEffectProgram,
@@ -79,6 +88,7 @@
     buildPatchNodeViews,
     compileGraphExecution,
     orderInstancesByGraph,
+    type GraphExecutionPlan,
   } from './core/patch-chain';
   import { BLEND_OPS } from './ops/blend';
   import FeedbackDelayCard from './ui/FeedbackDelayCard.svelte';
@@ -86,6 +96,7 @@
   import MasterMeter from './ui/MasterMeter.svelte';
   import LfoBank from './ui/LfoBank.svelte';
   import Patch from './ui/Patch.svelte';
+  import ProgramMacros from './ui/ProgramMacros.svelte';
   import type { ParamSpec } from './core/params';
   import {
     applyGlobalLfoAssignments,
@@ -103,6 +114,7 @@
   let loadedVideoName = $state<string | null>(null);
   let programs = $state<VideoEffectProgramBank>({});
   let activeProgram = $state<string | null>(null);
+  let activeProgramMacros = $state<Record<string, number>>({});
   let videoFeatures = $state<VideoFeatureState>({ ...EMPTY_VIDEO_FEATURES });
   let monitorBus = $state<BusIndex>(0);
   let previewMode = $state<PreviewMode>('single');
@@ -123,6 +135,8 @@
   let granulatorEnabled = $state(false);
   let granulatorEnvelope = $state<GranulatorEnvelope>('hann');
   let granulatorMode = $state<GranulatorMode>('classic');
+  let granulatorEmitInterpModeMessages = true;
+  let granulatorEmitDiagnosticMessages = false;
   let feedbackDelay: FeedbackDelay | null = null;
   let feedbackDelayDisconnect: (() => void) | null = null;
   let feedbackDelayParams = $state<Record<FeedbackDelayParamName, number>>({
@@ -144,15 +158,25 @@
   let grainDecodedSrc: string | null = null;
   let grainDecodeGen = 0;
   let grainVideoFps = $state<number | null>(null);
+  const EMPTY_AUDIO_PLAN: GraphExecutionPlan = {
+    monitorBus: 0,
+    monitorNodeId: null,
+    busOutputIds: {},
+    steps: [],
+    executableInstances: [],
+    executableIds: new Set<string>(),
+    diagnostics: [],
+  };
   // Granulator raw param values (what the sliders show) and per-param LFO assignment
   // indices. The raw values flow through applyGlobalLfoAssignments() each animation
-  // frame and the modulated result is pushed to the worklet's k-rate AudioParams via
-  // granulator.setParam(). Slider UI mirrors the raw values, not the modulated values —
+  // frame and the modulated result is pushed into the worklet's shared control snapshot.
+  // Slider UI mirrors the raw values, not the modulated values —
   // standard synth UX where the knob shows what the user set, not what the LFO is doing.
   let granulatorRawParams = $state<Record<GranulatorSliderParam, number>>({
     ...GRANULATOR_DEFAULTS,
   });
   let granulatorLfoAssignments = $state<ParamLfoAssignments>({});
+  let granulatorAppliedParams: Partial<Record<GranulatorSliderParam, number>> = {};
   let featureProbeCanvas: HTMLCanvasElement | null = null;
   let featureProbeCtx: CanvasRenderingContext2D | null = null;
   let featureSampleTimer = 0;
@@ -182,17 +206,19 @@
     PRESENTATION_LENS_DIRTS,
   ) as PresentationLensDirtName[];
   let presentationLensDirt = $state<PresentationLensDirtName>('none');
-  const HIDDEN_PROGRAM_KEYS = new Set([
-    'haloKey',
-    'rgbSpill',
-    'shadowMatte',
-    'tunnel',
-    'bloom',
-    'lattice',
-    'chaos',
-    'ghost',
-    'kaleido',
-    'zero',
+  const PUBLIC_PROGRAM_KEYS = new Set([
+    'temporalBloomGhost',
+    'slitScanEcho',
+    'lumaTimeSmear',
+    'edgeFeedback',
+    'contourBloom',
+    'datamoshSmear',
+    'flowMelt',
+    'motionBloomGhost',
+    'kaleidoFeedbackTunnel',
+    'freezeFeedback',
+    'granularVideoCloud',
+    'grainField',
   ]);
 
   const VIDEO_FEATURE_SAMPLE_WIDTH = 96;
@@ -231,11 +257,13 @@
   const orderedInstances = $derived(orderInstancesByGraph(instances, graphNodes));
 
   const graphPlan = $derived(compileGraphExecution(graphNodes, orderedInstances, monitorBus));
+  const activeAudioPlan = $derived(sourceInstance ? graphPlan : EMPTY_AUDIO_PLAN);
 
   const patchNodes = $derived(buildPatchNodeViews(graphNodes, orderedInstances, graphPlan));
   const visiblePrograms = $derived(
-    Object.entries(programs).filter(([name]) => !HIDDEN_PROGRAM_KEYS.has(name)),
+    Object.entries(programs).filter(([name]) => PUBLIC_PROGRAM_KEYS.has(name)),
   );
+  const activeProgramData = $derived(activeProgram ? programs[activeProgram] : undefined);
 
   interface QaBridge {
     getState(): {
@@ -290,9 +318,15 @@
       value: number,
       opIndex?: number,
     ): Promise<boolean>;
+    getOperatorParam(op: string, paramId: string, opIndex?: number): number | null;
     setSourceParam(paramId: string, value: number): Promise<boolean>;
     applyProgram(name: string): Promise<boolean>;
     setGranulatorParam(name: string, value: number): Promise<boolean>;
+    setGranulatorDiagnostics(options: {
+      emitInterpModeMessages?: boolean;
+      emitDiagnosticMessages?: boolean;
+    }): Promise<boolean>;
+    getGranulatorRuntimeDiagnostics(): GranulatorRuntimeSnapshot[];
     setFeedbackDelayParam(name: string, value: number): Promise<boolean>;
     getAudioContext(): AudioContext | null;
     isGrainDecoded(): boolean;
@@ -573,6 +607,7 @@
       }
       flux /= frame.lumas.length;
     }
+    const motion = renderer?.readMotionEnergy() ?? flux;
     previousFeatureLumas = frame.lumas;
     videoFeatures = videoFeatures.available
       ? {
@@ -580,12 +615,14 @@
           luma: smoothFeatureValue(videoFeatures.luma, frame.meanLuma),
           flux: smoothFeatureValue(videoFeatures.flux, flux),
           edge: smoothFeatureValue(videoFeatures.edge, frame.edgeDensity),
+          motion: smoothFeatureValue(videoFeatures.motion, motion),
         }
       : {
           available: true,
           luma: frame.meanLuma,
           flux,
           edge: frame.edgeDensity,
+          motion,
         };
   }
 
@@ -883,6 +920,10 @@
     activeProgram = null;
   }
 
+  function resetRendererTemporalState(): void {
+    renderer?.resetTemporalState();
+  }
+
   function setOperatorParamLfo(instanceId: string, paramId: string, lfoIndex: number | null): void {
     const instance = instances.find((candidate) => candidate.id === instanceId);
     if (!instance) return;
@@ -974,6 +1015,62 @@
     granulatorRawParams = { ...granulatorRawParams, [name]: value };
   }
 
+  function pushGranulatorParams(values: Partial<Record<GranulatorSliderParam, number>>): void {
+    if (!granulator) return;
+    const changed: Partial<Record<GranulatorSliderParam, number>> = {};
+    for (const [name, raw] of Object.entries(values) as [GranulatorSliderParam, number][]) {
+      if (!Number.isFinite(raw)) continue;
+      const prev = granulatorAppliedParams[name];
+      if (prev !== undefined && Math.abs(prev - raw) <= 1e-6) continue;
+      granulatorAppliedParams[name] = raw;
+      changed[name] = raw;
+    }
+    if (Object.keys(changed).length === 0) return;
+    granulator.setParams(changed);
+  }
+
+  function pushGranulatorParam(name: GranulatorSliderParam, value: number): void {
+    pushGranulatorParams({ [name]: value });
+  }
+
+  function applyResolvedProgramState(program: VideoEffectProgram): void {
+    const resolved = resolveProgramState(program, activeProgramMacros);
+    applyProgram(resolved.values, instances);
+    graph.syncParams(instances);
+    applyProgramAudioState(resolved.audio, {
+      setGranulatorParam: (name, value) => {
+        setGranulatorParam(name, value);
+        pushGranulatorParam(name, value);
+      },
+      setGranulatorEnvelope: (value) => setGranulatorEnvelope(value),
+      setGranulatorMode: (value) => setGranulatorMode(value),
+      setFeedbackDelayParam: (name, value) =>
+        setFeedbackDelayParam(name, value, {
+          clearProgram: false,
+          syncVideo: name === 'feedback' ? false : undefined,
+        }),
+    });
+    const sharedFeedback = getResolvedProgramSharedFeedback(resolved);
+    if (sharedFeedback !== null) {
+      setFeedbackDelayParam('feedback', sharedFeedback, {
+        syncVideo: false,
+        clearProgram: false,
+      });
+    }
+  }
+
+  function setActiveProgramMacro(id: string, value: number): void {
+    const program = activeProgram ? programs[activeProgram] : undefined;
+    if (!program) return;
+    activeProgramMacros = {
+      ...activeProgramMacros,
+      [id]: Math.max(0, Math.min(1, value)),
+    };
+    applyResolvedProgramState(program);
+    applyActiveProgramAutomation(program);
+    instances = [...instances];
+  }
+
   function setGranulatorEnabled(next: boolean): void {
     granulatorEnabled = next;
     granulator?.setEnabled(next);
@@ -1036,8 +1133,8 @@
     setGranulatorMode('loop');
     for (const [name, value] of Object.entries(probeParams) as [GranulatorSliderParam, number][]) {
       setGranulatorParam(name, value);
-      granulator.setParam(name, value);
     }
+    pushGranulatorParams(probeParams);
     granulator.clear();
     return true;
   }
@@ -1230,6 +1327,12 @@
         await tick();
         return true;
       },
+      getOperatorParam: (op, paramId, opIndex = 0) => {
+        const match = orderedInstances.filter((instance) => instance.def.op === op)[opIndex];
+        if (!match) return null;
+        const value = match.params[paramId];
+        return typeof value === 'number' ? value : null;
+      },
       setSourceParam: async (paramId, value) => {
         if (!renderer || !sourceInstance) return false;
         if (!sourceInstance.def.paramOrder.includes(paramId)) {
@@ -1252,10 +1355,23 @@
       setGranulatorParam: async (name, value) => {
         if (!granulator) return false;
         setGranulatorParam(name as GranulatorSliderParam, value);
-        granulator.setParam(name as GranulatorSliderParam, value);
+        pushGranulatorParam(name as GranulatorSliderParam, value);
         await tick();
         return true;
       },
+      setGranulatorDiagnostics: async (options) => {
+        if (typeof options.emitInterpModeMessages === 'boolean') {
+          granulatorEmitInterpModeMessages = options.emitInterpModeMessages;
+          granulator?.setEmitInterpModeMessages(options.emitInterpModeMessages);
+        }
+        if (typeof options.emitDiagnosticMessages === 'boolean') {
+          granulatorEmitDiagnosticMessages = options.emitDiagnosticMessages;
+          granulator?.setEmitDiagnosticMessages(options.emitDiagnosticMessages);
+        }
+        await tick();
+        return true;
+      },
+      getGranulatorRuntimeDiagnostics: () => granulator?.readRuntimeDiagnostics() ?? [],
       setFeedbackDelayParam: async (name, value) => {
         if (!feedbackDelay) return false;
         setFeedbackDelayParam(name as FeedbackDelayParamName, value);
@@ -1579,21 +1695,40 @@
     if (!audio.isInitialised) return;
     if (granulator) return;
     try {
-      const g = await Granulator.create(audio.ctx);
+      const g = await Granulator.create(audio.ctx, {
+        emitDiagnosticMessages: granulatorEmitDiagnosticMessages,
+        emitInterpModeMessages: granulatorEmitInterpModeMessages,
+      });
       const delay = new FeedbackDelay(audio.ctx, feedbackDelayParams);
       granulator = g;
+      granulatorAppliedParams = {};
+      // TEMP DIAGNOSTIC (B2.3 allocation audit): capture worklet diag pings via the port.
+      const __diag: { sabAvail: number | null; interpToggles: number } = {
+        sabAvail: null,
+        interpToggles: 0,
+      };
+      (window as unknown as { __GRANULATOR_DIAG__?: typeof __diag }).__GRANULATOR_DIAG__ = __diag;
+      const prevPortHandler = g.node.port.onmessage;
+      g.node.port.onmessage = (ev: MessageEvent): void => {
+        const d = ev.data as { type?: string; kind?: string; avail?: number } | null;
+        if (!d) {
+          prevPortHandler?.call(g.node.port, ev);
+          return;
+        }
+        if (d.type === 'diag' && d.kind === 'sab' && typeof d.avail === 'number') {
+          __diag.sabAvail = d.avail;
+        } else if (d.type === 'diag' && d.kind === 'toggle') {
+          __diag.interpToggles += 1;
+        }
+        prevPortHandler?.call(g.node.port, ev);
+      };
       feedbackDelay = delay;
       g.output.connect(delay.input);
       feedbackDelayDisconnect = audio.attachAuxiliarySource(delay.output);
       g.setEnabled(granulatorEnabled);
       g.setEnvelope(granulatorEnvelope);
       g.setMode(granulatorMode);
-      for (const [name, value] of Object.entries(granulatorRawParams) as [
-        GranulatorSliderParam,
-        number,
-      ][]) {
-        g.setParam(name, value);
-      }
+      pushGranulatorParams(granulatorRawParams);
       for (const [name, value] of Object.entries(feedbackDelayParams) as [
         FeedbackDelayParamName,
         number,
@@ -1659,7 +1794,9 @@
   // measured fps rather than the old fixed 30 fps assumption.
   function ensureGrainComposite(): GrainCompositeSource | null {
     if (!renderer || !granulator || !videoEl || !videoEl.src) return null;
-    if (!grainScheduler) grainScheduler = new GrainScheduler(granulator.node);
+    if (!grainScheduler) {
+      grainScheduler = new GrainScheduler(granulator.node, granulator.grainEventRing);
+    }
     if (!grainBuffer) grainBuffer = new GrainBuffer(renderer.gl);
     const planResult = planCurrentGrainBuffer();
     if (!planResult || !planResult.ok) return null;
@@ -1726,6 +1863,7 @@
     if (!nextIsVideo) pauseVideoSource();
     sourceKind = kind;
     grainSourceMessage = null;
+    renderer.resetTemporalState();
 
     // Tear down any current procedural source instance.
     if (sourceInstance) {
@@ -1826,6 +1964,7 @@
     const program = programs[name];
     if (!program || !renderer) return;
     if (sourceLoaded && sourceKind !== 'video') setSourceKind('video');
+    renderer.resetTemporalState();
     const orderedProgramOps = getOrderedProgramOps(program, DEFAULT_CHAIN);
     const reusableByOp = new Map<string, OperatorInstance[]>();
     for (const instance of instances) {
@@ -1842,21 +1981,11 @@
     }
     instances = nextInstances;
     applyProgramGraph(program, instances);
-    applyProgram(program, instances);
-    syncSharedFeedbackFromVideoChain();
-    applyProgramAudio(program, {
-      setGranulatorParam: (name, value) => {
-        setGranulatorParam(name, value);
-        granulator?.setParam(name, value);
-      },
-      setGranulatorEnvelope: (value) => setGranulatorEnvelope(value),
-      setGranulatorMode: (value) => setGranulatorMode(value),
-      setFeedbackDelayParam: (name, value) =>
-        setFeedbackDelayParam(name, value, { clearProgram: false }),
-    });
+    activeProgram = name;
+    activeProgramMacros = getProgramMacroDefaults(program);
+    applyResolvedProgramState(program);
     applyActiveProgramAutomation(program);
     applyProgramRenderStyle(program.render);
-    activeProgram = name;
     instances = [...instances];
   }
 
@@ -1873,11 +2002,10 @@
     };
   }
 
-  function applyActiveProgramAutomation(
-    program = activeProgram ? programs[activeProgram] : undefined,
-  ): void {
+  function applyActiveProgramAutomation(program = activeProgramData): void {
     if (!program || !programHasAutomation(program)) return;
-    applyProgramAutomation(program, instances, currentProgramAutomationRuntime());
+    const resolved = resolveProgramState(program, activeProgramMacros);
+    applyProgramAutomation(program, instances, currentProgramAutomationRuntime(), resolved.values);
     graph.syncParams(instances);
   }
 
@@ -1893,11 +2021,11 @@
   }
 
   // Per-frame: pull raw granulator slider values, fold in any assigned global LFOs via
-  // mod-bank, and push the modulated result into the worklet's k-rate AudioParams.
+  // mod-bank, and push the modulated result into the worklet's shared control snapshot.
   // Runs at rAF cadence (≈60 Hz) — matches video FX LFO timing and is more than fast
   // enough for the granulator's slowest sensible LFO rates (default bank 0.08–0.89 Hz).
-  // Costs ~13 setParam writes per frame; AudioParam k-rate scheduling de-dups identical
-  // values internally so quiet (no-LFO) state is essentially free.
+  // Writes are locally de-duped and batched so a static patch does not keep re-sending
+  // identical control values every frame.
   function tickGranulatorModulation(): void {
     if (!granulator) return;
     const modulated = applyGlobalLfoAssignments(
@@ -1906,10 +2034,7 @@
       granulatorLfoAssignments,
       couplingCtx,
     );
-    for (const name of Object.keys(modulated) as GranulatorSliderParam[]) {
-      const value = modulated[name];
-      if (value !== undefined) granulator.setParam(name, value);
-    }
+    pushGranulatorParams(modulated);
   }
 
   function applyProgramRenderStyle(style: VideoEffectRenderStyle | undefined): void {
@@ -1953,6 +2078,7 @@
     next.splice(to, 0, moved!);
     instances = next;
     syncSerialGraph(instances);
+    resetRendererTemporalState();
     activeProgram = null;
   }
 
@@ -1968,6 +2094,7 @@
     }
     instances = [...instances, instance];
     syncSerialGraph(instances);
+    resetRendererTemporalState();
     if ((instance.def.inputArity ?? 1) > 1) {
       graph.setPrimaryInput(instance.id, instances.at(-2)?.id ?? null);
     }
@@ -1982,17 +2109,20 @@
     disposeInstance(instance, renderer.gl);
     instances = instances.filter((candidate) => candidate.id !== id);
     syncSerialGraph(instances);
+    resetRendererTemporalState();
     if (removedFeedback) syncSharedFeedbackFromVideoChain();
     activeProgram = null;
   }
 
   function onSetPatchNodeBus(id: string, bus: BusIndex): void {
     graph.setBus(id, bus);
+    resetRendererTemporalState();
     activeProgram = null;
   }
 
   function onSetMonitorBus(bus: BusIndex): void {
     monitorBus = bus;
+    resetRendererTemporalState();
   }
 
   function onSetPreviewMode(mode: PreviewMode): void {
@@ -2001,11 +2131,13 @@
 
   function onSetPatchNodePrimaryInput(id: string, inputId: string | null): void {
     graph.setPrimaryInput(id, inputId);
+    resetRendererTemporalState();
     activeProgram = null;
   }
 
   function onAddPatchNodeInput(id: string, inputId: string): void {
     graph.addInput(id, inputId);
+    resetRendererTemporalState();
     activeProgram = null;
   }
 
@@ -2017,6 +2149,7 @@
       Boolean(input && input !== SOURCE_NODE_ID),
     );
     graph.setInputs(id, nextInputs);
+    resetRendererTemporalState();
     activeProgram = null;
   }
 
@@ -2060,7 +2193,7 @@
   $effect(() => {
     renderer?.setPlan(graphPlan);
     if (!audio.isInitialised) return;
-    audio.setPlan(graphPlan);
+    audio.setPlan(activeAudioPlan);
   });
 
   onDestroy(() => {
@@ -2089,13 +2222,14 @@
     feedbackDelay = null;
     granulator?.dispose();
     granulator = null;
+    granulatorAppliedParams = {};
     renderer?.dispose();
     renderer = null;
   });
 
   async function onStart() {
     await audio.init();
-    audio.setPlan(graphPlan);
+    audio.setPlan(activeAudioPlan);
     await ensureGranulatorPipeline();
 
     // Audio side of the active source needs the AudioContext, so wire it now
@@ -2161,7 +2295,7 @@
 
     if (!audio.isInitialised) {
       await audio.init();
-      audio.setPlan(graphPlan);
+      audio.setPlan(activeAudioPlan);
     }
     await ensureGranulatorPipeline();
     void loadClipIntoGranulator(file);
@@ -2392,10 +2526,23 @@
           />
         {:else}
           <div class="presets-tab">
-            {#if activeProgram && programs[activeProgram]}
+            {#if activeProgramData}
               <div class="presets-active">
                 <span class="sec-label">── active ──</span>
-                <strong>{programs[activeProgram]!.title}</strong>
+                <strong>{activeProgramData.title}</strong>
+                <p>{activeProgramData.tagline}</p>
+                <div class="program-focus">
+                  {#each activeProgramData.operatorFocus as focus (focus)}
+                    <span>{focus}</span>
+                  {/each}
+                </div>
+                {#if programHasMacros(activeProgramData)}
+                  <ProgramMacros
+                    macros={activeProgramData.macros ?? []}
+                    values={activeProgramMacros}
+                    onSetValue={setActiveProgramMacro}
+                  />
+                {/if}
               </div>
             {/if}
             <div class="program-grid">
@@ -2463,8 +2610,7 @@
   }
 
   .presets-active {
-    display: inline-flex;
-    align-items: center;
+    display: grid;
     gap: 0.45rem;
   }
 
@@ -2472,6 +2618,28 @@
     font-size: 0.82rem;
     font-weight: 600;
     color: var(--accent);
+  }
+
+  .presets-active p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.76rem;
+    line-height: 1.35;
+  }
+
+  .program-focus {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .program-focus span {
+    border: 1px solid var(--line);
+    padding: 0.12rem 0.38rem;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
   }
 
   .program-grid {

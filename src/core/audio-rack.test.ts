@@ -90,6 +90,7 @@ describe('audio rack registry', () => {
         luma: 1,
         flux: 0,
         edge: 0,
+        motion: 0,
       },
     });
 
@@ -112,6 +113,7 @@ describe('audio rack registry', () => {
         luma: 0,
         flux: 0,
         edge: 0,
+        motion: 0,
       },
     });
 

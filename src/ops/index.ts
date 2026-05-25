@@ -2,6 +2,9 @@
 
 import { registerOp } from '../core/operators';
 import { feedbackDef } from './feedback';
+import { timeDisplaceDef } from './timeDisplace';
+import { structureDef } from './structure';
+import { flowDef } from './flow';
 import { aDef, bDef, gDef, rDef } from './channel';
 import { grainDef } from './grain';
 import { modulateDef } from './modulate';
@@ -51,6 +54,9 @@ export function registerAllOps(): void {
   if (registered) return;
   registered = true;
   registerOp(feedbackDef);
+  registerOp(timeDisplaceDef);
+  registerOp(structureDef);
+  registerOp(flowDef);
   registerOp(rDef);
   registerOp(gDef);
   registerOp(bDef);
@@ -111,6 +117,9 @@ export function registerAllOps(): void {
 // then pixel quantisation) so each subsequent op sees the post-warped grid.
 export const DEFAULT_CHAIN: readonly string[] = [
   'feedback',
+  'timeDisplace',
+  'structure',
+  'flow',
   'r',
   'g',
   'b',

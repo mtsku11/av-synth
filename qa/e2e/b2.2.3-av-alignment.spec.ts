@@ -106,7 +106,7 @@ test.describe('B2.2.3 — AV alignment (gate #2c)', () => {
       processingDuration?: number;
     };
 
-    const samples = await page.evaluate(
+    const samples: AlignmentSample[] = await page.evaluate(
       async ({ MEASURE_MS }) => {
         const bridge = (
           window as Window & {
@@ -235,7 +235,6 @@ test.describe('B2.2.3 — AV alignment (gate #2c)', () => {
     const outPath = path.join(outDir, 'av-alignment.json');
     fs.writeFileSync(outPath, JSON.stringify(summary, null, 2));
 
-    // eslint-disable-next-line no-console
     console.log(
       `[B2.2.3] worst |drift| ${maxAbsDriftMs.toFixed(2)} ms (signed ${signedAtMax.toFixed(2)} ms), ` +
         `median ${medianDriftMs.toFixed(2)} ms over ${allDrifts.length} drift samples ` +

@@ -2,7 +2,16 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { clock } from './clock.svelte';
 import { createParamLfoAssignment } from './mod-bank';
-import { applyProgram, applyProgramAudio, applyProgramAutomation, getOrderedProgramOps } from './presets';
+import {
+  applyProgram,
+  applyProgramAudio,
+  applyProgramAudioState,
+  applyProgramAutomation,
+  getResolvedProgramSharedFeedback,
+  getOrderedProgramOps,
+  getProgramMacroDefaults,
+  resolveProgramState,
+} from './presets';
 import type { VideoEffectProgram } from './presets';
 import type { OperatorInstance } from './operators';
 
@@ -162,6 +171,160 @@ describe('applyProgram', () => {
     expect(second.params.amount).toBeCloseTo(1 + 10 ** (-6 / 20) * 2, 6);
   });
 
+  it('evaluates motion-feature automation against the public video feature state', () => {
+    const flow = makeInstance('flow', { mix: 0.5 });
+    const program = {
+      title: 'Motion',
+      tagline: 'motion',
+      videoIntent: 'motion',
+      audioIntent: 'motion',
+      operatorFocus: ['flow'],
+      values: {
+        'flow.mix': 0.5,
+      },
+      automation: {
+        'flow.mix': {
+          kind: 'video' as const,
+          feature: 'motion' as const,
+          scale: 0.25,
+          smooth: 0,
+        },
+      },
+    };
+
+    applyProgram(program, [flow]);
+    applyProgramAutomation(program, [flow], {
+      time: 0,
+      videoFeatures: {
+        available: true,
+        luma: 0,
+        flux: 0,
+        edge: 0,
+        motion: 0.4,
+      },
+    });
+
+    expect(flow.params.mix).toBeCloseTo(0.6, 6);
+  });
+
+  it('resolves macro targets into video, clock, and audio state', () => {
+    const program: VideoEffectProgram = {
+      title: 'Macro',
+      tagline: 'macro',
+      videoIntent: 'macro',
+      audioIntent: 'macro',
+      operatorFocus: ['flow'],
+      values: {
+        'clock.rate': 0.4,
+        'flow.mix': 0.3,
+      },
+      audio: {
+        granulator: { density: 18, gain: 0.42 },
+        feedbackDelay: { mix: 0.15 },
+      },
+      macros: [
+        {
+          id: 'intensity',
+          label: 'Intensity',
+          default: 0.5,
+          targets: [
+            { key: 'clock.rate', min: 0.2, max: 0.8 },
+            { key: 'flow.mix', min: 0.1, max: 0.9 },
+            { key: 'audio.granulator.density', min: 12, max: 36 },
+            { key: 'audio.feedbackDelay.mix', min: 0.08, max: 0.34 },
+          ],
+        },
+      ],
+    };
+
+    expect(getProgramMacroDefaults(program)).toEqual({ intensity: 0.5 });
+
+    const resolved = resolveProgramState(program, { intensity: 0.75 });
+    expect(resolved.values['clock.rate']).toBeCloseTo(0.65, 6);
+    expect(resolved.values['flow.mix']).toBeCloseTo(0.7, 6);
+    expect(resolved.audio?.granulator?.density).toBeCloseTo(30, 6);
+    expect(resolved.audio?.feedbackDelay?.mix).toBeCloseTo(0.275, 6);
+  });
+
+  it('uses macro-resolved base values when evaluating automation', () => {
+    const flow = makeInstance('flow', { mix: 0.5 });
+    const program: VideoEffectProgram = {
+      title: 'Macro Motion',
+      tagline: 'macro motion',
+      videoIntent: 'macro motion',
+      audioIntent: 'macro motion',
+      operatorFocus: ['flow'],
+      values: {
+        'flow.mix': 0.2,
+      },
+      macros: [
+        {
+          id: 'motion',
+          label: 'Motion',
+          default: 0.5,
+          targets: [{ key: 'flow.mix', min: 0.1, max: 0.7 }],
+        },
+      ],
+      automation: {
+        'flow.mix': {
+          kind: 'video',
+          feature: 'motion',
+          scale: 0.25,
+          smooth: 0,
+        },
+      },
+    };
+
+    const resolved = resolveProgramState(program, { motion: 1 });
+    applyProgram(resolved.values, [flow]);
+    applyProgramAutomation(
+      program,
+      [flow],
+      {
+        time: 0,
+        videoFeatures: {
+          available: true,
+          luma: 0,
+          flux: 0,
+          edge: 0,
+          motion: 0.4,
+        },
+      },
+      resolved.values,
+    );
+
+    expect(flow.params.mix).toBeCloseTo(0.8, 6);
+  });
+
+  it('prefers resolved video feedback when syncing the shared feedback identity', () => {
+    const program: VideoEffectProgram = {
+      title: 'Shared Feedback',
+      tagline: 'shared feedback',
+      videoIntent: 'shared feedback',
+      audioIntent: 'shared feedback',
+      operatorFocus: ['feedback'],
+      values: {
+        'feedback.feedback': 0.32,
+      },
+      audio: {
+        feedbackDelay: { feedback: 0.18, mix: 0.2 },
+      },
+      macros: [
+        {
+          id: 'intensity',
+          label: 'Intensity',
+          default: 0.4,
+          targets: [{ key: 'feedback.feedback', min: 0.2, max: 0.74 }],
+        },
+      ],
+    };
+
+    const resolved = resolveProgramState(program, { intensity: 1 });
+
+    expect(getResolvedProgramSharedFeedback(resolved)).toBeCloseTo(0.74, 6);
+    expect(resolved.audio?.feedbackDelay?.feedback).toBeCloseTo(0.18, 6);
+  });
+
   it('respects explicit program chain order before appending extra ops', () => {
     const ordered = getOrderedProgramOps(
       {
@@ -251,6 +414,19 @@ describe('applyProgramAudio', () => {
     expect(calls).toEqual([]);
   });
 
+  it('applies a feedback-delay-only audio block without a granulator block', () => {
+    const calls: string[] = [];
+    applyProgramAudio(
+      program({
+        feedbackDelay: { time: 0.31, feedback: 0.74, mix: 0.28 },
+      }),
+      {
+        setFeedbackDelayParam: (name, value) => calls.push(`${name}:${value}`),
+      },
+    );
+    expect(calls).toEqual(['time:0.31', 'feedback:0.74', 'mix:0.28']);
+  });
+
   it('skips invalid numeric and enum values', () => {
     const calls: string[] = [];
     applyProgramAudio(
@@ -270,5 +446,20 @@ describe('applyProgramAudio', () => {
       },
     );
     expect(calls).toEqual(['gain:0.4']);
+  });
+
+  it('applies a resolved audio state without a full program wrapper', () => {
+    const calls: string[] = [];
+    applyProgramAudioState(
+      {
+        granulator: { density: 28, gain: 0.5 },
+        feedbackDelay: { mix: 0.22 },
+      },
+      {
+        setGranulatorParam: (name, value) => calls.push(`${name}:${value}`),
+        setFeedbackDelayParam: (name, value) => calls.push(`${name}:${value}`),
+      },
+    );
+    expect(calls).toEqual(['density:28', 'gain:0.5', 'mix:0.22']);
   });
 });

@@ -19,6 +19,7 @@ export interface VideoFeatureState {
   luma: number;
   flux: number;
   edge: number;
+  motion: number;
 }
 
 export const EMPTY_VIDEO_FEATURES: VideoFeatureState = {
@@ -26,6 +27,7 @@ export const EMPTY_VIDEO_FEATURES: VideoFeatureState = {
   luma: 0,
   flux: 0,
   edge: 0,
+  motion: 0,
 };
 
 export interface CouplingContext {

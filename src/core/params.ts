@@ -42,7 +42,7 @@ export type AutomationSource =
       invert: boolean;
     }
   | { kind: 'fft'; bin: number; scale: number; smooth: number; cutoff: number }
-  | { kind: 'video'; feature: 'luma' | 'flux' | 'edge'; scale: number; smooth: number };
+  | { kind: 'video'; feature: 'luma' | 'flux' | 'edge' | 'motion'; scale: number; smooth: number };
 
 export const staticAutomation: AutomationSource = { kind: 'static' };
 

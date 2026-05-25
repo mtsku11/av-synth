@@ -233,7 +233,6 @@ test.describe('B2.4 — post-limit true-peak (gate #6)', () => {
     fs.writeFileSync(outPath, JSON.stringify(result, null, 2));
 
     // surface key numbers in the test log
-    // eslint-disable-next-line no-console
     console.log(
       `[B2.4] worst-case post-limit: samplePeak ${result.worst.samplePeak_dBFS.toFixed(2)} dBFS, ` +
         `truePeak ${result.worst.truePeak_dBFS.toFixed(2)} dBFS — ${result.verdict_postLimit}`,

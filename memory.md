@@ -1928,3 +1928,334 @@ The shared-feedback law is enforced at the app layer, not by adding a new render
 - program recall can now set `audio.feedbackDelay.*`, and if `audio.feedbackDelay.feedback` is present it becomes the canonical shared value
 
 Why this shape: the renderer already resolves its history-polish feedback amount by scanning video `feedback` instances. Synchronising those instance params keeps the defining AV identity honest without introducing a second partially-overlapping feedback scalar in `CouplingContext` during the release sprint.
+
+## 2026-05-24 — First temporal-history video slice landed (`timeDisplace` + flagship presets)
+
+Direction changed explicitly in this pass: new release-track video work should bias toward **stateful systems and flagship presets**, not more presentation-stack tweaking. The existing bloom/LUT/halation/lens-dirt stack is now "good enough support infrastructure"; it should polish stronger looks, not remain the main source of perceived sophistication.
+
+Chosen first slice: a reusable temporal-history system in the renderer rather than another one-off post preset. `src/video/renderer.ts` now owns a bounded 8-frame `TEXTURE_2D_ARRAY` ring plus a small renderer-resource hook on `VideoStage` so operators can sample shared history without hard-coding renderer internals into their constructors. The old `#prevFrame` target still exists for the one-frame feedback idioms; the new ring is the deeper history path. Reset policy is explicit and deterministic: clear temporal state on resize, source change, and program application.
+
+First consumer: new `timeDisplace` in `src/ops/timeDisplace.ts` and `src/video/shaders/timeDisplace.frag`. It blends vertical slit-scan indexing (`scan=0`) and luma-indexed time selection (`scan=1`) over the shared history ring, then adds a small motion-ish UV drift from temporal contrast. This is intentionally not academic optical flow; it is a performant WebGL2 temporal vocabulary builder that stays inside the current architecture.
+
+Program implications:
+- Added three new flagship presets: `Temporal Bloom Ghost`, `Slit-Scan Echo`, and `Luma Time Smear`.
+- Each preset now carries a deterministic audio block (`audio.feedbackDelay` + `audio.granulator`) so the whole AV state recalls honestly instead of leaving the previous granulator cloud behind.
+- `zero` now also carries a neutral `audio.granulator` block for the same reason.
+
+Incidental fixes folded into the same pass because they directly affected preset honesty:
+- `applyProgramAudio()` no longer bails out when `audio.granulator` is absent; `audio.feedbackDelay`-only presets now recall correctly.
+- Editing a video `feedback` node now uses the real shared-feedback sync path again instead of leaving multi-feedback chains internally divergent.
+
+Verification worth remembering:
+- `npm run check`
+- `npm run test:run -- src/core/presets.test.ts`
+- `npm run build`
+- `npx playwright test qa/e2e/temporal-history-programs.spec.ts -c qa/playwright.config.ts`
+
+The Playwright pass caught a real WebGL2 bug mid-implementation: `sampler2DArray` needed an explicit precision qualifier in `timeDisplace.frag`. Keep that in mind for future texture-array shaders.
+
+## 2026-05-24 — V2 structure-aware slice landed (`structure` operator + shared analysis texture)
+
+The next release-track video move stayed on the current renderer and pushed post-stack tuning further down the priority order again. Chosen second slice: derive reusable structure masks from the raw clip inside `VideoRenderer` instead of baking more ad hoc edge logic into isolated shaders. The renderer now owns two extra RGBA8 targets: a previous raw-source frame and a per-frame structure-analysis texture. That analysis pass writes clip `luma`, Sobel-style `edge`, frame-to-frame `flux`, and a contour-emphasis helper into one shared texture, then exposes it to video stages through `VideoStageRendererResources` on `TEXTURE4`.
+
+Why this shape: V2 needed reusable edge/luma/flux masks inside the renderer/operator surface, not just more polish knobs. Reusing the same renderer-resource hook introduced for temporal history keeps the architecture incremental and gives V3 a natural insertion point for motion-field work later. Using RGBA8 instead of the float presentation format keeps the analysis path cheap and available on devices that only meet the current WebGL2 baseline. The analysis is derived from the raw clip rather than the already-processed frame so structure-led looks stay anchored to source content instead of recursively chasing their own feedback artifacts.
+
+First consumer: new `structure` operator in `src/ops/structure.ts` and `src/video/shaders/structure.frag`. It is deliberately neutral by default (`mix = 0`) and keeps the audio side passthrough-only for now. On video it uses the shared structure texture to gate contour-led displacement, previous-frame reinjection, and glow. This was chosen over adding separate single-purpose `edgeGlow` / `lumaTrail` / `fluxWarp` operators because the release-track need is a small number of authored systems, not another burst of raw operator-count growth.
+
+Program implications:
+- Added two structure-first flagship looks: `Edge Feedback` and `Contour Bloom`.
+- `Edge Feedback` proves the new contour/memory path can keep flat regions quiet while edges drag and tear.
+- `Contour Bloom` proves the same shared structure resource can support a softer authored look without falling back to the old post-preset vocabulary as the headline feature.
+
+Verification worth remembering:
+- `npm run check`
+- `npm run test:run -- src/core/presets.test.ts`
+- `npm run build`
+- `PLAYWRIGHT_SERVER_MODE=external PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 npx playwright test qa/e2e/structure-programs.spec.ts -c qa/playwright.config.ts`
+
+## 2026-05-24 — V3 motion-aware slice landed (`flow` operator + shared motion field)
+
+The third release-track video slice stayed on the same renderer-resource architecture as V1/V2. Chosen shape: a reusable low-resolution motion field derived from consecutive raw clip frames, not a one-off presentation glitch and not an academic optical-flow detour. `VideoRenderer` now owns a half-resolution RGBA8 motion target plus one-frame motion history, updates that field immediately after the raw source render, and exposes it to stages on `TEXTURE5` through `VideoStageRendererResources`.
+
+Why this shape: V3 needed a practical motion vocabulary inside WebGL2 that could feed authored presets now and deeper coupling later. The motion field is intentionally approximate: it does a small directional search against the previous raw frame, carries a confidence/magnitude channel, and smooths against the previous motion field. That is enough to support motion-directed smear, datamosh tearing, and direction-aware reinjection without reopening the renderer architecture or requiring float-only compute-style infrastructure.
+
+First consumer: new `flow` operator in `src/ops/flow.ts` and `src/video/shaders/flow.frag`. It is neutral by default (`mix = 0`) and keeps the audio side passthrough-only for now. On video it uses the shared motion field plus `u_prev_frame` to create directional smear, datamosh drag, blocky motion quantization, and chroma tearing. Two flagship programs now exercise that slice: `Datamosh Smear` and `Flow Melt`.
+
+Important correction folded into the same pass: the first V2 `structure` implementation over-relied on the renderer's source-aligned structure texture, which could misregister after upstream warps. The renderer still keeps that shared structure analysis because later systems need source-anchored masks, but the `structure` operator itself now derives its contour mask from its current stage input so displacement/glow stay spatially honest inside reordered chains.
+
+App/QA implications worth keeping:
+- `VideoFeatureState` now includes public `motion`, sampled from the renderer motion field rather than guessed from luma flux alone.
+- Graph topology and monitor-bus edits now call `renderer.resetTemporalState()` explicitly; this avoids stale history from old routes bleeding into new ones without wiping state on ordinary param edits.
+- The shared audio/video feedback identity remains app-owned, but editing one video `feedback` node no longer forces every feedback node to match it. The regression is protected by `qa/e2e/shared-feedback-sync.spec.ts`.
+- The temporal/structure flagship Playwright specs are now baseline-relative and require material frame changes, not merely non-zero metrics.
+
+Verification worth remembering:
+- `npm run check`
+- `npm run test:run -- src/core/presets.test.ts src/core/audio-rack.test.ts`
+- `npm run build`
+- `PLAYWRIGHT_SERVER_MODE=external PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 npx playwright test qa/e2e/temporal-history-programs.spec.ts qa/e2e/structure-programs.spec.ts qa/e2e/motion-programs.spec.ts qa/e2e/shared-feedback-sync.spec.ts -c qa/playwright.config.ts`
+
+## 2026-05-24 — V4 flagship bank + macro surface landed
+
+Chosen V4 shape: keep the raw operator cards generic and put the authored control surface on the programs themselves. `public/presets.json` now supports an optional `macros` block per program, and `src/core/presets.ts` resolves those macro values into deterministic `values` + `audio` state before the normal automation pass runs. Important consequence: automation keeps using the macro-adjusted base values instead of fighting them, so a motion-reactive preset can still be "the same preset" while the user opens or tightens the look from the Presets tab.
+
+Why this shape: the product problem at this point was not "more raw knobs." It was that the public bank still felt like a collection of authored starting points that immediately dumped the user back into engineering controls. Keeping macros program-owned means:
+- the active program remains active while a macro is adjusted
+- macro changes can fan out across video, clock, granulator, and shared delay without teaching users the patch graph
+- deterministic preset recall stays honest because the macro defaults live in the factory bank instead of in ad hoc UI state
+
+Program-bank implications:
+- The visible public bank is now 12 looks: the earlier temporal / structure / motion programs plus `Motion Bloom Ghost`, `Kaleido Feedback Tunnel`, `Freeze Feedback`, and `Granular Video Cloud`, with `Grain Field` retained as the clearest granulator-first anchor patch.
+- The Presets tab now exposes a dedicated macro surface (`src/ui/ProgramMacros.svelte`) immediately under the active-program summary instead of sending users to raw node cards for the first musical move.
+- Post/presentation work was explicitly pushed down again in the docs during this pass. The renderer finish stack remains support infrastructure; it is not the next release-track implementation target unless a concrete bug promotes it.
+
+Verification worth remembering:
+- `npm run check`
+- `npm run test:run -- src/core/presets.test.ts`
+- `npm run build`
+- `npx eslint src/App.svelte src/core/presets.ts src/core/presets.test.ts src/ui/ProgramMacros.svelte qa/e2e/flagship-macros.spec.ts`
+- `npx prettier --check src/App.svelte src/core/presets.ts src/core/presets.test.ts src/ui/ProgramMacros.svelte qa/e2e/flagship-macros.spec.ts public/presets.json`
+
+One environment caveat from this session: `qa/e2e/flagship-macros.spec.ts` was added as the browser regression for V4, but it was not executed here because the sandbox would not allow binding `127.0.0.1:4173` for `npm run dev:http`. The test should be run on the next machine/session where a local Playwright server can bind normally.
+
+## 2026-05-24 — flagship-macros first end-to-end run (Codex-owned fix)
+
+The V4 browser smoke ran for the first time against the live dev server on port 5173 (`PLAYWRIGHT_BASE_URL=http://localhost:5173 PLAYWRIGHT_SERVER_MODE=external`). The spec fails today. Marc chose to leave the fix to Codex rather than have Claude rewrite Codex's test; this memory captures the findings so Codex picks it up cleanly. The spec at HEAD is unmodified by this run.
+
+Three independent observations:
+
+1. **Card-count drift.** Spec line 96 asserts `.program-card` count = 12. `public/presets.json` now contains 29 programs; `HIDDEN_PROGRAM_KEYS` in `src/App.svelte` hides 10; the visible bank is therefore 19, not 12. The V4 docs above still say "12 looks" — that statement is now historically true but no longer matches the shipping bank.
+
+2. **Center-pixel canary too narrow for two of three programs.** With `ci-smoke.mp4` as the fixture and `readCenterPixel()` reading from the persistent `#prevFrame` RGBA16F FBO, sweeping each macro 0→0.94:
+   - `temporalBloomGhost/memory`: (102,96,0) → (4,6,105) — RGB sum Δ=207, passes.
+   - `datamoshSmear/glitch`: (0,7,0) → (0,7,0) — Δ=0, fails.
+   - `granularVideoCloud/cloud`: (0,7,0) → (0,7,0) — Δ=0, fails.
+   The macros do work — whole-frame `meanLuma` drops by 0.058, 0.018, 0.006 across the three sweeps — but the exact canvas center on this fixture lives in a near-black region where posterize-bin and flow/structure shifts don't produce a visible delta.
+
+3. **temporalDiff threshold too tight for `granularVideoCloud`.** Spec asserts `> 0.0004` on the change in `temporalDiff`. Measured deltas: 0.0024, 0.0021, 0.00028. The third one slips under.
+
+Plausible Codex moves (no preference asserted): switch the change canary to `meanLuma` (a 0.005 threshold catches every macro from the diagnostic above); add a brighter off-center sample point; replace the fixture with one that has more energy at frame center; or retune the macro target ranges in `public/presets.json` so each macro pushes pixels harder. Recorded as `V4 follow-up` in `todo.md` so the work is tracked without disturbing the V4 landing entry.
+
+## 2026-05-24 — B2.3 soak regression surfaced; gate #4 PROVISIONAL PASS withdrawn
+
+Trying to run the canonical 4-hour soak surfaced two distinct issues. The first (a test-setup bug) was fixed in-session; the second (a real allocation regression) blocks the 4-hour run and is now a release-track blocker.
+
+**Issue 1 — spec setup bug, fixed.** The soak spec called `setGranulatorParam('voiceCount', 64)` before `startTransport()`. In `src/App.svelte` the QA bridge's `setGranulatorParam` returns `false` when `granulator` is null, and the granulator worklet is only instantiated by `startTransport`. So `expect(programOk).toBe(true)` failed at line 98 within ~1.4 s, every time, before any GC measurement could begin. Fix landed in `qa/e2e/b2.3-granulator-soak.spec.ts` (uncommitted, awaiting review): reorder to `applyProgram` → `startTransport` → `expect.poll` `setGranulatorParam` until it returns `true` (10 s timeout). Same structural shape as the flagship-macros V4 spec failure — a V4-era spec encoding an init-order assumption the current app no longer honours.
+
+**Issue 2 — real allocation regression on the granulator worklet thread.** Once the setup ran, the gate itself failed. Two 30 s canaries on HEAD:
+
+| Run | WARMUP_MS | worklet major | worklet minor | page-wide major | page-wide minor | max_ms |
+|---|---|---|---|---|---|---|
+| 1 | 2 000 | 2 | 4 | 4 | 88 | 3.932 |
+| 2 | 15 000 | 2 | 0 | 6 | 54 | 3.593 |
+
+Reading: with default warmup, 4 minor-GCs were warmup tail (they vanished when warmup was raised to 15 s). Majors stayed at 2 across both runs — i.e. **steady-state major allocation on the granulator worklet thread**, not initialisation bleed. `max_ms ≈ 3.6 ms` exceeds one 128-frame audio quantum at 48 kHz (≈2.67 ms), so a major GC during the soak window is long enough to drop a quantum and be audible.
+
+This directly contradicts the 2026-05-23 PROVISIONAL PASS recorded in `todo.md` (60 s short-soak: `worklet major=0, minor=4`). Something landed between 2026-05-23 and 2026-05-24 that introduced allocation in the audio path. Two suspect changes landed on 2026-05-24:
+- **C1/C2/C3 feedback-delay rewire** — `granulator.output -> FeedbackDelay -> AudioEngine master` now routes audio through `FeedbackDelay`. If that block allocates per-quantum (or rebuilds an internal node graph when `feedback`/`mix` changes via shared-feedback identity sync), it would show up here.
+- **V4 program/macro work** — the new `setActiveProgramMacro` → `applyResolvedProgramState` → `applyProgramAudioState` fan-out runs on every macro move, but the canary doesn't move macros. Less likely to be the steady-state culprit. Could still allocate on transport start if the recall path is in the audio thread message channel.
+
+The auto-revert canary knob (`GRANULATOR_WARMUP_MS` env) was added and removed in the same task — it served its diagnostic purpose, the answer is decisive (steady-state, not warmup), so the spec is back at the original `WARMUP_MS = 2_000` constant. The setup-reorder fix remains.
+
+**Next investigative step (not done in this session):** bisect 2026-05-23..HEAD against `qa/e2e/b2.3-granulator-soak.spec.ts` at 30 s, focused on `src/audio/feedback-delay.ts`, `src/audio/engine.ts`, the granulator/feedback wiring inside `ensureGranulatorPipeline()` in `App.svelte`, and `public/worklets/granulator.js`. The first commit at which the 30 s canary flips from `worklet major=0` to `worklet major=2` is the regression. Allocation in worklet code is usually one of: typed-array creation in `process()`, closure capture in a `.subscribe()` hot path, `Array#push` that resizes, string concatenation in a log/notify path, exception throwing, or message-port serialisation of growing objects.
+
+**Release-policy consequence:** `todo.md` previously listed the B2.3 4-hour soak as mechanically unblocked (just "run it"). That is no longer accurate. Both the high-level blocker and the `B2.3 — Zero-allocation 4-hour soak` milestone bullet have been updated to reflect the withdrawal of the provisional pass and the bisect-next-step plan. Until the regression is identified and fixed, do not burn 4 h of compute on a soak that will fail.
+
+## 2026-05-24 — B2.3 bisect: not a regression, latent worklet defect
+
+Followed up the B2.3 soak failure with a one-step bisect via a `/tmp/av-synth-bisect` worktree pinned to `14603d6` (the first commit that contains `qa/e2e/b2.3-granulator-soak.spec.ts`, immediately *before* the C1/C2/C3 feedback-delay landing in `b6a9389`). Applied the same setup-reorder spec fix into the worktree's spec file, symlinked the main repo's `node_modules` to avoid a fresh install, and ran the 30 s canary.
+
+Result at `14603d6`:
+
+```
+[B2.3] FAIL — 2 major-GC event(s) on the worklet thread over 30s
+(worklet major=2, minor=4; page-wide major=4, minor=86; worklet threads=1, events=178229)
+majorGC.max_ms = 4.019
+```
+
+Essentially identical to HEAD's failure (`worklet major=2, minor=4, max_ms ≈ 3.6`). Conclusion:
+
+- The C1/C2/C3 feedback-delay rewire is **not** the regression source.
+- The granulator worklet has been allocating in the hot path since at least `2df6969` (the first commit that introduces `public/worklets/granulator.js`).
+- The "2026-05-23 60 s PROVISIONAL PASS" recorded in `todo.md` (`worklet major=0`) is now explainable not as "the worklet was clean then and dirty now" but as "the soak that produced that number was almost certainly not actually running at 64 voices." The setup bug (`setGranulatorParam('voiceCount', 64)` called before the worklet existed, silent `false` return) means the soak was measuring the worklet at its boot-default voice count (much lower than 64). At lower polyphony, the per-block allocation rate per active grain just doesn't accumulate enough heap pressure to fire a major GC over 60 s. **Gate #4 has therefore never honestly passed against its stated parameters.**
+
+Why this matters beyond the gate:
+- Audible: a major GC `max_ms ≈ 4 ms > 2.67 ms` (one 128-frame quantum @ 48 kHz) means at least one audio quantum is dropped during a major collection. Two of those in 30 s is two audible glitches per half-minute under 64-voice load. That's a real defect users would hear, not just a paranoid metric.
+- Release-track: this was previously flagged as one of two remaining release-track items I could "just run" without involving Codex, hardware, or humans. It is no longer that. It is a granulator-worklet investigation task.
+
+Next investigative step (Never-Delegate-to-DeepSeek; debugging + tight integration + DSP):
+1. Read `public/worklets/granulator.js` end-to-end with allocation eyes — `process()` and any function it calls per block.
+2. Suspects in rough order: typed-array creation inside the per-block path (e.g. `new Float32Array(...)` for grain envelopes that should be cached per voice); `Array#push` on collections that grow without `length = N` reuse; closure capture inside `.map`/`.filter` per block; string concatenation in log/notify code paths; exception throwing in normal flow; message-port `postMessage` of objects that include growing arrays.
+3. The trace JSON is captured at `qa/results/granulator-soak-trace.json` (overwritten each run). It contains the full V8 GC event timeline including stack-attribution for the two major events — that's the single most direct lead.
+4. After identifying and fixing, re-canary at 30 s. Only if `worklet major=0` at 30 s does it make sense to commit to a 4 h run.
+
+Worktree cleaned up after the bisect (`git worktree remove --force /tmp/av-synth-bisect`). Main repo still on `b6a9389 [main]` with the uncommitted spec setup-fix + doc updates intact.
+
+## 2026-05-24 — V4 takeover fix: explicit flagship allowlist + shared-feedback macro correction
+
+Codex takeover found that the V4 landing was only partially honest. The public Presets tab had drifted back into showing every non-hidden program in `public/presets.json`, which meant 19 visible cards even though the docs and smoke spec both described a 12-look flagship bank. The correct product move was not to weaken the test to 19; it was to make the public shell explicit. `src/App.svelte` now uses a `PUBLIC_PROGRAM_KEYS` allowlist for the Presets tab, keeping the 12 flagship looks public while leaving older ports/reference patches available in the JSON bank for QA and internal recall.
+
+The same takeover pass fixed a more important functional bug in program macros. Several flagship macros push `feedback.feedback`, but `applyResolvedProgramState()` used to call `syncSharedFeedbackFromVideoChain()` *before* replaying `audio.feedbackDelay`, so the program's base `audio.feedbackDelay.feedback` would write the stale shared value right back over the macro-adjusted chain. Result: macros such as `Temporal Bloom Ghost / Intensity`, `Datamosh Smear / Smear`, `Kaleido Feedback Tunnel / Tunnel`, `Freeze Feedback / Hold`, `Granular Video Cloud / Grains`, and `Grain Field / Density` under-delivered their feedback move. Fix shape:
+
+- `src/core/presets.ts` now exports `getResolvedProgramSharedFeedback()` so the shared AV feedback identity can be derived from the macro-resolved program state in a pure/testable way.
+- `src/App.svelte` now replays `audio.feedbackDelay.feedback` with `syncVideo: false` during program apply, then applies the canonical shared-feedback value from the resolved program state afterward.
+- If a program has video feedback nodes, those win; if it is audio-only, `audio.feedbackDelay.feedback` still survives unchanged.
+
+QA implications recorded here so they do not get lost again:
+
+- `qa/e2e/flagship-macros.spec.ts` no longer relies on a center-pixel canary. On `ci-smoke.mp4`, the center sample sat in a near-black pocket for `Datamosh Smear / glitch` and `Granular Video Cloud / cloud`, even though whole-frame `meanLuma` moved materially. The spec now uses whole-frame `meanLuma` deltas instead.
+- `qa/e2e/b2.3-granulator-soak.spec.ts` now waits for `ensureGrainAudioLoaded()` as part of setup, not just `startTransport()` plus `setGranulatorParam('voiceCount', 64)`. Without the grain-audio readiness gate, the soak could still begin before the 64-voice workload was actually active.
+
+## 2026-05-24 — B2.3 hot-path fix: grain events move onto a shared ring
+
+The concrete allocation culprit in the granulator worklet was not an exotic DSP helper; it was the event bridge. `public/worklets/granulator.js` was calling `port.postMessage({ type: 'grain', ... })` for every spawned grain from inside `process()`. At dense clouds that means a fresh JS object plus structured-clone work on the audio thread for every spawn, which is exactly the kind of steady-state churn that can accumulate into a worklet-side major GC during the soak.
+
+Chosen fix: keep the grain-event payload contract, change the transport. Isolated builds now create a fixed `SharedArrayBuffer` ring in the worklet constructor and write per-grain fields into that ring from `process()`. `src/core/grain-scheduler.ts` now attaches to that ring when it sees the one-time `grainRing` setup message and drains unread entries before pruning/rendering voices. Non-isolated sessions still fall back to the old `MessagePort` object transport so the app keeps working outside COOP/COEP contexts, but the release-track soak path now has a genuinely zero-allocation event channel on the audio thread.
+
+This is a deliberate spec adjustment. The earlier "no SAB for grain events in v1" rule was a product-simplicity preference, not a sacred constraint. Once B2.3 showed that per-grain `postMessage` churn was loud enough to threaten gate #4, the preference lost. The important invariant is the one the spec actually gates on: zero-allocation `process()` and deterministic audio/video grain coupling.
+
+## 2026-05-24 — B2.3 follow-up: ring fix was necessary, not sufficient
+
+After the shared-ring landing, the 30 s canary still failed at `worklet major=2, minor=6`. The trace revealed why the result was still noisy: the AudioWorklet thread was running `worklets/feedback-freeze.js`, `worklets/phase-modulator.js`, and `worklets/pitch-shifter.js` alongside `worklets/granulator.js`. That meant the public uploaded-video path was still quietly feeding the patch graph's legacy operator-audio stages through `AudioEngine`, which made the "granulator soak" measurement broader than the actual public product.
+
+Chosen correction: the public uploaded-video path no longer calls `audio.setPlan(graphPlan)`; it now uses an empty audio execution plan unless a procedural/internal source instance is active. Practically, that means uploaded-video sessions route clip audio directly plus the parallel granulator/feedback branch, while the old operator-audio worklets remain internal scaffolding only. Rerunning the 30 s canary after that change proved the isolation worked: the trace now shows **only `worklets/granulator.js`** on the AudioWorklet thread.
+
+Bad news, but useful bad news: the canary still failed at `worklet major=2, minor=2, max_ms=3.241`. That narrows the remaining defect further. The next credible target is not more event transport cleanup or more graph pruning; it is the granulator control path itself. The strongest current hypothesis is the 15-lane `AudioParam` surface on a k-rate-only processor. If B2.3 work resumes, the next slice should move granulator controls off `AudioParam` delivery and onto a shared control buffer or equivalent non-allocating transport.
+
+## 2026-05-24 — B2.3 control-path rewrite landed; short-canary outcome is now mixed, not flatly failing
+
+Followed through on the next B2.3 slice. The granulator no longer uses the worklet `AudioParam` lane for its 15 k-rate controls. `src/audio/granulator.ts` now allocates a `SharedArrayBuffer` control snapshot at node creation time when isolation is available, writes changed controls into that buffer in batches, and only falls back to explicit `port.postMessage({ type: 'setControl', ... })` updates when SAB is unavailable. `public/worklets/granulator.js` no longer declares `parameterDescriptors`; instead it keeps a cached `Float32Array` of the control snapshot, refreshes it when the shared sequence counter changes, and reads the cached values once per block. MIDI note events stay on the message port.
+
+Why this shape: the point of the slice was not "fewer `setParam()` calls on the main thread"; it was to remove the browser's `AudioParam` delivery machinery from the hot path entirely. App-side batching in `App.svelte` is still useful because it collapses multiple changed sliders/LFO targets into one shared-sequence bump, but the real change is that the worklet no longer receives a per-block `parameters.<name>[0]` surface in release-track use.
+
+Verification split:
+- Local correctness passed: `npm run check`, `npm run test:run -- src/audio/worklets/granulator.test.ts src/core/grain-scheduler.test.ts src/core/presets.test.ts src/core/audio-rack.test.ts`, and targeted `eslint`.
+- Soak canaries changed meaningfully, but not cleanly enough to declare victory yet:
+  - first 30 s rerun on the fresh server: **FAIL** — `worklet major=2, minor=2, max_ms=3.241`
+  - 60 s rerun on the same updated build: **PROVISIONAL PASS** — `worklet major=0, minor=6`
+  - second 30 s rerun immediately after: **PROVISIONAL PASS** — `worklet major=0, minor=2`
+
+Interpretation: the old "the control path rewrite changed nothing" conclusion is no longer true. The updated transport can run zero-major for both 30 s and 60 s on repeat, which was the point of the slice. But the first cold 30 s failure means gate #4 is still not honest enough to close. The remaining question is now narrower: is there still a post-start allocation flake in the worklet/runtime, or is the first failing run catching one-time browser/server startup noise that the gate harness should explicitly pre-burn before the real soak window?
+
+## 2026-05-24 — B2.3 repeated cold canaries disproved the "first-run-only" theory
+
+Ran the next decision step exactly as queued in `todo.md`: a small repeated-canary set on a **fresh** server/browser before attempting any longer soak. Procedure was intentionally strict: start `npm run dev:http`, run the 30 s Playwright soak once, stop the server, restart it, and repeat. Did that three times, with a brand-new Playwright browser process each run.
+
+Result: all three cold runs failed in the same way. The signatures were effectively identical:
+- run 1: `worklet major=2, minor=2`, `max_ms=3.241`
+- run 2: `worklet major=2, minor=2`, `max_ms=3.241`
+- run 3: `worklet major=2, minor=2`, `max_ms=3.160`
+
+That materially changes the interpretation from the earlier mixed result set. The repeat 30 s and 60 s passes that happened after the control rewrite are still true data points, but they are no longer enough to justify the "maybe only the very first browser/server run is noisy" hypothesis. Fresh-process repetition brought the majors back every time.
+
+Trace timing also matters. Parsing `qa/results/granulator-soak-trace.json` from the last cold run showed the worklet-thread GC sequence as:
+- `MinorGC` at trace-relative `0 ms`
+- `V8.GCScavenger` at trace-relative `0.003 ms`
+- `MajorGC` at trace-relative `15226.705 ms`
+- `MajorGC` at trace-relative `15830.543 ms`
+
+So the majors are not front-loaded at the start of the traced soak window; they arrive about 15–16 s into steady runtime. The first major reclaimed a meaningful chunk (`usedHeapSizeBefore: 1201584`, `usedHeapSizeAfter: 460568`), while the second reclaimed almost nothing (`484268 → 460540`), which reads more like a threshold-crossing runtime churn pattern than a one-time initialization cliff.
+
+Practical consequence: do **not** escalate to a 5-minute or 4-hour soak yet. The correct next step is inspection of remaining worklet/runtime allocation candidates. The current suspicious paths are the few message-producing branches still on the worklet thread (`pendingNotes.push({ ... })` for note triggers, though probably idle in this soak, and `port.postMessage({ type: 'interpMode', ... })` when the sinc/Hermite auto-dispatch flips). More generally, B2.3 is back in "identify the last allocation path" mode rather than "collect more soak length" mode.
+
+## 2026-05-24 — 120 s discriminator points away from a simple linear leak
+
+Took over after Claude's lightweight diagnostic pass. The two obvious remaining suspects from the previous note were ruled out before this run:
+- `SharedArrayBuffer` is available in the worklet (`sabAvail=1`), so `emitGrainEvent()` is taking the ring-buffer path, not the per-grain object `postMessage` fallback.
+- Hermite/sinc dispatch stayed pinned with `interpToggles=0`, so the `interpMode` diagnostic/notification path was not firing during the soak.
+
+With those in place, ran the proposed discriminator measurement on a **fresh** `npm run dev:http` server and a fresh Playwright browser process:
+- `PLAYWRIGHT_SERVER_MODE=external PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 GRANULATOR_SOAK_S=120 npx playwright test qa/e2e/b2.3-granulator-soak.spec.ts -c qa/playwright.config.ts`
+
+Result: still a FAIL, but the shape is the point:
+- `worklet major=2, minor=10, max_ms=3.262`
+
+That is materially different from what a simple steady allocation leak would suggest. If the worklet were just churning linearly into major collection, the 120 s count should have grown toward roughly `8` majors given the repeatable `2 majors / 30 s` baseline. It did not. The majors stayed fixed at **2**, while only the minor scavenges continued to recur over the longer window.
+
+Parsed timing from `qa/results/granulator-soak-trace.json`:
+- `MajorGC` at trace-relative `15336.992 ms`
+- `MajorGC` at trace-relative `15940.720 ms`
+- later recurring `MinorGC` bursts at about `37.85 s`, `59.73 s`, `81.62 s`, and `103.56 s`
+
+Heap details reinforce that interpretation:
+- first major: `usedHeapSizeBefore 1175964 → after 461984`
+- second major: `485684 → 461956`
+
+So the current best read is **not** "the worklet leaks enough every 30 s to trigger another major." It is closer to "the worklet isolate crosses one early threshold around 15–16 s, pays two major collections, then settles into periodic minor scavenges." That could still be caused by app code, but it no longer looks like a naive per-block object-allocation leak.
+
+Immediate consequence: do **not** spend time on longer soaks yet. The next credible B2.3 slice is source inspection and targeted elimination of the remaining worklet-thread message/object paths, plus any one-time structures that can accumulate during the first ~16 s of runtime. The temporary diagnostics (`__GRANULATOR_DIAG__` in `App.svelte` and `qa/e2e/_diag-granulator-allocation.spec.ts`) were useful and should stay only until that next slice is done.
+
+## 2026-05-24 — B2.3 source cleanup: fixed pending-note queue + soak-gated interp messages
+
+Followed through on the next narrow B2.3 slice after the 120 s discriminator. The worklet no longer keeps note triggers in a growable JS array of objects. `public/worklets/granulator.js` now stores pending note-on data in a fixed-capacity typed queue (`Float32Array` pitch/velocity + `Uint8Array` channel, with read/write/count indices) and drains that queue from the same top-of-`process()` region as before. Policy on overflow is "drop oldest, keep newest" because this path is an immediate-trigger queue and the newest note-on is usually the one the performer expects to hear.
+
+The other change is a real soak-mode gate for interpolation diagnostics. `GranulatorOptions` now carries `emitInterpModeMessages` through `src/audio/granulator.ts` into the worklet's `processorOptions`, the worklet respects that flag before posting either the temporary `diag toggle` packet or the long-lived `interpMode` notification, and the QA bridge exposes `setGranulatorDiagnostics({ emitInterpModeMessages })` so `qa/e2e/b2.3-granulator-soak.spec.ts` can disable that traffic **before** transport start. This keeps the diagnostic path available for unit tests and ad-hoc investigation while letting the soak harness exercise the quietest honest runtime path.
+
+One adjacent cleanup also landed in the same pass: the temporary diagnostic listener in `App.svelte` now chains any previous `port.onmessage` handler instead of replacing it outright. That keeps the B2.3 probe from accidentally masking other port consumers while the investigation is still active.
+
+Fresh canaries after that cleanup did **not** improve the gate metric. With a restarted `npm run dev:http` server and a new Playwright browser each time:
+
+- `GRANULATOR_SOAK_S=30` still failed at **`worklet major=2, minor=2, max_ms=3.244`**
+- `GRANULATOR_SOAK_S=60` still failed at **`worklet major=2, minor=4, max_ms=3.244`**
+
+The 60 s trace still shows the same early pattern:
+
+- `MajorGC` at **15.337 s** (`3.244 ms`)
+- `MajorGC` at **15.941 s** (`1.737 ms`)
+- later activity only as paired minor scavenges around **37.854 s**
+
+Conclusion: removing the growable pending-note queue and suppressing `interpMode` port traffic was still a correct cleanup, but it was a **no-op on the major-GC signature**. The next credible B2.3 slice is deeper source inspection of worklet startup/runtime behavior, not a longer soak.
+
+## 2026-05-24 — B2.3 startup/message-path cleanup fixed protocol correctness, not the early-major pair
+
+Followed through on the next B2.3 slice after the source inspection pass. The granulator's grain-event SAB ring no longer depends on a constructor-time `port.postMessage({ type: 'grainRing' })` that the app could easily miss: `src/audio/granulator.ts` now allocates the ring on the main side, passes it through `processorOptions`, exposes it as `granulator.grainEventRing`, and `src/core/grain-scheduler.ts` can attach the ring directly at construction time. This fixes a real correctness hole in the old design: `ensureGranulatorPipeline()` created the worklet before the app installed its port wrapper, while `GrainScheduler` only attached much later on first `grain-composite` use, so the one-shot ring setup message was inherently racy.
+
+The clip-load handoff is also more honest now. `Granulator.loadFromAudioBuffer()` can use SAB-backed source buffers in isolated builds instead of transferring ordinary `ArrayBuffer`s into the worklet, and it now resolves only after the worklet sends a `loaded` ack from `handleMessage('load'/'loadShared')`. `App.svelte`'s `ensureGranulatorClipLoaded()` was already awaiting the wrapper call, so after this change "granulator loaded" finally means "worklet-side `srcReady` set" rather than merely "main thread posted a message."
+
+The last one-shot diagnostic path is now default-off. `emitDiagnosticMessages` joins `emitInterpModeMessages` in `GranulatorOptions` / `setGranulatorDiagnostics()`, the worklet only posts the temporary `diag` packets when explicitly enabled, the soak harness now disables both before transport start, and the ad-hoc diagnostic spec opts back in on purpose.
+
+Verification for the slice was clean on the code side:
+
+- `npm run check`
+- `npm run test:run -- src/audio/worklets/granulator.test.ts src/core/grain-scheduler.test.ts`
+- targeted `eslint`
+- targeted `prettier --check`
+
+The cold canary result stayed bad in the same way:
+
+- `PLAYWRIGHT_SERVER_MODE=external PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 GRANULATOR_SOAK_S=30 npx playwright test qa/e2e/b2.3-granulator-soak.spec.ts -c qa/playwright.config.ts`
+- FAIL — `worklet major=2, minor=2, max_ms=3.606`
+
+Parsed timing from the new trace still matches the previous signature almost exactly:
+
+- `MajorGC` at **15.337 s**
+- `MajorGC` at **15.942 s**
+
+So this pass was worth doing because it removed startup races and made the transport model honest, but it was still a **GC no-op**. The remaining defect is unlikely to be explained by the one-shot `grainRing` / `loaded` / `diag` message paths alone. The next B2.3 slice should target the first-15-second steady-runtime behavior under 64-voice load, not more port-protocol cleanup and not a longer soak.
+
+## 2026-05-25 — B2.3 shared runtime snapshots rule out a hidden 64-voice threshold
+
+Followed through on the next B2.3 step after the startup/message cleanup: add a no-message shared runtime-snapshot ring so the main thread can inspect steady-state worklet state without reintroducing `postMessage` churn. `src/audio/granulator.ts` now allocates a SAB diagnostics ring alongside the control snapshot and grain-event ring, exposes `readRuntimeDiagnostics()`, and passes the transport through `processorOptions`. `public/worklets/granulator.js` samples a fixed set of counters/derived values into that ring every `125 ms` from inside `process()`: relative active-runtime seconds, active/fading voices, pitch load, interpolation mode, samples-until-next-spawn, next voice id, total spawns, total steals, norm gain, density, voiceCount, and mean samples per grain. `App.svelte` exposes that through the QA bridge, and `qa/e2e/b2.3-granulator-soak.spec.ts` now writes those inspection points into `qa/results/granulator-soak-summary.json`.
+
+The crucial result from the fresh cold 30 s canary is not that the gate passed — it still failed at **`worklet major=2, minor=2`** — but that the new diagnostics change the hypothesis. Around the persistent early-major window:
+
+- at **~15.337 s**: closest snapshot was **15.377 s**, with **4 active voices**, **0 fading voices**, **pitchLoad ≈ 5.14**, **interpMode = sinc**, **stealCount = 0**
+- at **~15.942 s**: closest snapshot was **16.001 s**, with **3 active voices**, **0 fading voices**, **pitchLoad = 3.0**, **interpMode = sinc**, **stealCount = 0**
+- whole 30 s run maxima: **maxActiveVoices = 5**, **maxPitchLoad ≈ 6.22**, **maxStealCount = 0**
+
+That rules out the previous "maybe a hidden 64-voice threshold, Hermite switch, or voice-steal buildup around 15–16 s" theory for the shipped `grainField` canary. The harness is setting `voiceCount = 64`, but the actual patch is only sustaining a light cloud, nowhere near a real pool-saturation event, when the two major GCs hit. In other words: the repeated early-major pair is either light steady-state grain lifecycle pressure or worklet-isolate housekeeping, not a runaway polyphony threshold on this preset.
+
+Verification for the slice:
+
+- `npm run check`
+- `npm run test:run -- src/audio/worklets/granulator.test.ts src/core/grain-scheduler.test.ts`
+- targeted `eslint`
+- `PLAYWRIGHT_SERVER_MODE=external PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 GRANULATOR_SOAK_S=30 npx playwright test qa/e2e/b2.3-granulator-soak.spec.ts -c qa/playwright.config.ts`
+
+This changes the next B2.3 move. Do **not** jump to a longer soak yet, and do **not** keep chasing saturation-only explanations. The next useful discriminator is an A/B canary matrix:
+
+1. a no-spawn or near-zero-spawn baseline,
+2. the current `grainField` patch,
+3. a deliberately dense fixed patch that actually saturates active voices.
+
+If the major pair survives even the no-spawn baseline, treat it as isolate/runtime housekeeping. If it appears only once grains are spawning, keep inspecting the steady-state grain lifecycle path instead of startup messages.

@@ -5,8 +5,9 @@
 // 8-tap windowed sinc by default, with a 4-point Hermite fallback selected automatically when
 // active voice / pitch load crosses the current CPU budget.
 //
-// All AudioParams are k-rate (read once per process() block) per the spec's worklet header policy.
-// Per-grain randomisation: each voice carries its own xorshift32 seed advanced from a master PRNG.
+// Granulator controls arrive through a shared control snapshot when SharedArrayBuffer is available,
+// with a port-message fallback for non-isolated sessions. Per-grain randomisation: each voice
+// carries its own xorshift32 seed advanced from a master PRNG.
 // AV-coupling identical-statistics rule (spec §7) is honoured by exposing the master seed for
 // future video-twin reuse — the same seed advance will drive the video grain pool.
 
@@ -16,14 +17,44 @@ const SINC_TAPS = 8;
 const KAISER_BETA = 8.6;
 const POOL_SIZE = 64;
 const MIDI_CHANNELS = 16;
+const PENDING_NOTE_CAPACITY = 128;
 const STEAL_FADE_SAMPLES = 64;
 const INTERP_SINC = 0;
 const INTERP_HERMITE = 1;
 const INTERP_COST_BUDGET = 192;
+const GRAIN_EVENT_RING_CAPACITY = 2048;
+const GRAIN_EVENT_RING_FIELDS = 10;
+const GRAIN_EVENT_WRITE_SEQ_IDX = 0;
+const GRAIN_EVENT_F_VOICE_ID = 0;
+const GRAIN_EVENT_F_SEED = 1;
+const GRAIN_EVENT_F_SPAWN_TIME = 2;
+const GRAIN_EVENT_F_DURATION_SEC = 3;
+const GRAIN_EVENT_F_POSITION_SEC = 4;
+const GRAIN_EVENT_F_PITCH_RATIO = 5;
+const GRAIN_EVENT_F_PAN_X = 6;
+const GRAIN_EVENT_F_PAN_Y = 7;
+const GRAIN_EVENT_F_REVERSE = 8;
+const GRAIN_EVENT_F_ENVELOPE_INDEX = 9;
+const RUNTIME_DIAG_RING_FIELDS = 13;
+const RUNTIME_DIAG_WRITE_SEQ_IDX = 0;
+const RUNTIME_DIAG_SAMPLE_INTERVAL_SEC = 0.125;
+const RUNTIME_DIAG_F_REL_TIME_SEC = 0;
+const RUNTIME_DIAG_F_ACTIVE_VOICES = 1;
+const RUNTIME_DIAG_F_FADING_VOICES = 2;
+const RUNTIME_DIAG_F_PITCH_LOAD = 3;
+const RUNTIME_DIAG_F_INTERP_MODE = 4;
+const RUNTIME_DIAG_F_SAMPLES_UNTIL_NEXT_SPAWN = 5;
+const RUNTIME_DIAG_F_NEXT_VOICE_ID = 6;
+const RUNTIME_DIAG_F_SPAWN_COUNT = 7;
+const RUNTIME_DIAG_F_STEAL_COUNT = 8;
+const RUNTIME_DIAG_F_NORM_GAIN = 9;
+const RUNTIME_DIAG_F_DENSITY = 10;
+const RUNTIME_DIAG_F_VOICE_COUNT = 11;
+const RUNTIME_DIAG_F_MEAN_SAMPLES_PER_GRAIN = 12;
 // Voice-count-aware normalisation: divide output by √(active voices) to keep
 // the sum of uncorrelated grains bounded (gate #6, spec §13). Smoothed over
 // ~30 ms to avoid zipper noise as polyphony changes.
-const NORM_SMOOTH_TAU_S = 0.030;
+const NORM_SMOOTH_TAU_S = 0.03;
 
 const ENV_HANN = 0;
 const ENV_TUKEY25 = 1;
@@ -31,9 +62,28 @@ const ENV_GAUSSIAN = 2;
 const ENV_EXPDEC = 3;
 const ENV_REXPDEC = 4;
 const ENV_COUNT = 5;
+const CONTROL_PARAM_COUNT = 15;
+const CONTROL_WRITE_SEQ_IDX = 0;
+const CONTROL_POSITION = 0;
+const CONTROL_POSITION_JITTER = 1;
+const CONTROL_PITCH = 2;
+const CONTROL_PITCH_JITTER = 3;
+const CONTROL_DURATION = 4;
+const CONTROL_DURATION_JITTER = 5;
+const CONTROL_DENSITY = 6;
+const CONTROL_DISTRIBUTION = 7;
+const CONTROL_ENVELOPE = 8;
+const CONTROL_PAN_SPREAD = 9;
+const CONTROL_Y_SPREAD = 10;
+const CONTROL_REVERSE_PROBABILITY = 11;
+const CONTROL_VOICE_COUNT = 12;
+const CONTROL_MODE = 13;
+const CONTROL_GAIN = 14;
+const DEFAULT_CONTROL_VALUES = new Float32Array([
+  0.5, 0, 0, 0, 80, 0, 20, 0, 0, 0, 0, 0, 32, 0, 0.7,
+]);
 
 const MODE_CLASSIC = 0;
-const MODE_LOOP = 1;
 const MODE_CLOUD = 2;
 
 function besselI0(x) {
@@ -173,56 +223,45 @@ const ENV_LUTS = buildEnvelopeLuts();
 
 class GranulatorV1Processor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
-    return [
-      { name: 'position',           defaultValue: 0.5, minValue: 0,   maxValue: 1,    automationRate: 'k-rate' },
-      { name: 'positionJitter',     defaultValue: 0,   minValue: 0,   maxValue: 1,    automationRate: 'k-rate' },
-      { name: 'pitch',              defaultValue: 0,   minValue: -48, maxValue: 48,   automationRate: 'k-rate' },
-      { name: 'pitchJitter',        defaultValue: 0,   minValue: 0,   maxValue: 24,   automationRate: 'k-rate' },
-      { name: 'duration',           defaultValue: 80,  minValue: 5,   maxValue: 2000, automationRate: 'k-rate' },
-      { name: 'durationJitter',     defaultValue: 0,   minValue: 0,   maxValue: 1,    automationRate: 'k-rate' },
-      { name: 'density',            defaultValue: 20,  minValue: 0.1, maxValue: 200,  automationRate: 'k-rate' },
-      { name: 'distribution',       defaultValue: 0,   minValue: 0,   maxValue: 1,    automationRate: 'k-rate' },
-      { name: 'envelope',           defaultValue: 0,   minValue: 0,   maxValue: 4,    automationRate: 'k-rate' },
-      { name: 'panSpread',          defaultValue: 0,   minValue: 0,   maxValue: 1,    automationRate: 'k-rate' },
-      { name: 'ySpread',            defaultValue: 0,   minValue: 0,   maxValue: 1,    automationRate: 'k-rate' },
-      { name: 'reverseProbability', defaultValue: 0,   minValue: 0,   maxValue: 1,    automationRate: 'k-rate' },
-      { name: 'voiceCount',         defaultValue: 32,  minValue: 1,   maxValue: 64,   automationRate: 'k-rate' },
-      { name: 'mode',               defaultValue: 0,   minValue: 0,   maxValue: 2,    automationRate: 'k-rate' },
-      { name: 'gain',               defaultValue: 0.7, minValue: 0,   maxValue: 1,    automationRate: 'k-rate' },
-    ];
+    return [];
   }
 
-  constructor(_options) {
+  constructor(options) {
     super();
 
-    this.vActive    = new Uint8Array(POOL_SIZE);
-    this.vFading    = new Uint8Array(POOL_SIZE);
-    this.vFadeRem   = new Int32Array(POOL_SIZE);
-    this.vStart     = new Float32Array(POOL_SIZE);
-    this.vRatio     = new Float32Array(POOL_SIZE);
+    this.vActive = new Uint8Array(POOL_SIZE);
+    this.vFading = new Uint8Array(POOL_SIZE);
+    this.vFadeRem = new Int32Array(POOL_SIZE);
+    this.vStart = new Float32Array(POOL_SIZE);
+    this.vRatio = new Float32Array(POOL_SIZE);
     this.vPitchRand = new Float32Array(POOL_SIZE);
-    this.vDur       = new Int32Array(POOL_SIZE);
-    this.vElapsed   = new Int32Array(POOL_SIZE);
-    this.vSubStart  = new Int32Array(POOL_SIZE);
-    this.vPanL      = new Float32Array(POOL_SIZE);
-    this.vPanR      = new Float32Array(POOL_SIZE);
-    this.vSeed      = new Uint32Array(POOL_SIZE);
-    this.vVoiceId   = new Uint32Array(POOL_SIZE);
-    this.vEnv       = new Uint8Array(POOL_SIZE);
-    this.vAaAlpha   = new Float32Array(POOL_SIZE);
-    this.vAaL       = new Float32Array(POOL_SIZE);
-    this.vAaR       = new Float32Array(POOL_SIZE);
-    this.vGain      = new Float32Array(POOL_SIZE); // per-grain velocity attenuation (1.0 = unattenuated)
-    this.vReverse   = new Uint8Array(POOL_SIZE);
-    this.vMidiCh    = new Uint8Array(POOL_SIZE);
+    this.vDur = new Int32Array(POOL_SIZE);
+    this.vElapsed = new Int32Array(POOL_SIZE);
+    this.vSubStart = new Int32Array(POOL_SIZE);
+    this.vPanL = new Float32Array(POOL_SIZE);
+    this.vPanR = new Float32Array(POOL_SIZE);
+    this.vSeed = new Uint32Array(POOL_SIZE);
+    this.vVoiceId = new Uint32Array(POOL_SIZE);
+    this.vEnv = new Uint8Array(POOL_SIZE);
+    this.vAaAlpha = new Float32Array(POOL_SIZE);
+    this.vAaL = new Float32Array(POOL_SIZE);
+    this.vAaR = new Float32Array(POOL_SIZE);
+    this.vGain = new Float32Array(POOL_SIZE); // per-grain velocity attenuation (1.0 = unattenuated)
+    this.vReverse = new Uint8Array(POOL_SIZE);
+    this.vMidiCh = new Uint8Array(POOL_SIZE);
 
-    // Pending note-on triggers from the main thread (spec §11). Drained at the top of
-    // process(); each entry spawns one immediate grain with baked per-grain velocity.
-    this.pendingNotes = [];
+    // Pending note-on triggers from the main thread (spec §11). Kept in fixed-size typed
+    // storage so note bursts do not allocate on the worklet thread.
+    this.pendingNotePitch = new Float32Array(PENDING_NOTE_CAPACITY);
+    this.pendingNoteVelocity = new Float32Array(PENDING_NOTE_CAPACITY);
+    this.pendingNoteChannel = new Uint8Array(PENDING_NOTE_CAPACITY);
+    this.pendingNoteRead = 0;
+    this.pendingNoteWrite = 0;
+    this.pendingNoteCount = 0;
     this.notePitch = new Float32Array(MIDI_CHANNELS);
 
     this.masterSeed = new Uint32Array(1);
-    this.masterSeed[0] = 0xC0FFEE13;
+    this.masterSeed[0] = 0xc0ffee13;
 
     this.srcL = null;
     this.srcR = null;
@@ -239,8 +278,79 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     // Smoothed √N normalisation gain; tracks 1/√(active voices) over time.
     this.vNormGain = 1.0;
     this.interpMode = INTERP_SINC;
+    this.controlHeader = null;
+    this.controlData = null;
+    this.controlSeq = -1;
+    this.controlCache = new Float32Array(DEFAULT_CONTROL_VALUES);
+    this.emitInterpModeMessages = true;
+    this.emitDiagnosticMessages = false;
+
+    this.grainRingHeader = null;
+    this.grainRingData = null;
+    this.grainRingWriteSeq = 0;
+    this.runtimeDiagHeader = null;
+    this.runtimeDiagData = null;
+    this.runtimeDiagCapacity = 0;
+    this.runtimeDiagWriteSeq = 0;
+    this.runtimeDiagElapsedSec = 0;
+    this.runtimeDiagNextSampleSec = 0;
+    this.totalSpawnCount = 0;
+    this.totalStealCount = 0;
+
+    // TEMP DIAGNOSTIC (B2.3 allocation audit): reported from the first process() call
+    // because the main-side handler isn't installed until after construction.
+    this.diagSabReported = false;
+
+    const processorOptions = options?.processorOptions;
+    if (
+      processorOptions?.controlHeader instanceof SharedArrayBuffer &&
+      processorOptions?.controlData instanceof SharedArrayBuffer
+    ) {
+      this.controlHeader = new Int32Array(processorOptions.controlHeader);
+      this.controlData = new Float32Array(processorOptions.controlData);
+      this.controlSeq = Atomics.load(this.controlHeader, CONTROL_WRITE_SEQ_IDX);
+      this.controlCache.set(this.controlData);
+    }
+    if (
+      typeof processorOptions?.grainRingCapacity === 'number' &&
+      processorOptions?.grainRingHeader instanceof SharedArrayBuffer &&
+      processorOptions?.grainRingData instanceof SharedArrayBuffer
+    ) {
+      this.grainRingHeader = new Int32Array(processorOptions.grainRingHeader);
+      this.grainRingData = new Float64Array(processorOptions.grainRingData);
+    }
+    if (
+      typeof processorOptions?.runtimeDiagCapacity === 'number' &&
+      processorOptions?.runtimeDiagHeader instanceof SharedArrayBuffer &&
+      processorOptions?.runtimeDiagData instanceof SharedArrayBuffer
+    ) {
+      this.runtimeDiagCapacity = processorOptions.runtimeDiagCapacity | 0;
+      this.runtimeDiagHeader = new Int32Array(processorOptions.runtimeDiagHeader);
+      this.runtimeDiagData = new Float64Array(processorOptions.runtimeDiagData);
+    }
+    if (typeof processorOptions?.emitInterpModeMessages === 'boolean') {
+      this.emitInterpModeMessages = processorOptions.emitInterpModeMessages;
+    }
+    if (typeof processorOptions?.emitDiagnosticMessages === 'boolean') {
+      this.emitDiagnosticMessages = processorOptions.emitDiagnosticMessages;
+    }
 
     this.port.onmessage = (ev) => this.handleMessage(ev.data);
+  }
+
+  applyLoadedSource(left, right) {
+    this.srcL = left;
+    this.srcR = right;
+    this.srcLen = left.length;
+    this.srcReady = this.srcLen >= SINC_TAPS;
+    this.samplesUntilNextSpawn = 0;
+    this.lastPositionK = -1;
+    this.resetRuntimeDiagnostics();
+    this.port.postMessage({
+      type: 'loaded',
+      samples: left.length,
+      channels: right === left ? 1 : 2,
+    });
   }
 
   handleMessage(msg) {
@@ -251,18 +361,31 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         if (!Array.isArray(channels) || channels.length === 0) return;
         const left = channels[0];
         if (!(left instanceof Float32Array) || left.length === 0) return;
-        const right = channels.length > 1 && channels[1] instanceof Float32Array ? channels[1] : left;
-        this.srcL = left;
-        this.srcR = right;
-        this.srcLen = left.length;
-        this.srcReady = this.srcLen >= SINC_TAPS;
-        this.samplesUntilNextSpawn = 0;
-        this.lastPositionK = -1;
-        this.port.postMessage({ type: 'loaded', samples: left.length, channels: right === left ? 1 : 2 });
+        const right =
+          channels.length > 1 && channels[1] instanceof Float32Array ? channels[1] : left;
+        this.applyLoadedSource(left, right);
+        break;
+      }
+      case 'loadShared': {
+        const samples = msg.samples | 0;
+        const channels = msg.channels | 0;
+        const leftBuffer = msg.left;
+        const rightBuffer = msg.right;
+        if (!(leftBuffer instanceof SharedArrayBuffer) || samples <= 0) return;
+        if (leftBuffer.byteLength < samples * Float32Array.BYTES_PER_ELEMENT) return;
+        const left = new Float32Array(leftBuffer, 0, samples);
+        let right = left;
+        if (channels > 1) {
+          if (!(rightBuffer instanceof SharedArrayBuffer)) return;
+          if (rightBuffer.byteLength < samples * Float32Array.BYTES_PER_ELEMENT) return;
+          right = new Float32Array(rightBuffer, 0, samples);
+        }
+        this.applyLoadedSource(left, right);
         break;
       }
       case 'enable':
         this.enabled = !!msg.value;
+        if (!this.enabled) this.resetRuntimeDiagnostics();
         break;
       case 'clear':
         this.srcReady = false;
@@ -275,10 +398,28 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
           this.vMidiCh[i] = 0;
         }
         this.notePitch.fill(0);
-        this.pendingNotes.length = 0;
+        this.pendingNoteRead = 0;
+        this.pendingNoteWrite = 0;
+        this.pendingNoteCount = 0;
+        this.resetRuntimeDiagnostics();
         break;
       case 'reseed':
-        this.masterSeed[0] = ((msg.seed | 0) >>> 0) || 0xC0FFEE13;
+        this.masterSeed[0] = (msg.seed | 0) >>> 0 || 0xc0ffee13;
+        break;
+      case 'setControl': {
+        const index = msg.index | 0;
+        const value = Number(msg.value);
+        if (index < 0 || index >= CONTROL_PARAM_COUNT || !Number.isFinite(value)) break;
+        this.controlCache[index] = value;
+        break;
+      }
+      case 'setDiagnostics':
+        if (typeof msg.emitInterpModeMessages === 'boolean') {
+          this.emitInterpModeMessages = msg.emitInterpModeMessages;
+        }
+        if (typeof msg.emitDiagnosticMessages === 'boolean') {
+          this.emitDiagnosticMessages = msg.emitDiagnosticMessages;
+        }
         break;
       case 'noteOn': {
         // Validate at the boundary; ignore malformed triggers rather than crashing the audio thread.
@@ -287,7 +428,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         const channel = msg.channel | 0;
         if (!Number.isFinite(pitchSt) || !Number.isFinite(velocity)) break;
         if (channel >= 1 && channel <= MIDI_CHANNELS) this.notePitch[channel - 1] = pitchSt;
-        this.pendingNotes.push({ pitchSt, velocity, channel });
+        this.enqueuePendingNote(pitchSt, velocity, channel);
         break;
       }
       case 'noteOff': {
@@ -305,6 +446,38 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         break;
       }
     }
+  }
+
+  enqueuePendingNote(pitchSt, velocity, channel) {
+    if (this.pendingNoteCount >= PENDING_NOTE_CAPACITY) {
+      this.pendingNoteRead = (this.pendingNoteRead + 1) % PENDING_NOTE_CAPACITY;
+      this.pendingNoteCount--;
+    }
+    const idx = this.pendingNoteWrite;
+    this.pendingNotePitch[idx] = pitchSt;
+    this.pendingNoteVelocity[idx] = velocity;
+    this.pendingNoteChannel[idx] = channel >= 1 && channel <= MIDI_CHANNELS ? channel : 0;
+    this.pendingNoteWrite = (idx + 1) % PENDING_NOTE_CAPACITY;
+    this.pendingNoteCount++;
+  }
+
+  syncSharedControls() {
+    const header = this.controlHeader;
+    const data = this.controlData;
+    if (!header || !data) return;
+    const seq = Atomics.load(header, CONTROL_WRITE_SEQ_IDX);
+    if (seq === this.controlSeq) return;
+    this.controlSeq = seq;
+    this.controlCache.set(data);
+  }
+
+  readControl(parameters, name, index) {
+    const block = parameters[name];
+    if (block && block.length > 0) {
+      const value = block[0];
+      if (Number.isFinite(value)) return value;
+    }
+    return this.controlCache[index];
   }
 
   releaseChannel(channel) {
@@ -354,6 +527,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       if (oldestIdx >= 0) {
         this.vFading[oldestIdx] = 1;
         this.vFadeRem[oldestIdx] = STEAL_FADE_SAMPLES;
+        this.totalStealCount++;
       }
     }
     for (let i = 0; i < POOL_SIZE; i++) {
@@ -363,10 +537,21 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
   }
 
   spawnGrain(
-    subStartFrame, mode, voiceCount,
-    position, positionJitter, basePitchSt, pitchJitter, duration, durationJitter,
-    envelopeIdx, panSpread, ySpread, reverseProb,
-    velocityGain = 1, midiChannel = 0,
+    subStartFrame,
+    mode,
+    voiceCount,
+    position,
+    positionJitter,
+    basePitchSt,
+    pitchJitter,
+    duration,
+    durationJitter,
+    envelopeIdx,
+    panSpread,
+    ySpread,
+    reverseProb,
+    velocityGain = 1,
+    midiChannel = 0,
   ) {
     if (!this.srcReady) return;
     const slot = this.pickSlot(voiceCount);
@@ -377,15 +562,15 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     this.vSeed[slot] = this.masterSeed[0] || 1;
     this.vVoiceId[slot] = this.nextVoiceId++;
 
-    const rPos   = xorshift32(this.vSeed, slot) * 2 - 1;
+    const rPos = xorshift32(this.vSeed, slot) * 2 - 1;
     const rPitch = xorshift32(this.vSeed, slot) * 2 - 1;
-    const rDur   = xorshift32(this.vSeed, slot) * 2 - 1;
-    const rPan   = xorshift32(this.vSeed, slot) * 2 - 1;
-    const rRev   = xorshift32(this.vSeed, slot);
+    const rDur = xorshift32(this.vSeed, slot) * 2 - 1;
+    const rPan = xorshift32(this.vSeed, slot) * 2 - 1;
+    const rRev = xorshift32(this.vSeed, slot);
     // rY is appended after rRev to preserve audio-side seed reproducibility (§7
     // identical-statistics: video twin reuses the same per-grain seed and consumes
     // draws in this canonical order; do not reorder).
-    const rY     = xorshift32(this.vSeed, slot) * 2 - 1;
+    const rY = xorshift32(this.vSeed, slot) * 2 - 1;
 
     // Base position depends on mode: classic uses the auto-advancing cursor; loop / cloud read
     // straight off the user-set position.
@@ -436,42 +621,129 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     if (startSample < 3) startSample = 3;
     if (startSample > srcLen - 5) startSample = srcLen - 5;
 
-    this.vStart[slot]    = startSample;
-    this.vRatio[slot]    = ratio;
-    this.vPitchRand[slot]= pitchRand;
-    this.vDur[slot]      = durSamples;
-    this.vElapsed[slot]  = 0;
+    this.vStart[slot] = startSample;
+    this.vRatio[slot] = ratio;
+    this.vPitchRand[slot] = pitchRand;
+    this.vDur[slot] = durSamples;
+    this.vElapsed[slot] = 0;
     this.vSubStart[slot] = subStartFrame;
-    this.vPanL[slot]     = Math.cos(theta);
-    this.vPanR[slot]     = Math.sin(theta);
-    this.vEnv[slot]      = envelopeIdx;
-    this.vAaAlpha[slot]  = aaAlpha;
-    this.vAaL[slot]      = 0;
-    this.vAaR[slot]      = 0;
-    this.vGain[slot]     = velocityGain;
-    this.vReverse[slot]  = reverseFlag;
-    this.vMidiCh[slot]   = midiChannel >= 1 && midiChannel <= MIDI_CHANNELS ? midiChannel : 0;
-    this.vFading[slot]   = 0;
-    this.vFadeRem[slot]  = 0;
-    this.vActive[slot]   = 1;
+    this.vPanL[slot] = Math.cos(theta);
+    this.vPanR[slot] = Math.sin(theta);
+    this.vEnv[slot] = envelopeIdx;
+    this.vAaAlpha[slot] = aaAlpha;
+    this.vAaL[slot] = 0;
+    this.vAaR[slot] = 0;
+    this.vGain[slot] = velocityGain;
+    this.vReverse[slot] = reverseFlag;
+    this.vMidiCh[slot] = midiChannel >= 1 && midiChannel <= MIDI_CHANNELS ? midiChannel : 0;
+    this.vFading[slot] = 0;
+    this.vFadeRem[slot] = 0;
+    this.vActive[slot] = 1;
+    this.totalSpawnCount++;
 
+    this.emitGrainEvent(
+      slot,
+      subStartFrame,
+      durSamples,
+      startSample,
+      ratio,
+      panNorm,
+      rY * ySpread,
+      reverseFlag,
+      envelopeIdx,
+    );
+  }
+
+  emitGrainEvent(
+    slot,
+    subStartFrame,
+    durSamples,
+    startSample,
+    ratio,
+    panX,
+    panY,
+    reverseFlag,
+    envelopeIdx,
+  ) {
     // Voice-event channel for the video grain twin (spec §15 step 6). Resolved per-grain
     // values are baked into the event so the video side never needs its own PRNG — the
     // identical-statistics rule reduces to "consume the same draws in the same order".
     // spawnTime is the absolute AudioContext time at sub-block offset subStartFrame.
+    const spawnTime = currentTime + subStartFrame / sampleRate;
+    if (this.grainRingHeader && this.grainRingData) {
+      const seq = this.grainRingWriteSeq;
+      const off = (seq % GRAIN_EVENT_RING_CAPACITY) * GRAIN_EVENT_RING_FIELDS;
+      const ring = this.grainRingData;
+      ring[off + GRAIN_EVENT_F_VOICE_ID] = this.vVoiceId[slot];
+      ring[off + GRAIN_EVENT_F_SEED] = this.vSeed[slot];
+      ring[off + GRAIN_EVENT_F_SPAWN_TIME] = spawnTime;
+      ring[off + GRAIN_EVENT_F_DURATION_SEC] = durSamples / sampleRate;
+      ring[off + GRAIN_EVENT_F_POSITION_SEC] = startSample / sampleRate;
+      ring[off + GRAIN_EVENT_F_PITCH_RATIO] = ratio;
+      ring[off + GRAIN_EVENT_F_PAN_X] = panX;
+      ring[off + GRAIN_EVENT_F_PAN_Y] = panY;
+      ring[off + GRAIN_EVENT_F_REVERSE] = reverseFlag;
+      ring[off + GRAIN_EVENT_F_ENVELOPE_INDEX] = envelopeIdx;
+      this.grainRingWriteSeq = seq + 1;
+      Atomics.store(this.grainRingHeader, GRAIN_EVENT_WRITE_SEQ_IDX, this.grainRingWriteSeq);
+      return;
+    }
     this.port.postMessage({
       type: 'grain',
       voiceId: this.vVoiceId[slot],
       seed: this.vSeed[slot],
-      spawnTime: currentTime + subStartFrame / sampleRate,
+      spawnTime,
       durationSec: durSamples / sampleRate,
       positionSec: startSample / sampleRate,
       pitchRatio: ratio,
-      panX: panNorm,
-      panY: rY * ySpread,
+      panX,
+      panY,
       reverse: reverseFlag,
       envelopeIndex: envelopeIdx,
     });
+  }
+
+  resetRuntimeDiagnostics() {
+    this.runtimeDiagWriteSeq = 0;
+    this.runtimeDiagElapsedSec = 0;
+    this.runtimeDiagNextSampleSec = 0;
+    this.totalSpawnCount = 0;
+    this.totalStealCount = 0;
+    if (this.runtimeDiagHeader)
+      Atomics.store(this.runtimeDiagHeader, RUNTIME_DIAG_WRITE_SEQ_IDX, 0);
+  }
+
+  writeRuntimeDiagnosticSnapshot(
+    activeVoices,
+    fadingVoices,
+    pitchLoad,
+    interpMode,
+    samplesUntilNextSpawn,
+    nextVoiceId,
+    normGain,
+    density,
+    voiceCount,
+    meanSamplesPerGrain,
+  ) {
+    if (!this.runtimeDiagHeader || !this.runtimeDiagData || this.runtimeDiagCapacity <= 0) return;
+    const seq = this.runtimeDiagWriteSeq;
+    const off = (seq % this.runtimeDiagCapacity) * RUNTIME_DIAG_RING_FIELDS;
+    const ring = this.runtimeDiagData;
+    ring[off + RUNTIME_DIAG_F_REL_TIME_SEC] = this.runtimeDiagElapsedSec;
+    ring[off + RUNTIME_DIAG_F_ACTIVE_VOICES] = activeVoices;
+    ring[off + RUNTIME_DIAG_F_FADING_VOICES] = fadingVoices;
+    ring[off + RUNTIME_DIAG_F_PITCH_LOAD] = pitchLoad;
+    ring[off + RUNTIME_DIAG_F_INTERP_MODE] = interpMode;
+    ring[off + RUNTIME_DIAG_F_SAMPLES_UNTIL_NEXT_SPAWN] = samplesUntilNextSpawn;
+    ring[off + RUNTIME_DIAG_F_NEXT_VOICE_ID] = nextVoiceId;
+    ring[off + RUNTIME_DIAG_F_SPAWN_COUNT] = this.totalSpawnCount;
+    ring[off + RUNTIME_DIAG_F_STEAL_COUNT] = this.totalStealCount;
+    ring[off + RUNTIME_DIAG_F_NORM_GAIN] = normGain;
+    ring[off + RUNTIME_DIAG_F_DENSITY] = density;
+    ring[off + RUNTIME_DIAG_F_VOICE_COUNT] = voiceCount;
+    ring[off + RUNTIME_DIAG_F_MEAN_SAMPLES_PER_GRAIN] = meanSamplesPerGrain;
+    this.runtimeDiagWriteSeq = seq + 1;
+    Atomics.store(this.runtimeDiagHeader, RUNTIME_DIAG_WRITE_SEQ_IDX, this.runtimeDiagWriteSeq);
   }
 
   process(_inputs, outputs, parameters) {
@@ -488,21 +760,43 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
 
     if (!this.enabled || !this.srcReady) return true;
 
-    const position           = parameters.position[0];
-    const positionJitter     = parameters.positionJitter[0];
-    const pitchSt            = parameters.pitch[0];
-    const pitchJitter        = parameters.pitchJitter[0];
-    const duration           = parameters.duration[0];
-    const durationJitter     = parameters.durationJitter[0];
-    const density            = Math.max(0.1, parameters.density[0]);
-    const distribution       = parameters.distribution[0];
-    const envelopeIdx        = Math.max(0, Math.min(ENV_COUNT - 1, parameters.envelope[0] | 0));
-    const panSpread          = parameters.panSpread[0];
-    const ySpread            = parameters.ySpread[0];
-    const reverseProbability = parameters.reverseProbability[0];
-    const voiceCount         = Math.max(1, Math.min(POOL_SIZE, parameters.voiceCount[0] | 0));
-    const mode               = Math.max(0, Math.min(2, parameters.mode[0] | 0));
-    const gain               = parameters.gain[0];
+    // TEMP DIAGNOSTIC (B2.3 allocation audit): one-time SAB-availability ping.
+    if (this.emitDiagnosticMessages && !this.diagSabReported) {
+      this.diagSabReported = true;
+      this.port.postMessage({
+        type: 'diag',
+        kind: 'sab',
+        avail: this.grainRingHeader ? 1 : 0,
+      });
+    }
+
+    this.syncSharedControls();
+
+    const position = this.readControl(parameters, 'position', CONTROL_POSITION);
+    const positionJitter = this.readControl(parameters, 'positionJitter', CONTROL_POSITION_JITTER);
+    const pitchSt = this.readControl(parameters, 'pitch', CONTROL_PITCH);
+    const pitchJitter = this.readControl(parameters, 'pitchJitter', CONTROL_PITCH_JITTER);
+    const duration = this.readControl(parameters, 'duration', CONTROL_DURATION);
+    const durationJitter = this.readControl(parameters, 'durationJitter', CONTROL_DURATION_JITTER);
+    const density = Math.max(0.1, this.readControl(parameters, 'density', CONTROL_DENSITY));
+    const distribution = this.readControl(parameters, 'distribution', CONTROL_DISTRIBUTION);
+    const envelopeIdx = Math.max(
+      0,
+      Math.min(ENV_COUNT - 1, this.readControl(parameters, 'envelope', CONTROL_ENVELOPE) | 0),
+    );
+    const panSpread = this.readControl(parameters, 'panSpread', CONTROL_PAN_SPREAD);
+    const ySpread = this.readControl(parameters, 'ySpread', CONTROL_Y_SPREAD);
+    const reverseProbability = this.readControl(
+      parameters,
+      'reverseProbability',
+      CONTROL_REVERSE_PROBABILITY,
+    );
+    const voiceCount = Math.max(
+      1,
+      Math.min(POOL_SIZE, this.readControl(parameters, 'voiceCount', CONTROL_VOICE_COUNT) | 0),
+    );
+    const mode = Math.max(0, Math.min(2, this.readControl(parameters, 'mode', CONTROL_MODE) | 0));
+    const gain = this.readControl(parameters, 'gain', CONTROL_GAIN);
 
     const basePitchRatio = Math.pow(2, pitchSt / 12);
     const meanSamplesPerGrain = Math.max(1, (sampleRate / density) | 0);
@@ -519,27 +813,49 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     // block (≈3 ms at 48 kHz / 128 frames). Each note-on becomes one immediate grain at
     // subStartFrame=0 with baked per-grain velocity gain. Triggered-note pitch now stays
     // local to the tagged grain voices; the ambient cloud remains on the shared `pitch`
-    // AudioParam.
-    if (this.pendingNotes.length > 0) {
-      for (let i = 0; i < this.pendingNotes.length; i++) {
-        const note = this.pendingNotes[i];
+    // control slot.
+    if (this.pendingNoteCount > 0) {
+      while (this.pendingNoteCount > 0) {
+        const idx = this.pendingNoteRead;
         this.spawnGrain(
-          0, mode, voiceCount,
-          position, positionJitter, note.pitchSt, pitchJitter, duration, durationJitter,
-          envelopeIdx, panSpread, ySpread, reverseProbability,
-          velocityToGainWorklet(note.velocity), note.channel,
+          0,
+          mode,
+          voiceCount,
+          position,
+          positionJitter,
+          this.pendingNotePitch[idx],
+          pitchJitter,
+          duration,
+          durationJitter,
+          envelopeIdx,
+          panSpread,
+          ySpread,
+          reverseProbability,
+          velocityToGainWorklet(this.pendingNoteVelocity[idx]),
+          this.pendingNoteChannel[idx],
         );
+        this.pendingNoteRead = (idx + 1) % PENDING_NOTE_CAPACITY;
+        this.pendingNoteCount--;
       }
-      this.pendingNotes.length = 0;
     }
 
     let scanCursor = 0;
     while (scanCursor < N) {
       if (this.samplesUntilNextSpawn <= 0) {
         this.spawnGrain(
-          scanCursor, mode, voiceCount,
-          position, positionJitter, pitchSt, pitchJitter, duration, durationJitter,
-          envelopeIdx, panSpread, ySpread, reverseProbability,
+          scanCursor,
+          mode,
+          voiceCount,
+          position,
+          positionJitter,
+          pitchSt,
+          pitchJitter,
+          duration,
+          durationJitter,
+          envelopeIdx,
+          panSpread,
+          ySpread,
+          reverseProbability,
         );
         if (mode === MODE_CLOUD && distribution > 0) {
           this.masterSeed[0] = (Math.imul(this.masterSeed[0], 1664525) + 1013904223) >>> 0;
@@ -565,8 +881,11 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     // the target divisor with a single-pole filter so polyphony changes don't
     // cause zipper noise.
     let activeNow = 0;
+    let fadingNow = 0;
     for (let i = 0; i < POOL_SIZE; i++) {
-      if (this.vActive[i]) activeNow++;
+      if (!this.vActive[i]) continue;
+      activeNow++;
+      if (this.vFading[i]) fadingNow++;
     }
     const targetNormGain = 1.0 / Math.sqrt(activeNow > 0 ? activeNow : 1);
     const alpha = 1 - Math.exp(-N / (sampleRate * NORM_SMOOTH_TAU_S));
@@ -582,10 +901,32 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       pitchLoad * SINC_TAPS > INTERP_COST_BUDGET ? INTERP_HERMITE : INTERP_SINC;
     if (nextInterpMode !== this.interpMode) {
       this.interpMode = nextInterpMode;
-      this.port.postMessage({
-        type: 'interpMode',
-        mode: nextInterpMode === INTERP_HERMITE ? 'hermite' : 'sinc',
-      });
+      if (this.emitDiagnosticMessages) {
+        // TEMP DIAGNOSTIC (B2.3 allocation audit): dedicated diag channel for the toggle.
+        this.port.postMessage({ type: 'diag', kind: 'toggle', mode: nextInterpMode });
+      }
+      if (this.emitInterpModeMessages) {
+        this.port.postMessage({
+          type: 'interpMode',
+          mode: nextInterpMode === INTERP_HERMITE ? 'hermite' : 'sinc',
+        });
+      }
+    }
+
+    while (this.runtimeDiagElapsedSec >= this.runtimeDiagNextSampleSec) {
+      this.writeRuntimeDiagnosticSnapshot(
+        activeNow,
+        fadingNow,
+        pitchLoad,
+        this.interpMode,
+        this.samplesUntilNextSpawn,
+        this.nextVoiceId,
+        this.vNormGain,
+        density,
+        voiceCount,
+        meanSamplesPerGrain,
+      );
+      this.runtimeDiagNextSampleSec += RUNTIME_DIAG_SAMPLE_INTERVAL_SEC;
     }
 
     this.renderActiveVoices(outL, outR, N, gain * this.vNormGain, this.interpMode);
@@ -602,6 +943,8 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         outR[n] = mid * midGain - side * sideGain;
       }
     }
+
+    this.runtimeDiagElapsedSec += N / sampleRate;
 
     return true;
   }
@@ -664,23 +1007,11 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         let sR;
         if (useHermite) {
           const base = i0Idx - 1;
-          sL = hermite4(
-            srcL[base],
-            srcL[base + 1],
-            srcL[base + 2],
-            srcL[base + 3],
-            frac,
-          );
+          sL = hermite4(srcL[base], srcL[base + 1], srcL[base + 2], srcL[base + 3], frac);
           if (srcR === srcL) {
             sR = sL;
           } else {
-            sR = hermite4(
-              srcR[base],
-              srcR[base + 1],
-              srcR[base + 2],
-              srcR[base + 3],
-              frac,
-            );
+            sR = hermite4(srcR[base], srcR[base + 1], srcR[base + 2], srcR[base + 3], frac);
           }
         } else {
           const phase = (frac * SINC_PHASES) | 0;
@@ -696,18 +1027,26 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
           const c7 = sincLut[off + 7];
 
           sL =
-            srcL[base]     * c0 + srcL[base + 1] * c1 +
-            srcL[base + 2] * c2 + srcL[base + 3] * c3 +
-            srcL[base + 4] * c4 + srcL[base + 5] * c5 +
-            srcL[base + 6] * c6 + srcL[base + 7] * c7;
+            srcL[base] * c0 +
+            srcL[base + 1] * c1 +
+            srcL[base + 2] * c2 +
+            srcL[base + 3] * c3 +
+            srcL[base + 4] * c4 +
+            srcL[base + 5] * c5 +
+            srcL[base + 6] * c6 +
+            srcL[base + 7] * c7;
           if (srcR === srcL) {
             sR = sL;
           } else {
             sR =
-              srcR[base]     * c0 + srcR[base + 1] * c1 +
-              srcR[base + 2] * c2 + srcR[base + 3] * c3 +
-              srcR[base + 4] * c4 + srcR[base + 5] * c5 +
-              srcR[base + 6] * c6 + srcR[base + 7] * c7;
+              srcR[base] * c0 +
+              srcR[base + 1] * c1 +
+              srcR[base + 2] * c2 +
+              srcR[base + 3] * c3 +
+              srcR[base + 4] * c4 +
+              srcR[base + 5] * c5 +
+              srcR[base + 6] * c6 +
+              srcR[base + 7] * c7;
           }
         }
 

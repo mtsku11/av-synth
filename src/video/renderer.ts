@@ -27,7 +27,9 @@ import bloomPrefilterFs from './shaders/bloom-prefilter.frag?raw';
 import blurFs from './shaders/blur.frag?raw';
 import displacementFs from './shaders/displacement.frag?raw';
 import historyFs from './shaders/history.frag?raw';
+import motionAnalysisFs from './shaders/motion-analysis.frag?raw';
 import presentationFs from './shaders/presentation.frag?raw';
+import structureAnalysisFs from './shaders/structure-analysis.frag?raw';
 
 const VS_FULLSCREEN = /* glsl */ `#version 300 es
 out vec2 v_uv;
@@ -71,6 +73,16 @@ interface OffscreenTarget {
   tex: WebGLTexture;
   width: number;
   height: number;
+}
+
+interface TemporalHistoryBuffer {
+  fbo: WebGLFramebuffer;
+  tex: WebGLTexture;
+  width: number;
+  height: number;
+  capacity: number;
+  writeIndex: number;
+  validCount: number;
 }
 
 interface PresentationLookConfig {
@@ -648,6 +660,12 @@ export type PresentationLutSelection = PresentationLutName | typeof IMPORTED_PRE
 export type PreviewMode = 'single' | 'quad';
 
 const BLOOM_PYRAMID_SCALES = [0.5, 0.25, 0.125, 0.0625] as const;
+const TEMPORAL_HISTORY_CAPACITY = 8;
+const MOTION_FIELD_SCALE = 0.5;
+
+function scaledDimension(size: number, scale: number): number {
+  return Math.max(1, Math.round(size * scale));
+}
 
 function createTarget(
   gl: WebGL2RenderingContext,
@@ -678,6 +696,48 @@ function createTarget(
   return { fbo, tex, width, height };
 }
 
+function createTemporalHistoryBuffer(
+  gl: WebGL2RenderingContext,
+  width: number,
+  height: number,
+  capacity: number,
+  internalFormat: GLenum,
+): TemporalHistoryBuffer {
+  const tex = gl.createTexture();
+  const fbo = gl.createFramebuffer();
+  if (!tex || !fbo) throw new Error('Failed to allocate temporal-history texture');
+
+  const type = internalFormat === gl.RGBA16F ? gl.FLOAT : gl.UNSIGNED_BYTE;
+
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex);
+  gl.texImage3D(
+    gl.TEXTURE_2D_ARRAY,
+    0,
+    internalFormat,
+    width,
+    height,
+    capacity,
+    0,
+    gl.RGBA,
+    type,
+    null,
+  );
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, tex, 0, 0);
+  const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+  if (status !== gl.FRAMEBUFFER_COMPLETE) {
+    throw new Error(`Temporal history FBO incomplete: 0x${status.toString(16)}`);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
+  return { fbo, tex, width, height, capacity, writeIndex: 0, validCount: 0 };
+}
+
 export class VideoRenderer {
   readonly canvas: HTMLCanvasElement;
   readonly gl: WebGL2RenderingContext;
@@ -698,6 +758,17 @@ export class VideoRenderer {
   #uHistoryTex: WebGLUniformLocation;
   #uHistoryResolution: WebGLUniformLocation;
   #uHistoryFeedbackAmount: WebGLUniformLocation;
+  #structureAnalysisProgram: WebGLProgram;
+  #uStructureAnalysisTex: WebGLUniformLocation;
+  #uStructureAnalysisPrevTex: WebGLUniformLocation;
+  #uStructureAnalysisResolution: WebGLUniformLocation;
+  #uStructureAnalysisPrevValid: WebGLUniformLocation;
+  #motionAnalysisProgram: WebGLProgram;
+  #uMotionAnalysisTex: WebGLUniformLocation;
+  #uMotionAnalysisPrevTex: WebGLUniformLocation;
+  #uMotionAnalysisPrevMotionTex: WebGLUniformLocation;
+  #uMotionAnalysisResolution: WebGLUniformLocation;
+  #uMotionAnalysisPrevValid: WebGLUniformLocation;
   #displacementProgram: WebGLProgram;
   #uDisplacementTex: WebGLUniformLocation;
   #uDisplacementPrevTex: WebGLUniformLocation;
@@ -744,6 +815,11 @@ export class VideoRenderer {
   #busHistory = new Map<BusIndex, OffscreenTarget>();
   #emptyTarget: OffscreenTarget;
   #prevFrame: OffscreenTarget;
+  #prevSourceFrame: OffscreenTarget;
+  #structureAnalysisTarget: OffscreenTarget;
+  #motionFieldTarget: OffscreenTarget;
+  #prevMotionFieldTarget: OffscreenTarget;
+  #temporalHistory: TemporalHistoryBuffer;
   #bloomPyramid: BloomPyramidLevel[] = [];
   #lutTextures = new Map<PresentationLutName, LutTextureAsset>();
   #importedLutAsset: LutTextureAsset | null = null;
@@ -770,6 +846,7 @@ export class VideoRenderer {
   #presentationPostPreset: PresentationPostPresetName = 'none';
   #presentationLensDirt: PresentationLensDirtName = 'none';
   #previewMode: PreviewMode = 'single';
+  #hasSourceHistory = false;
 
   #running = false;
   #rafId = 0;
@@ -794,10 +871,23 @@ export class VideoRenderer {
 
     const w = canvas.width;
     const h = canvas.height;
+    const motionWidth = scaledDimension(w, MOTION_FIELD_SCALE);
+    const motionHeight = scaledDimension(h, MOTION_FIELD_SCALE);
     this.#sourceTarget = createTarget(gl, w, h, internalFormat);
     this.#displacementTarget = createTarget(gl, w, h, internalFormat);
     this.#emptyTarget = createTarget(gl, w, h, internalFormat);
     this.#prevFrame = createTarget(gl, w, h, internalFormat);
+    this.#prevSourceFrame = createTarget(gl, w, h, gl.RGBA8);
+    this.#structureAnalysisTarget = createTarget(gl, w, h, gl.RGBA8);
+    this.#motionFieldTarget = createTarget(gl, motionWidth, motionHeight, gl.RGBA8);
+    this.#prevMotionFieldTarget = createTarget(gl, motionWidth, motionHeight, gl.RGBA8);
+    this.#temporalHistory = createTemporalHistoryBuffer(
+      gl,
+      w,
+      h,
+      TEMPORAL_HISTORY_CAPACITY,
+      internalFormat,
+    );
     for (const bus of BUS_INDICES) {
       this.#busHistory.set(bus, createTarget(gl, w, h, internalFormat));
     }
@@ -810,6 +900,10 @@ export class VideoRenderer {
     this.#blurProgram = link(gl, vs, fsBlur);
     const fsHistory = compile(gl, gl.FRAGMENT_SHADER, historyFs);
     this.#historyProgram = link(gl, vs, fsHistory);
+    const fsStructureAnalysis = compile(gl, gl.FRAGMENT_SHADER, structureAnalysisFs);
+    this.#structureAnalysisProgram = link(gl, vs, fsStructureAnalysis);
+    const fsMotionAnalysis = compile(gl, gl.FRAGMENT_SHADER, motionAnalysisFs);
+    this.#motionAnalysisProgram = link(gl, vs, fsMotionAnalysis);
     const fsDisplacement = compile(gl, gl.FRAGMENT_SHADER, displacementFs);
     this.#displacementProgram = link(gl, vs, fsDisplacement);
     const fsPresentation = compile(gl, gl.FRAGMENT_SHADER, presentationFs);
@@ -818,6 +912,8 @@ export class VideoRenderer {
     gl.deleteShader(fsBloomPrefilter);
     gl.deleteShader(fsBlur);
     gl.deleteShader(fsHistory);
+    gl.deleteShader(fsStructureAnalysis);
+    gl.deleteShader(fsMotionAnalysis);
     gl.deleteShader(fsDisplacement);
     gl.deleteShader(fsPresentation);
 
@@ -845,6 +941,33 @@ export class VideoRenderer {
     const uHistoryTex = gl.getUniformLocation(this.#historyProgram, 'u_tex');
     const uHistoryResolution = gl.getUniformLocation(this.#historyProgram, 'u_resolution');
     const uHistoryFeedbackAmount = gl.getUniformLocation(this.#historyProgram, 'u_feedback_amount');
+    const uStructureAnalysisTex = gl.getUniformLocation(this.#structureAnalysisProgram, 'u_tex');
+    const uStructureAnalysisPrevTex = gl.getUniformLocation(
+      this.#structureAnalysisProgram,
+      'u_prev_tex',
+    );
+    const uStructureAnalysisResolution = gl.getUniformLocation(
+      this.#structureAnalysisProgram,
+      'u_resolution',
+    );
+    const uStructureAnalysisPrevValid = gl.getUniformLocation(
+      this.#structureAnalysisProgram,
+      'u_prev_valid',
+    );
+    const uMotionAnalysisTex = gl.getUniformLocation(this.#motionAnalysisProgram, 'u_tex');
+    const uMotionAnalysisPrevTex = gl.getUniformLocation(this.#motionAnalysisProgram, 'u_prev_tex');
+    const uMotionAnalysisPrevMotionTex = gl.getUniformLocation(
+      this.#motionAnalysisProgram,
+      'u_prev_motion_tex',
+    );
+    const uMotionAnalysisResolution = gl.getUniformLocation(
+      this.#motionAnalysisProgram,
+      'u_resolution',
+    );
+    const uMotionAnalysisPrevValid = gl.getUniformLocation(
+      this.#motionAnalysisProgram,
+      'u_prev_valid',
+    );
     const uDisplacementTex = gl.getUniformLocation(this.#displacementProgram, 'u_tex');
     const uDisplacementPrevTex = gl.getUniformLocation(this.#displacementProgram, 'u_prev_tex');
     const uDisplacementResolution = gl.getUniformLocation(
@@ -866,6 +989,15 @@ export class VideoRenderer {
       !uHistoryTex ||
       !uHistoryResolution ||
       !uHistoryFeedbackAmount ||
+      !uStructureAnalysisTex ||
+      !uStructureAnalysisPrevTex ||
+      !uStructureAnalysisResolution ||
+      !uStructureAnalysisPrevValid ||
+      !uMotionAnalysisTex ||
+      !uMotionAnalysisPrevTex ||
+      !uMotionAnalysisPrevMotionTex ||
+      !uMotionAnalysisResolution ||
+      !uMotionAnalysisPrevValid ||
       !uDisplacementTex ||
       !uDisplacementPrevTex ||
       !uDisplacementResolution ||
@@ -886,6 +1018,15 @@ export class VideoRenderer {
     this.#uHistoryTex = uHistoryTex;
     this.#uHistoryResolution = uHistoryResolution;
     this.#uHistoryFeedbackAmount = uHistoryFeedbackAmount;
+    this.#uStructureAnalysisTex = uStructureAnalysisTex;
+    this.#uStructureAnalysisPrevTex = uStructureAnalysisPrevTex;
+    this.#uStructureAnalysisResolution = uStructureAnalysisResolution;
+    this.#uStructureAnalysisPrevValid = uStructureAnalysisPrevValid;
+    this.#uMotionAnalysisTex = uMotionAnalysisTex;
+    this.#uMotionAnalysisPrevTex = uMotionAnalysisPrevTex;
+    this.#uMotionAnalysisPrevMotionTex = uMotionAnalysisPrevMotionTex;
+    this.#uMotionAnalysisResolution = uMotionAnalysisResolution;
+    this.#uMotionAnalysisPrevValid = uMotionAnalysisPrevValid;
     this.#uDisplacementTex = uDisplacementTex;
     this.#uDisplacementPrevTex = uDisplacementPrevTex;
     this.#uDisplacementResolution = uDisplacementResolution;
@@ -1060,8 +1201,8 @@ export class VideoRenderer {
     this.#source = new PlaceholderSource(gl);
     this.#clearTarget(this.#displacementTarget);
     this.#clearTarget(this.#emptyTarget);
-    for (const target of this.#busHistory.values()) this.#clearTarget(target);
-    this.#clearTarget(this.#prevFrame);
+    this.#clearTarget(this.#structureAnalysisTarget);
+    this.resetTemporalState();
   }
 
   updateCouplingContext(ctx: CouplingContext): void {
@@ -1163,6 +1304,40 @@ export class VideoRenderer {
     };
   }
 
+  readMotionEnergy(): number | null {
+    const gl = this.gl;
+    const prevFbo = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.#motionFieldTarget.fbo);
+    const sample = new Uint8Array(4);
+    const xs = [
+      0,
+      Math.max(0, Math.floor(this.#motionFieldTarget.width * 0.25)),
+      Math.max(0, Math.floor(this.#motionFieldTarget.width * 0.5)),
+      Math.max(0, Math.floor(this.#motionFieldTarget.width * 0.75)),
+      Math.max(0, this.#motionFieldTarget.width - 1),
+    ];
+    const ys = [
+      0,
+      Math.max(0, Math.floor(this.#motionFieldTarget.height * 0.25)),
+      Math.max(0, Math.floor(this.#motionFieldTarget.height * 0.5)),
+      Math.max(0, Math.floor(this.#motionFieldTarget.height * 0.75)),
+      Math.max(0, this.#motionFieldTarget.height - 1),
+    ];
+    let total = 0;
+    let count = 0;
+    for (const y of ys) {
+      for (const x of xs) {
+        gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, sample);
+        total += sample[2] ?? 0;
+        count += 1;
+      }
+    }
+    const err = gl.getError();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, prevFbo);
+    if (err !== gl.NO_ERROR) return null;
+    return total / (Math.max(1, count) * 255);
+  }
+
   dispose(): void {
     this.stop();
     const gl = this.gl;
@@ -1175,6 +1350,11 @@ export class VideoRenderer {
     this.#busHistory.clear();
     this.#deleteTarget(this.#emptyTarget);
     this.#deleteTarget(this.#prevFrame);
+    this.#deleteTarget(this.#prevSourceFrame);
+    this.#deleteTarget(this.#structureAnalysisTarget);
+    this.#deleteTarget(this.#motionFieldTarget);
+    this.#deleteTarget(this.#prevMotionFieldTarget);
+    this.#deleteTemporalHistory();
     this.#deleteBloomPyramid();
     for (const asset of this.#lutTextures.values()) gl.deleteTexture(asset.texture);
     this.#lutTextures.clear();
@@ -1185,6 +1365,8 @@ export class VideoRenderer {
     gl.deleteProgram(this.#bloomPrefilterProgram);
     gl.deleteProgram(this.#blurProgram);
     gl.deleteProgram(this.#historyProgram);
+    gl.deleteProgram(this.#structureAnalysisProgram);
+    gl.deleteProgram(this.#motionAnalysisProgram);
     gl.deleteProgram(this.#displacementProgram);
     gl.deleteProgram(this.#presentationProgram);
     gl.deleteVertexArray(this.#vao);
@@ -1217,6 +1399,8 @@ export class VideoRenderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.#sourceTarget.fbo);
     gl.viewport(0, 0, this.#sourceTarget.width, this.#sourceTarget.height);
     this.#source.render(gl, sourceParams, ctx);
+    this.#updateStructureAnalysis();
+    this.#updateMotionField();
 
     // 2. Walk the reachable graph in topological order, preserving every
     // node output so later Blend stages can converge multiple branches.
@@ -1249,6 +1433,15 @@ export class VideoRenderer {
         gl.bindTexture(gl.TEXTURE_2D, secondaryInput.tex);
       }
 
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.#temporalHistory.tex);
+
+      gl.activeTexture(gl.TEXTURE4);
+      gl.bindTexture(gl.TEXTURE_2D, this.#structureAnalysisTarget.tex);
+
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_2D, this.#motionFieldTarget.tex);
+
       const rawParams = applyGlobalLfoAssignments(
         instance.params,
         instance.def.coupling.params,
@@ -1256,6 +1449,27 @@ export class VideoRenderer {
         ctx,
       );
       const params = evaluateVideoParams(instance.def.coupling, rawParams, ctx);
+      instance.videoStage.bindRendererResources?.(gl, {
+        temporalHistory: {
+          textureUnit: 3,
+          capacity: this.#temporalHistory.capacity,
+          validCount: this.#temporalHistory.validCount,
+          writeIndex: this.#temporalHistory.writeIndex,
+          width: this.#temporalHistory.width,
+          height: this.#temporalHistory.height,
+        },
+        structureAnalysis: {
+          textureUnit: 4,
+          width: this.#structureAnalysisTarget.width,
+          height: this.#structureAnalysisTarget.height,
+        },
+        motionField: {
+          textureUnit: 5,
+          width: this.#motionFieldTarget.width,
+          height: this.#motionFieldTarget.height,
+          scale: MOTION_FIELD_SCALE,
+        },
+      });
       instance.videoStage.setUniforms(gl, params, ctx);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
@@ -1320,6 +1534,7 @@ export class VideoRenderer {
     gl.uniform2f(this.#uHistoryResolution, this.#prevFrame.width, this.#prevFrame.height);
     gl.uniform1f(this.#uHistoryFeedbackAmount, feedbackAmount);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    this.#writeTemporalHistoryFrame(this.#prevFrame);
     for (const bus of BUS_INDICES) {
       const history = this.#busHistory.get(bus);
       if (!history) continue;
@@ -1330,6 +1545,52 @@ export class VideoRenderer {
       }
       this.#copyTarget(target, history);
     }
+    this.#copyTarget(this.#sourceTarget, this.#prevSourceFrame);
+    this.#copyTarget(this.#motionFieldTarget, this.#prevMotionFieldTarget);
+    this.#hasSourceHistory = true;
+  }
+
+  #updateStructureAnalysis(): void {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.#structureAnalysisTarget.fbo);
+    gl.viewport(0, 0, this.#structureAnalysisTarget.width, this.#structureAnalysisTarget.height);
+    gl.useProgram(this.#structureAnalysisProgram);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.#sourceTarget.tex);
+    gl.uniform1i(this.#uStructureAnalysisTex, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.#prevSourceFrame.tex);
+    gl.uniform1i(this.#uStructureAnalysisPrevTex, 1);
+    gl.uniform2f(
+      this.#uStructureAnalysisResolution,
+      this.#structureAnalysisTarget.width,
+      this.#structureAnalysisTarget.height,
+    );
+    gl.uniform1f(this.#uStructureAnalysisPrevValid, this.#hasSourceHistory ? 1 : 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  #updateMotionField(): void {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.#motionFieldTarget.fbo);
+    gl.viewport(0, 0, this.#motionFieldTarget.width, this.#motionFieldTarget.height);
+    gl.useProgram(this.#motionAnalysisProgram);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.#sourceTarget.tex);
+    gl.uniform1i(this.#uMotionAnalysisTex, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.#prevSourceFrame.tex);
+    gl.uniform1i(this.#uMotionAnalysisPrevTex, 1);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, this.#prevMotionFieldTarget.tex);
+    gl.uniform1i(this.#uMotionAnalysisPrevMotionTex, 2);
+    gl.uniform2f(
+      this.#uMotionAnalysisResolution,
+      this.#motionFieldTarget.width,
+      this.#motionFieldTarget.height,
+    );
+    gl.uniform1f(this.#uMotionAnalysisPrevValid, this.#hasSourceHistory ? 1 : 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
   #resolveInputTarget(inputId: string | undefined): OffscreenTarget {
@@ -1555,6 +1816,58 @@ export class VideoRenderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
+  #clearTemporalHistory(): void {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.#temporalHistory.fbo);
+    gl.viewport(0, 0, this.#temporalHistory.width, this.#temporalHistory.height);
+    for (let layer = 0; layer < this.#temporalHistory.capacity; layer += 1) {
+      gl.framebufferTextureLayer(
+        gl.FRAMEBUFFER,
+        gl.COLOR_ATTACHMENT0,
+        this.#temporalHistory.tex,
+        0,
+        layer,
+      );
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    this.#temporalHistory.writeIndex = 0;
+    this.#temporalHistory.validCount = 0;
+  }
+
+  #writeTemporalHistoryFrame(source: OffscreenTarget): void {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, source.fbo);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.#temporalHistory.fbo);
+    gl.framebufferTextureLayer(
+      gl.DRAW_FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT0,
+      this.#temporalHistory.tex,
+      0,
+      this.#temporalHistory.writeIndex,
+    );
+    gl.blitFramebuffer(
+      0,
+      0,
+      source.width,
+      source.height,
+      0,
+      0,
+      this.#temporalHistory.width,
+      this.#temporalHistory.height,
+      gl.COLOR_BUFFER_BIT,
+      gl.LINEAR,
+    );
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    this.#temporalHistory.writeIndex =
+      (this.#temporalHistory.writeIndex + 1) % this.#temporalHistory.capacity;
+    this.#temporalHistory.validCount = Math.min(
+      this.#temporalHistory.validCount + 1,
+      this.#temporalHistory.capacity,
+    );
+  }
+
   #syncNodeTargets(): void {
     const width = this.canvas.width;
     const height = this.canvas.height;
@@ -1574,6 +1887,12 @@ export class VideoRenderer {
     const gl = this.gl;
     gl.deleteFramebuffer(target.fbo);
     gl.deleteTexture(target.tex);
+  }
+
+  #deleteTemporalHistory(): void {
+    const gl = this.gl;
+    gl.deleteFramebuffer(this.#temporalHistory.fbo);
+    gl.deleteTexture(this.#temporalHistory.tex);
   }
 
   #createBloomPyramid(width: number, height: number): BloomPyramidLevel[] {
@@ -1658,19 +1977,58 @@ export class VideoRenderer {
     this.#busHistory.clear();
     this.#deleteTarget(this.#emptyTarget);
     this.#deleteTarget(this.#prevFrame);
+    this.#deleteTarget(this.#prevSourceFrame);
+    this.#deleteTarget(this.#structureAnalysisTarget);
+    this.#deleteTarget(this.#motionFieldTarget);
+    this.#deleteTarget(this.#prevMotionFieldTarget);
+    this.#deleteTemporalHistory();
     this.#deleteBloomPyramid();
     this.#sourceTarget = createTarget(this.gl, width, height, this.#internalFormat);
     this.#displacementTarget = createTarget(this.gl, width, height, this.#internalFormat);
     this.#emptyTarget = createTarget(this.gl, width, height, this.#internalFormat);
     this.#prevFrame = createTarget(this.gl, width, height, this.#internalFormat);
+    this.#prevSourceFrame = createTarget(this.gl, width, height, this.gl.RGBA8);
+    this.#structureAnalysisTarget = createTarget(this.gl, width, height, this.gl.RGBA8);
+    this.#motionFieldTarget = createTarget(
+      this.gl,
+      scaledDimension(width, MOTION_FIELD_SCALE),
+      scaledDimension(height, MOTION_FIELD_SCALE),
+      this.gl.RGBA8,
+    );
+    this.#prevMotionFieldTarget = createTarget(
+      this.gl,
+      scaledDimension(width, MOTION_FIELD_SCALE),
+      scaledDimension(height, MOTION_FIELD_SCALE),
+      this.gl.RGBA8,
+    );
+    this.#temporalHistory = createTemporalHistoryBuffer(
+      this.gl,
+      width,
+      height,
+      TEMPORAL_HISTORY_CAPACITY,
+      this.#internalFormat,
+    );
     for (const bus of BUS_INDICES) {
       this.#busHistory.set(bus, createTarget(this.gl, width, height, this.#internalFormat));
     }
     this.#bloomPyramid = this.#createBloomPyramid(width, height);
     this.#clearTarget(this.#displacementTarget);
     this.#clearTarget(this.#emptyTarget);
-    for (const target of this.#busHistory.values()) this.#clearTarget(target);
-    this.#clearTarget(this.#prevFrame);
+    this.#clearTarget(this.#structureAnalysisTarget);
+    this.#clearTarget(this.#motionFieldTarget);
+    this.#clearTarget(this.#prevMotionFieldTarget);
+    this.resetTemporalState();
     this.#syncNodeTargets();
+  }
+
+  resetTemporalState(): void {
+    this.#clearTarget(this.#prevFrame);
+    this.#clearTarget(this.#prevSourceFrame);
+    this.#clearTarget(this.#structureAnalysisTarget);
+    this.#clearTarget(this.#motionFieldTarget);
+    this.#clearTarget(this.#prevMotionFieldTarget);
+    this.#clearTemporalHistory();
+    for (const target of this.#busHistory.values()) this.#clearTarget(target);
+    this.#hasSourceHistory = false;
   }
 }

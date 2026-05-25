@@ -108,7 +108,9 @@ class ScrollXAudioStage implements AudioStage {
     }
     try {
       this.#basePan.stop();
-    } catch {}
+    } catch {
+      // already stopped
+    }
     this.input.disconnect();
     this.#worklet.disconnect();
     this.#dry.disconnect();

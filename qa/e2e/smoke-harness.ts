@@ -18,6 +18,7 @@ interface QaState {
     luma: number;
     flux: number;
     edge: number;
+    motion: number;
   };
   video: {
     currentTime: number;

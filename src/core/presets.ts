@@ -11,14 +11,8 @@ import type { VideoFeatureState } from './coupling';
 import type { BusIndex } from './graph.svelte';
 import type { OperatorInstance } from './operators';
 import type { AutomationSource } from './params';
-import type {
-  GranulatorEnvelope,
-  GranulatorMode,
-} from '../audio/granulator';
-import {
-  GRANULATOR_ENVELOPES,
-  GRANULATOR_MODES,
-} from '../audio/granulator';
+import type { GranulatorEnvelope, GranulatorMode } from '../audio/granulator';
+import { GRANULATOR_ENVELOPES, GRANULATOR_MODES } from '../audio/granulator';
 import type { GranulatorSliderParam } from '../audio/granulator-params';
 import type { FeedbackDelayParamName } from '../audio/feedback-delay-params';
 import { TAU, clamp01, ease, lerp } from '../lib/math';
@@ -31,7 +25,11 @@ import type {
 } from '../video/renderer';
 
 export type ProgramValues = Readonly<Record<string, number>>;
-export type ProgramAutomation = Extract<AutomationSource, { kind: 'lfo' | 'sequence' | 'fft' | 'video' }>;
+export type ProgramMacroValues = Readonly<Record<string, number>>;
+export type ProgramAutomation = Extract<
+  AutomationSource,
+  { kind: 'lfo' | 'sequence' | 'fft' | 'video' }
+>;
 export type ProgramAutomationMap = Readonly<Record<string, ProgramAutomation>>;
 export interface VideoEffectProgramGraphNode {
   target: string;
@@ -58,6 +56,19 @@ export interface VideoEffectRenderStyle {
   lensDirt?: PresentationLensDirtName;
 }
 
+export interface VideoEffectProgramMacroTarget {
+  key: string;
+  min: number;
+  max: number;
+}
+
+export interface VideoEffectProgramMacro {
+  id: string;
+  label: string;
+  default: number;
+  targets: readonly VideoEffectProgramMacroTarget[];
+}
+
 export type GranulatorProgramState = Partial<Record<GranulatorSliderParam, number>> & {
   envelope?: GranulatorEnvelope;
   mode?: GranulatorMode;
@@ -76,6 +87,7 @@ export interface VideoEffectProgram {
   videoIntent: string;
   audioIntent: string;
   operatorFocus: readonly string[];
+  macros?: readonly VideoEffectProgramMacro[];
   chain?: readonly string[];
   graph?: VideoEffectProgramGraph;
   render?: VideoEffectRenderStyle;
@@ -88,6 +100,25 @@ export type VideoEffectProgramBank = Readonly<Record<string, VideoEffectProgram>
 
 export type Preset = ProgramValues;
 export type PresetBank = VideoEffectProgramBank;
+
+export interface ResolvedProgramState {
+  values: ProgramValues;
+  audio?: VideoEffectProgramAudio;
+}
+
+export function getResolvedProgramSharedFeedback(state: ResolvedProgramState): number | null {
+  let shared: number | null = null;
+  for (const [key, value] of Object.entries(state.values)) {
+    if (!key.endsWith('.feedback')) continue;
+    const scope = key.slice(0, key.indexOf('.'));
+    const parsed = parseProgramScope(scope);
+    if (!parsed || parsed.op !== 'feedback') continue;
+    shared = shared === null ? value : Math.max(shared, value);
+  }
+  if (shared !== null) return shared;
+  const audioFeedback = state.audio?.feedbackDelay?.feedback;
+  return typeof audioFeedback === 'number' && Number.isFinite(audioFeedback) ? audioFeedback : null;
+}
 
 export async function loadPrograms(): Promise<VideoEffectProgramBank> {
   const res = await fetch(`${import.meta.env.BASE_URL}presets.json`);
@@ -116,7 +147,10 @@ function parseProgramScope(scope: string): { op: string; index: number | null } 
   };
 }
 
-function getProgramTargets(scope: string, instances: readonly OperatorInstance[]): OperatorInstance[] {
+function getProgramTargets(
+  scope: string,
+  instances: readonly OperatorInstance[],
+): OperatorInstance[] {
   const parsed = parseProgramScope(scope);
   if (!parsed) return [];
   const matches = instances.filter((instance) => instance.def.op === parsed.op);
@@ -130,17 +164,28 @@ function clampParamValue(instance: OperatorInstance, param: string, value: numbe
   return Math.max(range[0], Math.min(range[1], value));
 }
 
-function resolveAutomatedValue(base: number, automation: ProgramAutomation, runtime: ProgramAutomationRuntime): number {
+function resolveAutomatedValue(
+  base: number,
+  automation: ProgramAutomation,
+  runtime: ProgramAutomationRuntime,
+): number {
   if (automation.kind === 'lfo') {
-    return base + Math.sin(runtime.time * automation.rate * TAU + automation.phase) * automation.depth;
+    return (
+      base + Math.sin(runtime.time * automation.rate * TAU + automation.phase) * automation.depth
+    );
   }
 
   if (automation.kind === 'sequence') {
-    const orderedValues = automation.invert ? [...automation.values].reverse() : [...automation.values];
+    const orderedValues = automation.invert
+      ? [...automation.values].reverse()
+      : [...automation.values];
     if (orderedValues.length === 0) return base;
     if (orderedValues.length === 1 || automation.fast === 0) return orderedValues[0] ?? base;
 
-    const phase = positiveModulo(runtime.time * automation.fast + automation.offset, orderedValues.length);
+    const phase = positiveModulo(
+      runtime.time * automation.fast + automation.offset,
+      orderedValues.length,
+    );
     const index = Math.floor(phase);
     const frac = phase - index;
     const current = orderedValues[index] ?? base;
@@ -166,17 +211,64 @@ function resolveAutomatedValue(base: number, automation: ProgramAutomation, runt
       ? runtime.videoFeatures?.luma
       : automation.feature === 'flux'
         ? runtime.videoFeatures?.flux
-        : runtime.videoFeatures?.edge;
+        : automation.feature === 'motion'
+          ? runtime.videoFeatures?.motion
+          : runtime.videoFeatures?.edge;
   return base + (featureValue ?? 0) * automation.scale;
 }
 
-function resolveAutomationBlend(current: number, target: number, automation: ProgramAutomation): number {
+function resolveAutomationBlend(
+  current: number,
+  target: number,
+  automation: ProgramAutomation,
+): number {
   if (automation.kind !== 'fft' && automation.kind !== 'video') return target;
   const alpha = 1 - clamp01(automation.smooth);
   return alpha <= 0 ? current : lerp(current, target, alpha);
 }
 
-function applyProgramValue(key: string, value: number, instances: readonly OperatorInstance[]): void {
+function cloneProgramAudio(
+  audio: VideoEffectProgramAudio | undefined,
+): VideoEffectProgramAudio | undefined {
+  if (!audio) return undefined;
+  return {
+    granulator: audio.granulator ? { ...audio.granulator } : undefined,
+    feedbackDelay: audio.feedbackDelay ? { ...audio.feedbackDelay } : undefined,
+  };
+}
+
+function applyMacroTarget(
+  key: string,
+  value: number,
+  values: Record<string, number>,
+  audio: VideoEffectProgramAudio | undefined,
+): void {
+  if (key.startsWith('audio.granulator.')) {
+    if (!audio) return;
+    const param = key.slice('audio.granulator.'.length);
+    audio.granulator = {
+      ...(audio.granulator ?? {}),
+      [param]: value,
+    };
+    return;
+  }
+  if (key.startsWith('audio.feedbackDelay.')) {
+    if (!audio) return;
+    const param = key.slice('audio.feedbackDelay.'.length);
+    audio.feedbackDelay = {
+      ...(audio.feedbackDelay ?? {}),
+      [param]: value,
+    };
+    return;
+  }
+  values[key] = value;
+}
+
+function applyProgramValue(
+  key: string,
+  value: number,
+  instances: readonly OperatorInstance[],
+): void {
   const dot = key.indexOf('.');
   if (dot < 0) return;
   const scope = key.slice(0, dot);
@@ -225,18 +317,38 @@ export function applyProgram(
   }
 }
 
+export function getProgramMacroDefaults(
+  program: VideoEffectProgram | undefined,
+): Record<string, number> {
+  if (!program?.macros?.length) return {};
+  return Object.fromEntries(program.macros.map((macro) => [macro.id, clamp01(macro.default)]));
+}
+
+export function resolveProgramState(
+  program: VideoEffectProgram,
+  macroValues: ProgramMacroValues = {},
+): ResolvedProgramState {
+  const values: Record<string, number> = { ...program.values };
+  const audio = cloneProgramAudio(program.audio);
+  for (const macro of program.macros ?? []) {
+    const amount = clamp01(macroValues[macro.id] ?? macro.default);
+    for (const target of macro.targets) {
+      applyMacroTarget(target.key, lerp(target.min, target.max, amount), values, audio);
+    }
+  }
+  return { values, audio };
+}
+
 export function applyProgramAutomation(
   program: VideoEffectProgram,
   instances: readonly OperatorInstance[],
   runtime: number | ProgramAutomationRuntime,
+  baseValues: ProgramValues = program.values,
 ): void {
   if (!program.automation) return;
-  const resolvedRuntime =
-    typeof runtime === 'number'
-      ? { time: runtime }
-      : runtime;
+  const resolvedRuntime = typeof runtime === 'number' ? { time: runtime } : runtime;
   for (const [key, automation] of Object.entries(program.automation)) {
-    const base = program.values[key] ?? 0;
+    const base = baseValues[key] ?? 0;
     const value = resolveAutomatedValue(base, automation, resolvedRuntime);
     const dot = key.indexOf('.');
     if (dot < 0) continue;
@@ -254,6 +366,10 @@ export function programHasAutomation(program: VideoEffectProgram | undefined): b
   return !!program?.automation && Object.keys(program.automation).length > 0;
 }
 
+export function programHasMacros(program: VideoEffectProgram | undefined): boolean {
+  return !!program?.macros?.length;
+}
+
 export function getOrderedProgramOps(
   program: VideoEffectProgram,
   defaultChain: readonly string[],
@@ -266,10 +382,7 @@ export function getOrderedProgramOps(
     ];
   }
 
-  const ordered = [
-    ...program.chain,
-    ...programOps.filter((op) => !program.chain!.includes(op)),
-  ];
+  const ordered = [...program.chain, ...programOps.filter((op) => !program.chain!.includes(op))];
   return ordered;
 }
 
@@ -287,34 +400,42 @@ export interface ApplyProgramAudioHandlers {
   setFeedbackDelayParam?: (name: FeedbackDelayParamName, value: number) => void;
 }
 
-export function applyProgramAudio(
-  program: VideoEffectProgram,
+export function applyProgramAudioState(
+  audio: VideoEffectProgramAudio | undefined,
   handlers: ApplyProgramAudioHandlers,
 ): void {
-  const granulator = program.audio?.granulator;
-  if (!granulator) return;
-  for (const [name, value] of Object.entries(granulator)) {
-    if (name === 'envelope') {
-      if (typeof value === 'string' && GRANULATOR_ENVELOPE_SET.has(value)) {
-        handlers.setGranulatorEnvelope?.(value as GranulatorEnvelope);
+  const granulator = audio?.granulator;
+  if (granulator) {
+    for (const [name, value] of Object.entries(granulator)) {
+      if (name === 'envelope') {
+        if (typeof value === 'string' && GRANULATOR_ENVELOPE_SET.has(value)) {
+          handlers.setGranulatorEnvelope?.(value as GranulatorEnvelope);
+        }
+        continue;
       }
-      continue;
-    }
-    if (name === 'mode') {
-      if (typeof value === 'string' && GRANULATOR_MODE_SET.has(value)) {
-        handlers.setGranulatorMode?.(value as GranulatorMode);
+      if (name === 'mode') {
+        if (typeof value === 'string' && GRANULATOR_MODE_SET.has(value)) {
+          handlers.setGranulatorMode?.(value as GranulatorMode);
+        }
+        continue;
       }
-      continue;
-    }
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      handlers.setGranulatorParam?.(name as GranulatorSliderParam, value);
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        handlers.setGranulatorParam?.(name as GranulatorSliderParam, value);
+      }
     }
   }
-  const feedbackDelay = program.audio?.feedbackDelay;
+  const feedbackDelay = audio?.feedbackDelay;
   if (!feedbackDelay) return;
   for (const [name, value] of Object.entries(feedbackDelay)) {
     if (typeof value === 'number' && Number.isFinite(value)) {
       handlers.setFeedbackDelayParam?.(name as FeedbackDelayParamName, value);
     }
   }
+}
+
+export function applyProgramAudio(
+  program: VideoEffectProgram,
+  handlers: ApplyProgramAudioHandlers,
+): void {
+  applyProgramAudioState(program.audio, handlers);
 }

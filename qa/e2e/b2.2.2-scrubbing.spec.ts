@@ -210,10 +210,8 @@ test.describe('B2.2.2-b — grain-buffer frame accuracy (gate §13 #2b)', () => 
         ),
       );
 
-      // eslint-disable-next-line no-console
       console.log(`[B2.2.2-b] grain buffer frame accuracy results (${fixture.fps} fps):`);
       for (const r of results) {
-        // eslint-disable-next-line no-console
         console.log(
           `  position=${r.position} → frame=${r.expectedFrame} ` +
             `expected=${r.expectedBrightness} measured=${r.measuredR} ` +

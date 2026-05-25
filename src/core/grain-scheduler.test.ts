@@ -9,6 +9,7 @@ import {
   ENV_REXPDEC,
   ENV_TUKEY25,
   GrainScheduler,
+  type GrainEventRingTransport,
   computeEnvelopeAlpha,
   computeEnvelopePhase,
   computeFrameIndex,
@@ -115,7 +116,13 @@ describe('isExpired', () => {
 
 describe('resolveVoice', () => {
   it('returns frame, alpha, and pan for an active voice', () => {
-    const ev = makeEvent({ spawnTime: 1.0, durationSec: 0.2, positionSec: 1.0, panX: 0.4, panY: -0.6 });
+    const ev = makeEvent({
+      spawnTime: 1.0,
+      durationSec: 0.2,
+      positionSec: 1.0,
+      panX: 0.4,
+      panY: -0.6,
+    });
     const v = resolveVoice(ev, 1.1, PLAN);
     expect(v.voiceId).toBe(1);
     expect(v.envelopePhase).toBeCloseTo(0.5, 5);
@@ -181,6 +188,67 @@ describe('GrainScheduler', () => {
     const sched = new GrainScheduler(node);
     node.port.onmessage?.({ data: { type: 'loaded' } } as MessageEvent);
     expect(sched.activeCount).toBe(0);
+    sched.dispose();
+  });
+
+  it('consumes grain events from the shared ring transport', () => {
+    const node = makeStubNode();
+    const sched = new GrainScheduler(node);
+    const capacity = 8;
+    const header = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
+    const data = new SharedArrayBuffer(Float64Array.BYTES_PER_ELEMENT * capacity * 10);
+    const headerView = new Int32Array(header);
+    const dataView = new Float64Array(data);
+    node.port.onmessage?.({
+      data: { type: 'grainRing', capacity, header, data },
+    } as MessageEvent);
+
+    dataView[0] = 77;
+    dataView[1] = 0x12345678;
+    dataView[2] = 1.0;
+    dataView[3] = 0.1;
+    dataView[4] = 2.0;
+    dataView[5] = 1.0;
+    dataView[6] = 0.25;
+    dataView[7] = -0.5;
+    dataView[8] = 0;
+    dataView[9] = ENV_HANN;
+    Atomics.store(headerView, 0, 1);
+
+    const active = sched.getActiveVoices(1.05, PLAN);
+    expect(active.length).toBe(1);
+    expect(active[0]!.voiceId).toBe(77);
+    expect(active[0]!.panX).toBe(0.25);
+    expect(active[0]!.panY).toBe(-0.5);
+    sched.dispose();
+  });
+
+  it('can attach a shared ring directly without waiting for a port message', () => {
+    const capacity = 8;
+    const header = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
+    const data = new SharedArrayBuffer(Float64Array.BYTES_PER_ELEMENT * capacity * 10);
+    const sched = new GrainScheduler(makeStubNode(), {
+      capacity,
+      header,
+      data,
+    } satisfies GrainEventRingTransport);
+    const headerView = new Int32Array(header);
+    const dataView = new Float64Array(data);
+    dataView[0] = 55;
+    dataView[1] = 0x1234;
+    dataView[2] = 1.0;
+    dataView[3] = 0.1;
+    dataView[4] = 2.0;
+    dataView[5] = 1.0;
+    dataView[6] = 0.1;
+    dataView[7] = 0.2;
+    dataView[8] = 0;
+    dataView[9] = ENV_HANN;
+    Atomics.store(headerView, 0, 1);
+
+    const active = sched.getActiveVoices(1.05, PLAN);
+    expect(active.length).toBe(1);
+    expect(active[0]!.voiceId).toBe(55);
     sched.dispose();
   });
 });

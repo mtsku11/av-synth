@@ -5,7 +5,16 @@
     "videoIntent": "Best on graphic motion, silhouettes, or footage with clear contour so the warped repeat branch stays assertive instead of muddy.",
     "audioIntent": "The coupled sound should feel like phase-twisted feedback pressure, not a random chorus pasted over the clip.",
     "operatorFocus": ["blend", "rotate", "modulateRepeatRouted", "repeatX", "repeatY"],
-    "chain": ["invert", "blend", "rotate", "modulateRepeatRouted", "contrast", "kaleid", "repeatX", "repeatY"],
+    "chain": [
+      "invert",
+      "blend",
+      "rotate",
+      "modulateRepeatRouted",
+      "contrast",
+      "kaleid",
+      "repeatX",
+      "repeatY"
+    ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
@@ -49,7 +58,23 @@
     "videoIntent": "Best on faces, gestures, and layered light where a routed zoom field can pull the image apart before the overprint lands.",
     "audioIntent": "The coupled sound should shimmer and widen through a real routed motion branch rather than just blurring into polite detune.",
     "operatorFocus": ["modulateScaleRouted", "modulateHueRouted", "layer", "posterize"],
-    "chain": ["saturate", "scale", "color", "modulateScaleRouted", "hue", "modulateHueRouted", "layer", "rotate", "scrollX", "posterize", "hue", "contrast", "luma", "color", "mult"],
+    "chain": [
+      "saturate",
+      "scale",
+      "color",
+      "modulateScaleRouted",
+      "hue",
+      "modulateHueRouted",
+      "layer",
+      "rotate",
+      "scrollX",
+      "posterize",
+      "hue",
+      "contrast",
+      "luma",
+      "color",
+      "mult"
+    ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
@@ -117,7 +142,17 @@
     "videoIntent": "Best on bodies, edges, and directional movement where the routed motion branches can visibly tear the image apart.",
     "audioIntent": "The coupled sound should feel like a dissolving stereo field with real motion pressure, not generic reverb wash.",
     "operatorFocus": ["modulateRouted", "diff", "modulateScrollYRouted", "scale"],
-    "chain": ["color", "modulateRouted", "diff", "modulateScrollYRouted", "scale", "rotate", "contrast", "color", "rotate"],
+    "chain": [
+      "color",
+      "modulateRouted",
+      "diff",
+      "modulateScrollYRouted",
+      "scale",
+      "rotate",
+      "contrast",
+      "color",
+      "rotate"
+    ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
@@ -165,7 +200,17 @@
     "videoIntent": "Best on busy footage, instruments, or bodies where a pixel-torn side bus can keep fighting the main branch instead of tinting it politely.",
     "audioIntent": "The coupled sound should feel restless and acid-leaning, with the dirty routed bus actively pushing the main line rather than just doubling it.",
     "operatorFocus": ["modulateScaleRouted", "modulatePixelateRouted", "add", "diff"],
-    "chain": ["color", "rotate", "modulateScaleRouted", "contrast", "add", "color", "diff", "modulatePixelateRouted", "color"],
+    "chain": [
+      "color",
+      "rotate",
+      "modulateScaleRouted",
+      "contrast",
+      "add",
+      "color",
+      "diff",
+      "modulatePixelateRouted",
+      "color"
+    ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
@@ -174,7 +219,11 @@
         { "target": "modulatePixelateRouted#0", "bus": 1, "inputs": ["diff#0", "rotate#0"] },
         { "target": "color#0", "bus": 0, "inputs": ["source"] },
         { "target": "rotate#0", "bus": 0, "inputs": ["color#0"] },
-        { "target": "modulateScaleRouted#0", "bus": 0, "inputs": ["rotate#0", "modulatePixelateRouted#0"] },
+        {
+          "target": "modulateScaleRouted#0",
+          "bus": 0,
+          "inputs": ["rotate#0", "modulatePixelateRouted#0"]
+        },
         { "target": "contrast#0", "bus": 0, "inputs": ["modulateScaleRouted#0"] },
         { "target": "color#1", "bus": 2, "inputs": ["source"] },
         { "target": "add#0", "bus": 0, "inputs": ["contrast#0", "color#1"] }
@@ -217,7 +266,18 @@
     "videoIntent": "Best on faces, webcams, or close framing where a moving slit branch can read as motion memory instead of static masking.",
     "audioIntent": "The coupled sound should feel like a narrow moving spectral cut with persistence and scrape, not a nearly dry image-to-audio mapping.",
     "operatorFocus": ["layer", "mask", "modulatePixelateRouted", "scrollX"],
-    "chain": ["contrast", "layer", "posterize", "scale", "scrollX", "scrollY", "modulatePixelateRouted", "sum", "scrollX", "mask"],
+    "chain": [
+      "contrast",
+      "layer",
+      "posterize",
+      "scale",
+      "scrollX",
+      "scrollY",
+      "modulatePixelateRouted",
+      "sum",
+      "scrollX",
+      "mask"
+    ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
@@ -692,6 +752,1095 @@
       "posterize.gamma": 1.0
     }
   },
+  "temporalBloomGhost": {
+    "title": "Temporal Bloom Ghost",
+    "tagline": "Hold the clip inside a soft multi-frame memory field, then let the brightest gestures bloom back through it.",
+    "videoIntent": "Best on portraits, lights, and slow-to-medium movement where time drag can stay legible instead of collapsing into noise.",
+    "audioIntent": "The grain cloud should widen and hang in the air while feedback stays present but controlled.",
+    "operatorFocus": ["timeDisplace", "feedback", "chromaShift"],
+    "render": {
+      "look": "cine",
+      "quality": "cinema",
+      "lut": "amber",
+      "postPreset": "none",
+      "lensDirt": "bloomMist"
+    },
+    "values": {
+      "clock.rate": 0.42,
+      "feedback.feedback": 0.72,
+      "feedback.delayTime": 0.24,
+      "timeDisplace.mix": 0.46,
+      "timeDisplace.depth": 0.6,
+      "timeDisplace.scan": 0.38,
+      "timeDisplace.smear": 0.24,
+      "timeDisplace.decay": 0.74,
+      "modulate.amount": 0.12,
+      "scale.amount": 1.008,
+      "rotate.angle": 0.0,
+      "kaleid.nSides": 1,
+      "chromaShift.amount": 0.008,
+      "posterize.bins": 64,
+      "posterize.gamma": 1.0
+    },
+    "macros": [
+      {
+        "id": "intensity",
+        "label": "Intensity",
+        "default": 0.55,
+        "targets": [
+          { "key": "feedback.feedback", "min": 0.58, "max": 0.82 },
+          { "key": "timeDisplace.mix", "min": 0.26, "max": 0.66 },
+          { "key": "audio.granulator.density", "min": 18, "max": 32 }
+        ]
+      },
+      {
+        "id": "memory",
+        "label": "Memory",
+        "default": 0.62,
+        "targets": [
+          { "key": "timeDisplace.depth", "min": 0.32, "max": 0.82 },
+          { "key": "timeDisplace.decay", "min": 0.42, "max": 0.88 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.18, "max": 0.42 }
+        ]
+      },
+      {
+        "id": "drift",
+        "label": "Drift",
+        "default": 0.46,
+        "targets": [
+          { "key": "clock.rate", "min": 0.28, "max": 0.62 },
+          { "key": "chromaShift.amount", "min": 0.002, "max": 0.014 },
+          { "key": "audio.granulator.pitchJitter", "min": 1, "max": 8 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.24,
+        "feedback": 0.72,
+        "damping": 6800,
+        "cross": 0.7853981634,
+        "mix": 0.32
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 26,
+        "duration": 110,
+        "durationJitter": 0.32,
+        "position": 0.5,
+        "positionJitter": 0.06,
+        "pitch": 0,
+        "pitchJitter": 4,
+        "panSpread": 0.48,
+        "ySpread": 0.22,
+        "reverseProbability": 0.12,
+        "distribution": 0.28,
+        "voiceCount": 24,
+        "gain": 0.52
+      }
+    }
+  },
+  "slitScanEcho": {
+    "title": "Slit-Scan Echo",
+    "tagline": "Slice the frame into vertical time bands, then let each band replay a slightly different moment of the clip.",
+    "videoIntent": "Best on faces, dancers, and handheld movement where vertical temporal drift reads as a deliberate scan rather than random tearing.",
+    "audioIntent": "The grains should feel more sparse and suspended, with enough space for the time slicing to read as one gesture.",
+    "operatorFocus": ["timeDisplace", "scrollX", "feedback"],
+    "render": {
+      "look": "silver",
+      "quality": "standard",
+      "lut": "chrome",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.68,
+      "feedback.feedback": 0.54,
+      "feedback.delayTime": 0.2,
+      "timeDisplace.mix": 0.8,
+      "timeDisplace.depth": 0.95,
+      "timeDisplace.scan": 0.0,
+      "timeDisplace.smear": 0.46,
+      "timeDisplace.decay": 0.34,
+      "scrollX.amount": 0.04,
+      "scrollX.speed": 0.035,
+      "scale.amount": 1.0,
+      "rotate.angle": 0.0,
+      "kaleid.nSides": 1,
+      "chromaShift.amount": 0.003,
+      "posterize.bins": 56,
+      "posterize.gamma": 1.0
+    },
+    "macros": [
+      {
+        "id": "depth",
+        "label": "Depth",
+        "default": 0.72,
+        "targets": [
+          { "key": "timeDisplace.mix", "min": 0.45, "max": 0.95 },
+          { "key": "timeDisplace.depth", "min": 0.62, "max": 1.0 },
+          { "key": "audio.granulator.density", "min": 12, "max": 26 }
+        ]
+      },
+      {
+        "id": "smear",
+        "label": "Smear",
+        "default": 0.54,
+        "targets": [
+          { "key": "timeDisplace.smear", "min": 0.16, "max": 0.68 },
+          { "key": "scrollX.amount", "min": 0.0, "max": 0.08 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.32 }
+        ]
+      },
+      {
+        "id": "drift",
+        "label": "Drift",
+        "default": 0.58,
+        "targets": [
+          { "key": "clock.rate", "min": 0.44, "max": 0.86 },
+          { "key": "scrollX.speed", "min": 0.01, "max": 0.06 },
+          { "key": "audio.granulator.pitchJitter", "min": 2, "max": 10 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.2,
+        "feedback": 0.54,
+        "damping": 7200,
+        "cross": 0.7853981634,
+        "mix": 0.24
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 18,
+        "duration": 145,
+        "durationJitter": 0.4,
+        "position": 0.46,
+        "positionJitter": 0.1,
+        "pitch": 0,
+        "pitchJitter": 8,
+        "panSpread": 0.4,
+        "ySpread": 0.18,
+        "reverseProbability": 0.08,
+        "distribution": 0.18,
+        "voiceCount": 20,
+        "gain": 0.48
+      }
+    }
+  },
+  "lumaTimeSmear": {
+    "title": "Luma Time Smear",
+    "tagline": "Let bright and dark structures pull from different moments of the clip, then tighten the result into a shaped contour.",
+    "videoIntent": "Best on graphic lighting, silhouettes, and footage with strong tonal separation so luma-indexed time drag stays articulate.",
+    "audioIntent": "The grain cloud should stay present and musical while the shared feedback remains a supporting texture instead of the headline.",
+    "operatorFocus": ["timeDisplace", "luma", "posterize"],
+    "render": {
+      "look": "clean",
+      "quality": "standard",
+      "lut": "silvered",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.5,
+      "feedback.feedback": 0.63,
+      "feedback.delayTime": 0.26,
+      "timeDisplace.mix": 0.68,
+      "timeDisplace.depth": 0.9,
+      "timeDisplace.scan": 1.0,
+      "timeDisplace.smear": 0.5,
+      "timeDisplace.decay": 0.5,
+      "luma.threshold": 0.56,
+      "luma.tolerance": 0.12,
+      "luma.amount": 0.24,
+      "scale.amount": 1.004,
+      "rotate.angle": 0.0,
+      "kaleid.nSides": 1,
+      "chromaShift.amount": 0.006,
+      "posterize.bins": 28,
+      "posterize.gamma": 0.92
+    },
+    "macros": [
+      {
+        "id": "contrast",
+        "label": "Contrast",
+        "default": 0.5,
+        "targets": [
+          { "key": "luma.threshold", "min": 0.4, "max": 0.72 },
+          { "key": "posterize.bins", "min": 18, "max": 42 },
+          { "key": "audio.granulator.duration", "min": 60, "max": 110 }
+        ]
+      },
+      {
+        "id": "drag",
+        "label": "Drag",
+        "default": 0.66,
+        "targets": [
+          { "key": "timeDisplace.depth", "min": 0.56, "max": 1.0 },
+          { "key": "timeDisplace.smear", "min": 0.22, "max": 0.7 },
+          { "key": "feedback.feedback", "min": 0.48, "max": 0.78 }
+        ]
+      },
+      {
+        "id": "air",
+        "label": "Air",
+        "default": 0.54,
+        "targets": [
+          { "key": "audio.granulator.density", "min": 22, "max": 40 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.14, "max": 0.34 },
+          { "key": "chromaShift.amount", "min": 0.002, "max": 0.01 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.26,
+        "feedback": 0.63,
+        "damping": 6400,
+        "cross": 0.7853981634,
+        "mix": 0.28
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 32,
+        "duration": 85,
+        "durationJitter": 0.28,
+        "position": 0.54,
+        "positionJitter": 0.05,
+        "pitch": 0,
+        "pitchJitter": 5,
+        "panSpread": 0.52,
+        "ySpread": 0.3,
+        "reverseProbability": 0.14,
+        "distribution": 0.34,
+        "voiceCount": 24,
+        "gain": 0.54
+      }
+    }
+  },
+  "edgeFeedback": {
+    "title": "Edge Feedback",
+    "tagline": "Let the clip's own contours decide where memory and displacement are allowed to bite, so edges drag while flat regions stay calm.",
+    "videoIntent": "Best on silhouettes, architecture, and body motion where contour-led tearing reads as authored structure instead of general blur.",
+    "audioIntent": "The grains should stay compact and articulate while the shared delay mirrors the visual drag without taking over.",
+    "operatorFocus": ["structure", "feedback", "posterize"],
+    "chain": ["feedback", "structure", "posterize", "chromaShift"],
+    "render": {
+      "look": "silver",
+      "quality": "standard",
+      "lut": "chrome",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.56,
+      "feedback.feedback": 0.66,
+      "feedback.delayTime": 0.22,
+      "structure.mix": 0.78,
+      "structure.mode": 0.6,
+      "structure.threshold": 0.18,
+      "structure.softness": 0.08,
+      "structure.displace": 0.5,
+      "structure.memory": 0.58,
+      "structure.glow": 0.24,
+      "scale.amount": 1.002,
+      "rotate.angle": 0.0,
+      "kaleid.nSides": 1,
+      "chromaShift.amount": 0.004,
+      "posterize.bins": 38,
+      "posterize.gamma": 0.97
+    },
+    "macros": [
+      {
+        "id": "edge",
+        "label": "Edge",
+        "default": 0.58,
+        "targets": [
+          { "key": "structure.threshold", "min": 0.08, "max": 0.28 },
+          { "key": "structure.mix", "min": 0.58, "max": 0.92 },
+          { "key": "audio.granulator.duration", "min": 70, "max": 110 }
+        ]
+      },
+      {
+        "id": "drag",
+        "label": "Drag",
+        "default": 0.62,
+        "targets": [
+          { "key": "structure.displace", "min": 0.18, "max": 0.68 },
+          { "key": "structure.memory", "min": 0.24, "max": 0.74 },
+          { "key": "feedback.feedback", "min": 0.5, "max": 0.78 }
+        ]
+      },
+      {
+        "id": "cut",
+        "label": "Cut",
+        "default": 0.46,
+        "targets": [
+          { "key": "posterize.bins", "min": 20, "max": 50 },
+          { "key": "chromaShift.amount", "min": 0.0, "max": 0.009 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.14, "max": 0.32 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.22,
+        "feedback": 0.66,
+        "damping": 6800,
+        "cross": 0.7853981634,
+        "mix": 0.26
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 24,
+        "duration": 92,
+        "durationJitter": 0.24,
+        "position": 0.48,
+        "positionJitter": 0.06,
+        "pitch": 0,
+        "pitchJitter": 4,
+        "panSpread": 0.4,
+        "ySpread": 0.2,
+        "reverseProbability": 0.08,
+        "distribution": 0.22,
+        "voiceCount": 20,
+        "gain": 0.5
+      }
+    }
+  },
+  "contourBloom": {
+    "title": "Contour Bloom",
+    "tagline": "Pull luminous contour and luma structure out of the clip, then let those lines bloom and drift without washing the whole frame.",
+    "videoIntent": "Best on highlights, costume contrast, and practical lights where contour-led glow can stay graphic instead of turning to fog.",
+    "audioIntent": "The grain field should stay airy and musical, with the shared delay acting as a halo rather than a slap.",
+    "operatorFocus": ["structure", "timeDisplace", "luma"],
+    "chain": ["timeDisplace", "structure", "luma", "posterize"],
+    "render": {
+      "look": "cine",
+      "quality": "cinema",
+      "lut": "amber",
+      "postPreset": "none",
+      "lensDirt": "bloomMist"
+    },
+    "values": {
+      "clock.rate": 0.38,
+      "feedback.feedback": 0.58,
+      "feedback.delayTime": 0.24,
+      "timeDisplace.mix": 0.32,
+      "timeDisplace.depth": 0.44,
+      "timeDisplace.scan": 0.8,
+      "timeDisplace.smear": 0.18,
+      "timeDisplace.decay": 0.72,
+      "structure.mix": 0.72,
+      "structure.mode": 0.34,
+      "structure.threshold": 0.14,
+      "structure.softness": 0.16,
+      "structure.displace": 0.22,
+      "structure.memory": 0.24,
+      "structure.glow": 0.78,
+      "luma.threshold": 0.5,
+      "luma.tolerance": 0.16,
+      "luma.amount": 0.14,
+      "scale.amount": 1.003,
+      "rotate.angle": 0.0,
+      "kaleid.nSides": 1,
+      "chromaShift.amount": 0.005,
+      "posterize.bins": 46,
+      "posterize.gamma": 0.98
+    },
+    "macros": [
+      {
+        "id": "contour",
+        "label": "Contour",
+        "default": 0.54,
+        "targets": [
+          { "key": "structure.threshold", "min": 0.08, "max": 0.22 },
+          { "key": "structure.mix", "min": 0.52, "max": 0.9 },
+          { "key": "luma.amount", "min": 0.06, "max": 0.24 }
+        ]
+      },
+      {
+        "id": "halo",
+        "label": "Halo",
+        "default": 0.72,
+        "targets": [
+          { "key": "structure.glow", "min": 0.36, "max": 0.96 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.32 },
+          { "key": "chromaShift.amount", "min": 0.001, "max": 0.008 }
+        ]
+      },
+      {
+        "id": "drift",
+        "label": "Drift",
+        "default": 0.48,
+        "targets": [
+          { "key": "timeDisplace.mix", "min": 0.14, "max": 0.46 },
+          { "key": "timeDisplace.decay", "min": 0.52, "max": 0.88 },
+          { "key": "audio.granulator.pitchJitter", "min": 2, "max": 9 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.24,
+        "feedback": 0.58,
+        "damping": 7200,
+        "cross": 0.7853981634,
+        "mix": 0.22
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 20,
+        "duration": 118,
+        "durationJitter": 0.3,
+        "position": 0.52,
+        "positionJitter": 0.05,
+        "pitch": 0,
+        "pitchJitter": 6,
+        "panSpread": 0.5,
+        "ySpread": 0.24,
+        "reverseProbability": 0.1,
+        "distribution": 0.3,
+        "voiceCount": 22,
+        "gain": 0.48
+      }
+    }
+  },
+  "datamoshSmear": {
+    "title": "Datamosh Smear",
+    "tagline": "Track motion between frames, then let that field drag the clip into blocky directional tears instead of generic blur.",
+    "videoIntent": "Best on gestures, handheld movement, dancers, and directional camera motion where flow-driven tearing can read as motion memory instead of simple distortion.",
+    "audioIntent": "The grains should stay clipped and present while the shared delay mirrors the smear as pressure, not as a washy headline effect.",
+    "operatorFocus": ["flow", "feedback", "posterize"],
+    "chain": ["feedback", "flow", "posterize", "chromaShift"],
+    "render": {
+      "look": "silver",
+      "quality": "standard",
+      "lut": "chrome",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.52,
+      "feedback.feedback": 0.61,
+      "feedback.delayTime": 0.18,
+      "flow.mix": 0.76,
+      "flow.strength": 0.64,
+      "flow.smear": 0.58,
+      "flow.memory": 0.62,
+      "flow.gate": 0.14,
+      "flow.glitch": 0.62,
+      "flow.chroma": 0.36,
+      "scale.amount": 1.002,
+      "rotate.angle": 0.0,
+      "kaleid.nSides": 1,
+      "posterize.bins": 28,
+      "posterize.gamma": 0.94,
+      "chromaShift.amount": 0.007
+    },
+    "automation": {
+      "flow.smear": {
+        "kind": "video",
+        "feature": "motion",
+        "scale": 0.18,
+        "smooth": 0.72
+      },
+      "flow.chroma": {
+        "kind": "video",
+        "feature": "motion",
+        "scale": 0.1,
+        "smooth": 0.7
+      }
+    },
+    "macros": [
+      {
+        "id": "glitch",
+        "label": "Glitch",
+        "default": 0.68,
+        "targets": [
+          { "key": "flow.glitch", "min": 0.22, "max": 0.86 },
+          { "key": "posterize.bins", "min": 18, "max": 36 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.08, "max": 0.24 }
+        ]
+      },
+      {
+        "id": "smear",
+        "label": "Smear",
+        "default": 0.62,
+        "targets": [
+          { "key": "flow.smear", "min": 0.36, "max": 0.82 },
+          { "key": "flow.memory", "min": 0.32, "max": 0.82 },
+          { "key": "feedback.feedback", "min": 0.42, "max": 0.76 }
+        ]
+      },
+      {
+        "id": "pressure",
+        "label": "Pressure",
+        "default": 0.56,
+        "targets": [
+          { "key": "flow.strength", "min": 0.36, "max": 0.82 },
+          { "key": "audio.granulator.density", "min": 16, "max": 30 },
+          { "key": "audio.granulator.duration", "min": 60, "max": 100 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.18,
+        "feedback": 0.61,
+        "damping": 6200,
+        "cross": 0.7853981634,
+        "mix": 0.18
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 22,
+        "duration": 86,
+        "durationJitter": 0.28,
+        "position": 0.5,
+        "positionJitter": 0.07,
+        "pitch": 0,
+        "pitchJitter": 5,
+        "panSpread": 0.46,
+        "ySpread": 0.22,
+        "reverseProbability": 0.1,
+        "distribution": 0.26,
+        "voiceCount": 22,
+        "gain": 0.5
+      }
+    }
+  },
+  "flowMelt": {
+    "title": "Flow Melt",
+    "tagline": "Use the clip's motion field as a soft liquid pull, then let temporal memory and contour structure turn that pull into a polished melt.",
+    "videoIntent": "Best on faces, fabric, smoke, and broad moving surfaces where a directional melt can stay legible without reading as a hard glitch.",
+    "audioIntent": "The grain cloud should stay airy and suspended while the shared delay adds a quiet tail behind the visual drag.",
+    "operatorFocus": ["flow", "timeDisplace", "structure"],
+    "chain": ["timeDisplace", "flow", "structure", "luma"],
+    "render": {
+      "look": "cine",
+      "quality": "cinema",
+      "lut": "amber",
+      "postPreset": "none",
+      "lensDirt": "bloomMist"
+    },
+    "values": {
+      "clock.rate": 0.41,
+      "feedback.feedback": 0.54,
+      "feedback.delayTime": 0.22,
+      "timeDisplace.mix": 0.18,
+      "timeDisplace.depth": 0.34,
+      "timeDisplace.scan": 0.42,
+      "timeDisplace.smear": 0.16,
+      "timeDisplace.decay": 0.64,
+      "flow.mix": 0.68,
+      "flow.strength": 0.46,
+      "flow.smear": 0.62,
+      "flow.memory": 0.48,
+      "flow.gate": 0.08,
+      "flow.glitch": 0.18,
+      "flow.chroma": 0.14,
+      "structure.mix": 0.42,
+      "structure.mode": 0.42,
+      "structure.threshold": 0.16,
+      "structure.softness": 0.14,
+      "structure.displace": 0.16,
+      "structure.memory": 0.18,
+      "structure.glow": 0.46,
+      "luma.threshold": 0.48,
+      "luma.tolerance": 0.18,
+      "luma.amount": 0.09,
+      "scale.amount": 1.002,
+      "rotate.angle": 0.0,
+      "kaleid.nSides": 1,
+      "chromaShift.amount": 0.004
+    },
+    "automation": {
+      "flow.mix": {
+        "kind": "video",
+        "feature": "motion",
+        "scale": 0.12,
+        "smooth": 0.76
+      }
+    },
+    "macros": [
+      {
+        "id": "melt",
+        "label": "Melt",
+        "default": 0.66,
+        "targets": [
+          { "key": "flow.mix", "min": 0.42, "max": 0.88 },
+          { "key": "flow.smear", "min": 0.4, "max": 0.8 },
+          { "key": "audio.granulator.duration", "min": 90, "max": 150 }
+        ]
+      },
+      {
+        "id": "contour",
+        "label": "Contour",
+        "default": 0.52,
+        "targets": [
+          { "key": "structure.mix", "min": 0.18, "max": 0.62 },
+          { "key": "structure.glow", "min": 0.18, "max": 0.68 },
+          { "key": "luma.amount", "min": 0.02, "max": 0.16 }
+        ]
+      },
+      {
+        "id": "drift",
+        "label": "Drift",
+        "default": 0.44,
+        "targets": [
+          { "key": "timeDisplace.mix", "min": 0.06, "max": 0.3 },
+          { "key": "clock.rate", "min": 0.28, "max": 0.56 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.1, "max": 0.24 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.22,
+        "feedback": 0.54,
+        "damping": 7100,
+        "cross": 0.7853981634,
+        "mix": 0.16
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 18,
+        "duration": 112,
+        "durationJitter": 0.24,
+        "position": 0.52,
+        "positionJitter": 0.05,
+        "pitch": 0,
+        "pitchJitter": 4,
+        "panSpread": 0.5,
+        "ySpread": 0.24,
+        "reverseProbability": 0.08,
+        "distribution": 0.28,
+        "voiceCount": 20,
+        "gain": 0.46
+      }
+    }
+  },
+  "motionBloomGhost": {
+    "title": "Motion Bloom Ghost",
+    "tagline": "Let motion pull a soft liquid ghost through the clip, then hold that ghost in a luminous temporal halo.",
+    "videoIntent": "Best on medium movement, practical lights, and faces where motion memory can stay supple instead of turning into hard glitch blocks.",
+    "audioIntent": "The grain cloud should hover and widen with the motion bloom rather than turn into a thick wash.",
+    "operatorFocus": ["flow", "timeDisplace", "structure"],
+    "chain": ["timeDisplace", "flow", "structure", "chromaShift"],
+    "render": {
+      "look": "cine",
+      "quality": "cinema",
+      "lut": "amber",
+      "postPreset": "none",
+      "lensDirt": "bloomMist"
+    },
+    "values": {
+      "clock.rate": 0.36,
+      "feedback.feedback": 0.57,
+      "feedback.delayTime": 0.24,
+      "timeDisplace.mix": 0.24,
+      "timeDisplace.depth": 0.46,
+      "timeDisplace.scan": 0.3,
+      "timeDisplace.smear": 0.18,
+      "timeDisplace.decay": 0.72,
+      "flow.mix": 0.62,
+      "flow.strength": 0.42,
+      "flow.smear": 0.48,
+      "flow.memory": 0.54,
+      "flow.gate": 0.06,
+      "flow.glitch": 0.1,
+      "flow.chroma": 0.12,
+      "structure.mix": 0.28,
+      "structure.mode": 0.34,
+      "structure.threshold": 0.14,
+      "structure.softness": 0.18,
+      "structure.displace": 0.12,
+      "structure.memory": 0.16,
+      "structure.glow": 0.54,
+      "scale.amount": 1.002,
+      "rotate.angle": 0.0,
+      "kaleid.nSides": 1,
+      "chromaShift.amount": 0.005
+    },
+    "automation": {
+      "flow.mix": {
+        "kind": "video",
+        "feature": "motion",
+        "scale": 0.12,
+        "smooth": 0.78
+      },
+      "structure.glow": {
+        "kind": "video",
+        "feature": "edge",
+        "scale": 0.18,
+        "smooth": 0.74
+      }
+    },
+    "macros": [
+      {
+        "id": "motion",
+        "label": "Motion",
+        "default": 0.62,
+        "targets": [
+          { "key": "flow.mix", "min": 0.34, "max": 0.84 },
+          { "key": "flow.strength", "min": 0.24, "max": 0.62 },
+          { "key": "audio.granulator.positionJitter", "min": 0.03, "max": 0.11 }
+        ]
+      },
+      {
+        "id": "halo",
+        "label": "Halo",
+        "default": 0.7,
+        "targets": [
+          { "key": "structure.glow", "min": 0.22, "max": 0.78 },
+          { "key": "timeDisplace.decay", "min": 0.46, "max": 0.9 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.1, "max": 0.28 }
+        ]
+      },
+      {
+        "id": "air",
+        "label": "Air",
+        "default": 0.56,
+        "targets": [
+          { "key": "audio.granulator.density", "min": 14, "max": 28 },
+          { "key": "audio.granulator.panSpread", "min": 0.28, "max": 0.66 },
+          { "key": "chromaShift.amount", "min": 0.001, "max": 0.009 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.24,
+        "feedback": 0.57,
+        "damping": 7200,
+        "cross": 0.7853981634,
+        "mix": 0.18
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 18,
+        "duration": 120,
+        "durationJitter": 0.26,
+        "position": 0.5,
+        "positionJitter": 0.05,
+        "pitch": 0,
+        "pitchJitter": 5,
+        "panSpread": 0.46,
+        "ySpread": 0.24,
+        "reverseProbability": 0.08,
+        "distribution": 0.28,
+        "voiceCount": 20,
+        "gain": 0.48
+      }
+    }
+  },
+  "kaleidoFeedbackTunnel": {
+    "title": "Kaleido Feedback Tunnel",
+    "tagline": "Fold the clip into a restrained prism, then let temporal replay and feedback turn that prism into a tunneled corridor.",
+    "videoIntent": "Best on centered movement, limbs, and architecture where symmetry can feel intentional and the tunnel still has a clear subject.",
+    "audioIntent": "The grains should pulse around the tunnel rather than fill it completely, with the shared delay reading as depth.",
+    "operatorFocus": ["timeDisplace", "kaleid", "feedback"],
+    "chain": ["feedback", "timeDisplace", "kaleid", "scrollX"],
+    "render": {
+      "look": "silver",
+      "quality": "standard",
+      "lut": "chrome",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.46,
+      "feedback.feedback": 0.7,
+      "feedback.delayTime": 0.2,
+      "timeDisplace.mix": 0.42,
+      "timeDisplace.depth": 0.58,
+      "timeDisplace.scan": 0.18,
+      "timeDisplace.smear": 0.22,
+      "timeDisplace.decay": 0.64,
+      "kaleid.nSides": 7,
+      "scrollX.amount": 0.03,
+      "scrollX.speed": 0.026,
+      "scale.amount": 1.016,
+      "rotate.angle": 0.02,
+      "chromaShift.amount": 0.006
+    },
+    "macros": [
+      {
+        "id": "sides",
+        "label": "Sides",
+        "default": 0.52,
+        "targets": [
+          { "key": "kaleid.nSides", "min": 5, "max": 11 },
+          { "key": "rotate.angle", "min": -0.04, "max": 0.06 },
+          { "key": "scale.amount", "min": 1.002, "max": 1.03 }
+        ]
+      },
+      {
+        "id": "tunnel",
+        "label": "Tunnel",
+        "default": 0.64,
+        "targets": [
+          { "key": "feedback.feedback", "min": 0.52, "max": 0.84 },
+          { "key": "timeDisplace.depth", "min": 0.32, "max": 0.88 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.34 }
+        ]
+      },
+      {
+        "id": "drift",
+        "label": "Drift",
+        "default": 0.48,
+        "targets": [
+          { "key": "scrollX.amount", "min": 0.0, "max": 0.08 },
+          { "key": "scrollX.speed", "min": 0.0, "max": 0.05 },
+          { "key": "clock.rate", "min": 0.32, "max": 0.72 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.2,
+        "feedback": 0.7,
+        "damping": 6600,
+        "cross": 0.7853981634,
+        "mix": 0.22
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 20,
+        "duration": 96,
+        "durationJitter": 0.24,
+        "position": 0.5,
+        "positionJitter": 0.05,
+        "pitch": 0,
+        "pitchJitter": 4,
+        "panSpread": 0.42,
+        "ySpread": 0.18,
+        "reverseProbability": 0.08,
+        "distribution": 0.22,
+        "voiceCount": 20,
+        "gain": 0.48
+      }
+    }
+  },
+  "freezeFeedback": {
+    "title": "Freeze Feedback",
+    "tagline": "Hold fragments of the clip almost in place, then let contour-led feedback decide what continues to move inside the freeze.",
+    "videoIntent": "Best on stillness, pauses, and sparse action where a near-held frame can keep a strong silhouette while only selected regions keep breathing.",
+    "audioIntent": "The granulator should thin out and lengthen so the scene feels suspended rather than busy.",
+    "operatorFocus": ["timeDisplace", "feedback", "structure"],
+    "chain": ["feedback", "timeDisplace", "structure", "luma"],
+    "render": {
+      "look": "clean",
+      "quality": "standard",
+      "lut": "silvered",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.24,
+      "feedback.feedback": 0.67,
+      "feedback.delayTime": 0.3,
+      "timeDisplace.mix": 0.9,
+      "timeDisplace.depth": 1.0,
+      "timeDisplace.scan": 0.12,
+      "timeDisplace.smear": 0.08,
+      "timeDisplace.decay": 0.9,
+      "structure.mix": 0.34,
+      "structure.mode": 0.5,
+      "structure.threshold": 0.16,
+      "structure.softness": 0.14,
+      "structure.displace": 0.08,
+      "structure.memory": 0.42,
+      "structure.glow": 0.18,
+      "luma.threshold": 0.52,
+      "luma.tolerance": 0.12,
+      "luma.amount": 0.1,
+      "scale.amount": 1.001,
+      "rotate.angle": 0.0,
+      "kaleid.nSides": 1
+    },
+    "macros": [
+      {
+        "id": "hold",
+        "label": "Hold",
+        "default": 0.74,
+        "targets": [
+          { "key": "clock.rate", "min": 0.08, "max": 0.42 },
+          { "key": "timeDisplace.decay", "min": 0.72, "max": 0.98 },
+          { "key": "feedback.feedback", "min": 0.46, "max": 0.82 }
+        ]
+      },
+      {
+        "id": "contour",
+        "label": "Contour",
+        "default": 0.48,
+        "targets": [
+          { "key": "structure.mix", "min": 0.12, "max": 0.56 },
+          { "key": "structure.memory", "min": 0.1, "max": 0.6 },
+          { "key": "luma.amount", "min": 0.02, "max": 0.18 }
+        ]
+      },
+      {
+        "id": "wash",
+        "label": "Wash",
+        "default": 0.38,
+        "targets": [
+          { "key": "audio.feedbackDelay.mix", "min": 0.08, "max": 0.3 },
+          { "key": "audio.granulator.density", "min": 10, "max": 24 },
+          { "key": "audio.granulator.duration", "min": 90, "max": 180 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.3,
+        "feedback": 0.67,
+        "damping": 7600,
+        "cross": 0.7853981634,
+        "mix": 0.14
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 14,
+        "duration": 128,
+        "durationJitter": 0.18,
+        "position": 0.5,
+        "positionJitter": 0.04,
+        "pitch": 0,
+        "pitchJitter": 3,
+        "panSpread": 0.36,
+        "ySpread": 0.18,
+        "reverseProbability": 0.06,
+        "distribution": 0.18,
+        "voiceCount": 18,
+        "gain": 0.44
+      }
+    }
+  },
+  "granularVideoCloud": {
+    "title": "Granular Video Cloud",
+    "tagline": "Shape the clip into a soft contour cloud while the granulator becomes the audible centre of gravity instead of an afterthought.",
+    "videoIntent": "Best on broad moving forms, haze, cloth, and low-contrast footage where contour and motion can build a visible cloud instead of a hard edge effect.",
+    "audioIntent": "The grain engine should read immediately as the instrument, with the video moving in the same density and spread family.",
+    "operatorFocus": ["structure", "flow", "posterize"],
+    "chain": ["structure", "flow", "posterize", "chromaShift"],
+    "render": {
+      "look": "clean",
+      "quality": "standard",
+      "lut": "chrome",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.48,
+      "feedback.feedback": 0.6,
+      "feedback.delayTime": 0.23,
+      "structure.mix": 0.46,
+      "structure.mode": 0.38,
+      "structure.threshold": 0.15,
+      "structure.softness": 0.14,
+      "structure.displace": 0.26,
+      "structure.memory": 0.28,
+      "structure.glow": 0.32,
+      "flow.mix": 0.38,
+      "flow.strength": 0.34,
+      "flow.smear": 0.42,
+      "flow.memory": 0.24,
+      "flow.gate": 0.1,
+      "flow.glitch": 0.1,
+      "flow.chroma": 0.16,
+      "posterize.bins": 20,
+      "posterize.gamma": 0.95,
+      "chromaShift.amount": 0.008,
+      "scale.amount": 1.003,
+      "rotate.angle": 0.0,
+      "kaleid.nSides": 1
+    },
+    "automation": {
+      "flow.chroma": {
+        "kind": "video",
+        "feature": "motion",
+        "scale": 0.08,
+        "smooth": 0.72
+      },
+      "structure.glow": {
+        "kind": "video",
+        "feature": "edge",
+        "scale": 0.18,
+        "smooth": 0.74
+      }
+    },
+    "macros": [
+      {
+        "id": "grains",
+        "label": "Grains",
+        "default": 0.66,
+        "targets": [
+          { "key": "audio.granulator.density", "min": 22, "max": 42 },
+          { "key": "audio.granulator.voiceCount", "min": 18, "max": 32 },
+          { "key": "feedback.feedback", "min": 0.44, "max": 0.74 }
+        ]
+      },
+      {
+        "id": "cloud",
+        "label": "Cloud",
+        "default": 0.58,
+        "targets": [
+          { "key": "flow.mix", "min": 0.18, "max": 0.62 },
+          { "key": "structure.glow", "min": 0.14, "max": 0.58 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.34 }
+        ]
+      },
+      {
+        "id": "drift",
+        "label": "Drift",
+        "default": 0.5,
+        "targets": [
+          { "key": "audio.granulator.panSpread", "min": 0.26, "max": 0.72 },
+          { "key": "audio.granulator.ySpread", "min": 0.14, "max": 0.44 },
+          { "key": "chromaShift.amount", "min": 0.002, "max": 0.012 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.23,
+        "feedback": 0.6,
+        "damping": 6400,
+        "cross": 0.7853981634,
+        "mix": 0.22
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 32,
+        "duration": 82,
+        "durationJitter": 0.3,
+        "position": 0.5,
+        "positionJitter": 0.05,
+        "pitch": 0,
+        "pitchJitter": 6,
+        "panSpread": 0.52,
+        "ySpread": 0.28,
+        "reverseProbability": 0.12,
+        "distribution": 0.34,
+        "voiceCount": 24,
+        "gain": 0.54
+      }
+    }
+  },
   "grainField": {
     "title": "Grain Field",
     "tagline": "A dense field of small audible grains paired with a softly-banded video texture — the cleanest demonstration of the granulator-first product shape.",
@@ -717,6 +1866,38 @@
       "posterize.bins": 24,
       "posterize.gamma": 0.94
     },
+    "macros": [
+      {
+        "id": "density",
+        "label": "Density",
+        "default": 0.7,
+        "targets": [
+          { "key": "audio.granulator.density", "min": 20, "max": 44 },
+          { "key": "audio.granulator.voiceCount", "min": 18, "max": 30 },
+          { "key": "feedback.feedback", "min": 0.58, "max": 0.86 }
+        ]
+      },
+      {
+        "id": "shimmer",
+        "label": "Shimmer",
+        "default": 0.54,
+        "targets": [
+          { "key": "posterize.bins", "min": 16, "max": 34 },
+          { "key": "chromaShift.amount", "min": 0.001, "max": 0.01 },
+          { "key": "audio.granulator.pitchJitter", "min": 2, "max": 10 }
+        ]
+      },
+      {
+        "id": "spread",
+        "label": "Spread",
+        "default": 0.58,
+        "targets": [
+          { "key": "audio.granulator.panSpread", "min": 0.28, "max": 0.74 },
+          { "key": "audio.granulator.ySpread", "min": 0.12, "max": 0.42 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.22, "max": 0.46 }
+        ]
+      }
+    ],
     "audio": {
       "feedbackDelay": {
         "time": 0.28,
@@ -776,6 +1957,23 @@
         "damping": 6000,
         "cross": 0.0,
         "mix": 0.0
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "classic",
+        "density": 20,
+        "duration": 80,
+        "durationJitter": 0.0,
+        "position": 0.5,
+        "positionJitter": 0.0,
+        "pitch": 0,
+        "pitchJitter": 0,
+        "panSpread": 0.0,
+        "ySpread": 0.0,
+        "reverseProbability": 0.0,
+        "distribution": 0.0,
+        "voiceCount": 32,
+        "gain": 0.7
       }
     }
   }

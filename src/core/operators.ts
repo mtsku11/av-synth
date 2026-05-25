@@ -18,10 +18,19 @@ export interface VideoStage {
   /** Returns the compiled program; the renderer binds it before drawing. */
   readonly program: WebGLProgram;
   /**
+   * Optional per-frame renderer-owned resources. Temporal operators use this to
+   * sample the shared N-frame history texture without hard-coding renderer
+   * state into the stage constructor.
+   */
+  bindRendererResources?(gl: WebGL2RenderingContext, resources: VideoStageRendererResources): void;
+  /**
    * Called every frame after the renderer has bound this stage's program and
    * any input textures (TEXTURE0 = primary input, TEXTURE1 = u_prev_frame,
-   * TEXTURE2 = secondary input for binary Blend operators). Stage writes its
-   * own scalar/vector uniforms.
+   * TEXTURE2 = secondary input for binary Blend operators, TEXTURE3 = shared
+   * temporal-history texture array when available, TEXTURE4 = shared
+   * structure-analysis texture when available, TEXTURE5 = shared low-res
+   * motion-field texture when available). Stage writes its own scalar/vector
+   * uniforms.
    */
   setUniforms(
     gl: WebGL2RenderingContext,
@@ -29,6 +38,28 @@ export interface VideoStage {
     ctx: CouplingContext,
   ): void;
   dispose(gl: WebGL2RenderingContext): void;
+}
+
+export interface VideoStageRendererResources {
+  temporalHistory: {
+    textureUnit: number;
+    capacity: number;
+    validCount: number;
+    writeIndex: number;
+    width: number;
+    height: number;
+  } | null;
+  structureAnalysis: {
+    textureUnit: number;
+    width: number;
+    height: number;
+  } | null;
+  motionField: {
+    textureUnit: number;
+    width: number;
+    height: number;
+    scale: number;
+  } | null;
 }
 
 export interface AudioStage {
@@ -102,6 +133,24 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'previous-frame trails and audio freeze-smear',
     intents: ['feedback', 'motion trails'],
     coreParams: ['feedback', 'delayTime'],
+  },
+  timeDisplace: {
+    family: 'Feedback',
+    blurb: 'multi-frame slit-scan smear and luma-driven time drag',
+    intents: ['feedback', 'motion trails', 'video texture'],
+    coreParams: ['mix', 'depth', 'scan', 'smear'],
+  },
+  structure: {
+    family: 'Feedback',
+    blurb: 'edge / luma / flux masks drive contour memory and displacement',
+    intents: ['feedback', 'contours', 'video texture'],
+    coreParams: ['mix', 'mode', 'memory', 'displace', 'glow'],
+  },
+  flow: {
+    family: 'Feedback',
+    blurb: 'motion-field smear and datamosh drag from consecutive frames',
+    intents: ['feedback', 'motion', 'video texture'],
+    coreParams: ['mix', 'strength', 'smear', 'memory', 'glitch'],
   },
   r: {
     family: 'Finish',
@@ -429,9 +478,7 @@ export function listOperatorFamilies(): readonly OperatorFamily[] {
 
 export function getOperatorUiMeta(op: string): OperatorUiMeta {
   const def = defs.get(op);
-  const fallbackCoreParams = def
-    ? def.paramOrder.slice(0, Math.min(4, def.paramOrder.length))
-    : [];
+  const fallbackCoreParams = def ? def.paramOrder.slice(0, Math.min(4, def.paramOrder.length)) : [];
   return {
     family: 'Texture',
     blurb: 'coupled av effect',
