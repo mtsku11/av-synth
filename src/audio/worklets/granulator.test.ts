@@ -151,6 +151,19 @@ function postLoadAndEnable(inst: WorkletInstance, mono: Float32Array): void {
   inst.port.onmessage?.({ data: { type: 'enable', value: true } });
 }
 
+function readControlAudit(inst: WorkletInstance): Record<string, number> | null {
+  let audit: Record<string, number> | null = null;
+  const prev = inst.port.postMessage;
+  inst.port.postMessage = (msg: unknown) => {
+    const data = msg as { type?: string } | null;
+    if (data?.type === 'controlAudit') audit = data as Record<string, number>;
+    prev(msg);
+  };
+  inst.port.onmessage?.({ data: { type: 'getControlAudit' } });
+  inst.port.postMessage = prev;
+  return audit;
+}
+
 function workletState(inst: WorkletInstance): {
   readonly vActive: Uint8Array;
   readonly vRatio: Float32Array;
@@ -554,6 +567,26 @@ describe('granulator-v1 worklet (sinc + envelopes + modes + full controls)', () 
     expect(data[0]).toBeGreaterThanOrEqual(0);
     expect(data[1]).toBeGreaterThan(0);
     expect(data[3]).toBeGreaterThan(0);
+  });
+
+  it('uses direct shared-control reads without AudioParam lookups in SAB mode', () => {
+    const controls = makeSharedControls({
+      density: 0.1,
+      duration: 1,
+      voiceCount: 64,
+    });
+    const inst = new ProcessorCtor({
+      processorOptions: {
+        controlHeader: controls.header,
+        controlData: controls.data,
+      },
+    });
+    postLoadAndEnable(inst, makeSineSource(1.0, 220));
+    runBlocks(inst, defaultParams({ density: 999, duration: 999, voiceCount: 1 }), 8);
+    const audit = readControlAudit(inst);
+    expect(audit).not.toBeNull();
+    expect(audit?.parameterLookupCount).toBe(0);
+    expect(audit?.syncCallCount).toBeGreaterThan(0);
   });
 
   it('clear() silences output and resets voice state', () => {

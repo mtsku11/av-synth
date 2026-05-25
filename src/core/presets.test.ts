@@ -22,7 +22,6 @@ function makeInstance(op: string, params: Record<string, number>): OperatorInsta
       op,
       coupling: {
         op,
-        kind: 'fully-coupled',
         params: {},
       },
       paramOrder: Object.keys(params),
@@ -30,12 +29,8 @@ function makeInstance(op: string, params: Record<string, number>): OperatorInsta
       createVideoStage() {
         throw new Error('not used in presets tests');
       },
-      createAudioStage() {
-        throw new Error('not used in presets tests');
-      },
     },
     videoStage: {} as OperatorInstance['videoStage'],
-    audioStage: null,
     params,
     lfoAssignments: Object.fromEntries(
       Object.keys(params).map((paramId) => [paramId, createParamLfoAssignment()]),

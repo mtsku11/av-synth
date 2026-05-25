@@ -6,7 +6,6 @@ import frag from '../video/shaders/repeatX.frag?raw';
 import type { OperatorDef, VideoStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
-import { RepeatAxisAudioStage } from './repeat-audio';
 
 class RepeatXVideoStage implements VideoStage {
   readonly op = 'repeatX';
@@ -44,7 +43,6 @@ export const repeatXDef: OperatorDef = {
   defaults: { reps: 1, offset: 0 },
   coupling: {
     op: 'repeatX',
-    kind: 'fully-coupled',
     params: {
       reps: {
         spec: {
@@ -57,7 +55,6 @@ export const repeatXDef: OperatorDef = {
           hint: 'X tiles (video) / left-biased grain stutter density (audio)',
         },
         toVideo: (c01) => c01,
-        toAudio: (c01) => c01,
       },
       offset: {
         spec: {
@@ -70,14 +67,10 @@ export const repeatXDef: OperatorDef = {
           hint: 'X tile phase / grain window position bias',
         },
         toVideo: (c01) => c01,
-        toAudio: (c01) => c01,
       },
     },
   },
   createVideoStage(gl) {
     return new RepeatXVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new RepeatAxisAudioStage(ctx, 'x');
   },
 };

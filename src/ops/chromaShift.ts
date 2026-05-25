@@ -19,7 +19,7 @@
 // (≤ 20 ms), and is identity at amount=0.
 
 import frag from '../video/shaders/chromaShift.frag?raw';
-import type { OperatorDef, VideoStage, AudioStage } from '../core/operators';
+import type { OperatorDef, VideoStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
 
@@ -52,57 +52,12 @@ class ChromaShiftVideoStage implements VideoStage {
 // Audio: ChannelSplitter → per-channel DelayNode → ChannelMerger.
 // L is delayed by +amount, R by 0 (or vice versa) for a Haas-style stereo
 // decorrelation that mirrors the L/R UV split in the visual domain.
-class ChromaShiftAudioStage implements AudioStage {
-  readonly op = 'chromaShift';
-  readonly input: GainNode;
-  readonly output: ChannelMergerNode;
-  readonly #splitter: ChannelSplitterNode;
-  readonly #delayL: DelayNode;
-  readonly #delayR: DelayNode;
-
-  constructor(ctx: AudioContext) {
-    this.input = ctx.createGain();
-    this.input.channelCount = 2;
-    this.input.channelCountMode = 'explicit';
-    this.input.channelInterpretation = 'speakers';
-
-    this.#splitter = ctx.createChannelSplitter(2);
-    this.output = ctx.createChannelMerger(2);
-    this.#delayL = ctx.createDelay(0.05);
-    this.#delayR = ctx.createDelay(0.05);
-
-    this.input.connect(this.#splitter);
-    this.#splitter.connect(this.#delayL, 0);
-    this.#splitter.connect(this.#delayR, 1);
-    this.#delayL.connect(this.output, 0, 0);
-    this.#delayR.connect(this.output, 0, 1);
-  }
-
-  setParams(params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {
-    const amount = Math.max(0, params['amount'] ?? 0);
-    // amount is a UV offset in [0, 0.08]; map to L/R asymmetric delay 0..20ms
-    const dL = amount * 0.25; // up to 20ms
-    const now = this.#delayL.context.currentTime;
-    this.#delayL.delayTime.setTargetAtTime(dL, now, 0.02);
-    this.#delayR.delayTime.setTargetAtTime(0, now, 0.02);
-  }
-
-  dispose(): void {
-    this.input.disconnect();
-    this.#splitter.disconnect();
-    this.#delayL.disconnect();
-    this.#delayR.disconnect();
-    this.output.disconnect();
-  }
-}
-
 export const chromaShiftDef: OperatorDef = {
   op: 'chromaShift',
   paramOrder: ['amount'],
   defaults: { amount: 0 },
   coupling: {
     op: 'chromaShift',
-    kind: 'fully-coupled',
     params: {
       amount: {
         spec: {
@@ -115,14 +70,10 @@ export const chromaShiftDef: OperatorDef = {
           hint: 'RGB spatial offset (video) / L-channel micro-delay (audio)',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
     },
   },
   createVideoStage(gl) {
     return new ChromaShiftVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new ChromaShiftAudioStage(ctx);
   },
 };

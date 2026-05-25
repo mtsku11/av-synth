@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# av-synth pre-push gate.
+#
+# Cheap, fast, local. Catches the regressions that should never reach CI.
+# Heavier gates (Playwright audit matrix, B2.3 soak) stay in CI / `/verify`.
+#
+# Enable once with:
+#   git config core.hooksPath scripts/hooks
+#
+# Bypass for an emergency push with:
+#   git push --no-verify
+# (do not make this a habit — see CLAUDE.md §4)
+
+set -euo pipefail
+
+echo "[pre-push] svelte-check…"
+npm run check
+
+echo "[pre-push] worklet + core unit tests…"
+# Targeted: the unit tests that have caught real regressions in this repo.
+# If you add more worklet-side specs, list them here.
+npm run test:run -- \
+  src/audio/worklets/granulator.test.ts \
+  src/core/grain-scheduler.test.ts
+
+echo "[pre-push] ok"

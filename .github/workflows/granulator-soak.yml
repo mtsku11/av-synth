@@ -1,0 +1,82 @@
+name: Granulator soak (B2.3 canary)
+
+# Runs the warmed steady-state granulator soak gate as a 60s canary on PRs
+# and pushes that touch the granulator / shared-mod hot path. The full 4-hour
+# soak (GRANULATOR_SOAK_S=14400) stays local — this is the cheap release gate.
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'src/audio/**'
+      - 'public/worklets/**'
+      - 'src/core/mod-bank.ts'
+      - 'src/core/grain-scheduler.ts'
+      - 'qa/e2e/b2.3-granulator-soak.spec.ts'
+      - 'qa/playwright.config.ts'
+      - '.github/workflows/granulator-soak.yml'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'src/audio/**'
+      - 'public/worklets/**'
+      - 'src/core/mod-bank.ts'
+      - 'src/core/grain-scheduler.ts'
+      - 'qa/e2e/b2.3-granulator-soak.spec.ts'
+      - 'qa/playwright.config.ts'
+      - '.github/workflows/granulator-soak.yml'
+
+jobs:
+  soak-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run B2.3 canary (60s warmed grainField)
+        env:
+          GRANULATOR_SOAK_S: '60'
+          PLAYWRIGHT_SERVER_MODE: preview
+          CI: 'true'
+        run: npx playwright test -c qa/playwright.config.ts -g b2.3 --reporter=list
+
+      - name: Print soak summary
+        if: ${{ !cancelled() }}
+        run: |
+          if [ -f qa/results/granulator-soak-summary.json ]; then
+            node -e "const s = require('./qa/results/granulator-soak-summary.json'); console.log('verdict:', s.verdict); console.log('soak:', s.soakDuration_s + 's', 'warmup:', s.warmup_ms + 'ms', 'forceNoSpawn:', s.forceNoSpawn); console.log('worklet major GC:', s.majorGC.count, s.majorGC.timestamps_s); console.log('worklet minor GC:', s.minorGC.count); console.log('attribution:', s.attribution);"
+          else
+            echo "no summary file produced"
+            exit 1
+          fi
+
+      - name: Upload soak artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: granulator-soak-canary
+          path: |
+            qa/results/granulator-soak-summary.json
+            qa/results/granulator-soak-trace.json
+          retention-days: 14

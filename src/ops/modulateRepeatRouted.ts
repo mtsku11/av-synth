@@ -1,6 +1,6 @@
 import frag from '../video/shaders/modulateRepeatRouted.frag?raw';
-import type { AudioStage, OperatorDef, VideoStage } from '../core/operators';
-import type { CouplingContext } from '../core/coupling';
+import type { OperatorDef, VideoStage } from '../core/operators';
+
 import { compileProgram, reqUniform } from '../video/glsl';
 
 class ModulateRepeatRoutedVideoStage implements VideoStage {
@@ -37,63 +37,6 @@ class ModulateRepeatRoutedVideoStage implements VideoStage {
   }
 }
 
-class ModulateRepeatRoutedAudioStage implements AudioStage {
-  readonly op = 'modulateRepeatRouted';
-  readonly input: GainNode;
-  readonly secondaryInput: GainNode;
-  readonly output: GainNode;
-  readonly #worklet: AudioWorkletNode;
-  readonly #repeatX: AudioParam;
-  readonly #repeatY: AudioParam;
-  readonly #offsetX: AudioParam;
-  readonly #offsetY: AudioParam;
-  readonly #bpm: AudioParam;
-
-  constructor(ctx: AudioContext) {
-    this.input = ctx.createGain();
-    this.secondaryInput = ctx.createGain();
-    this.output = ctx.createGain();
-    this.#worklet = new AudioWorkletNode(ctx, 'modulate-repeat-routed', {
-      numberOfInputs: 2,
-      numberOfOutputs: 1,
-      outputChannelCount: [2],
-      parameterData: { repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, bpm: 120 },
-    });
-    const repeatX = this.#worklet.parameters.get('repeatX');
-    const repeatY = this.#worklet.parameters.get('repeatY');
-    const offsetX = this.#worklet.parameters.get('offsetX');
-    const offsetY = this.#worklet.parameters.get('offsetY');
-    const bpm = this.#worklet.parameters.get('bpm');
-    if (!repeatX || !repeatY || !offsetX || !offsetY || !bpm) {
-      throw new Error('modulateRepeatRouted: missing worklet params');
-    }
-    this.#repeatX = repeatX;
-    this.#repeatY = repeatY;
-    this.#offsetX = offsetX;
-    this.#offsetY = offsetY;
-    this.#bpm = bpm;
-    this.input.connect(this.#worklet, 0, 0);
-    this.secondaryInput.connect(this.#worklet, 0, 1);
-    this.#worklet.connect(this.output);
-  }
-
-  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
-    const now = this.input.context.currentTime;
-    this.#repeatX.setTargetAtTime(params['repeatX'] ?? 1, now, 0.02);
-    this.#repeatY.setTargetAtTime(params['repeatY'] ?? 1, now, 0.02);
-    this.#offsetX.setTargetAtTime(params['offsetX'] ?? 0, now, 0.02);
-    this.#offsetY.setTargetAtTime(params['offsetY'] ?? 0, now, 0.02);
-    this.#bpm.setTargetAtTime(ctx.bpm, now, 0.02);
-  }
-
-  dispose(): void {
-    this.input.disconnect();
-    this.secondaryInput.disconnect();
-    this.#worklet.disconnect();
-    this.output.disconnect();
-  }
-}
-
 export const modulateRepeatRoutedDef: OperatorDef = {
   op: 'modulateRepeatRouted',
   inputArity: 2,
@@ -101,7 +44,6 @@ export const modulateRepeatRoutedDef: OperatorDef = {
   defaults: { repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0 },
   coupling: {
     op: 'modulateRepeatRouted',
-    kind: 'fully-coupled',
     params: {
       repeatX: {
         spec: {
@@ -114,7 +56,6 @@ export const modulateRepeatRoutedDef: OperatorDef = {
           hint: 'secondary branch sets horizontal tile density / routed signal drives left-channel stutter density',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
       repeatY: {
         spec: {
@@ -127,7 +68,6 @@ export const modulateRepeatRoutedDef: OperatorDef = {
           hint: 'secondary branch sets vertical tile density / routed signal drives right-channel stutter density',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
       offsetX: {
         spec: {
@@ -140,7 +80,6 @@ export const modulateRepeatRoutedDef: OperatorDef = {
           hint: 'horizontal tile phase bias / left-channel replay phase bias',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
       offsetY: {
         spec: {
@@ -153,14 +92,10 @@ export const modulateRepeatRoutedDef: OperatorDef = {
           hint: 'vertical tile phase bias / right-channel replay phase bias',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
     },
   },
   createVideoStage(gl) {
     return new ModulateRepeatRoutedVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new ModulateRepeatRoutedAudioStage(ctx);
   },
 };

@@ -5,7 +5,7 @@
 // heads so the ratio can move continuously without zipper noise.
 
 import frag from '../video/shaders/scale.frag?raw';
-import type { OperatorDef, VideoStage, AudioStage } from '../core/operators';
+import type { OperatorDef, VideoStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
 
@@ -35,45 +35,12 @@ class ScaleVideoStage implements VideoStage {
   }
 }
 
-class ScalePitchAudioStage implements AudioStage {
-  readonly op = 'scale';
-  readonly input: GainNode;
-  readonly output: GainNode;
-  readonly #worklet: AudioWorkletNode;
-  readonly #ratio: AudioParam;
-
-  constructor(ctx: AudioContext) {
-    this.input = ctx.createGain();
-    this.#worklet = new AudioWorkletNode(ctx, 'pitch-shifter', {
-      parameterData: { ratio: 1 },
-    });
-    const ratio = this.#worklet.parameters.get('ratio');
-    if (!ratio) throw new Error('scale: missing worklet ratio param');
-    this.#ratio = ratio;
-    this.output = ctx.createGain();
-    this.input.connect(this.#worklet);
-    this.#worklet.connect(this.output);
-  }
-
-  setParams(params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {
-    const ratio = Math.max(0.5, Math.min(2, params['amount'] ?? 1.0));
-    this.#ratio.setTargetAtTime(ratio, this.input.context.currentTime, 0.02);
-  }
-
-  dispose(): void {
-    this.input.disconnect();
-    this.#worklet.disconnect();
-    this.output.disconnect();
-  }
-}
-
 export const scaleDef: OperatorDef = {
   op: 'scale',
   paramOrder: ['amount'],
   defaults: { amount: 1.0 },
   coupling: {
     op: 'scale',
-    kind: 'fully-coupled',
     params: {
       amount: {
         spec: {
@@ -86,14 +53,10 @@ export const scaleDef: OperatorDef = {
           hint: 'UV zoom around centre / audio pitch ratio',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
     },
   },
   createVideoStage(gl) {
     return new ScaleVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new ScalePitchAudioStage(ctx);
   },
 };

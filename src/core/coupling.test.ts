@@ -1,36 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  COLOR_BAND_CROSSOVERS_HZ,
-  EMPTY_VIDEO_FEATURES,
-  evaluateAudioParams,
-  evaluateVideoParams,
-} from './coupling';
+import { EMPTY_VIDEO_FEATURES, evaluateVideoParams } from './coupling';
 import { createDefaultGlobalLfoBank } from './mod-bank';
 import type { OperatorInstance } from './operators';
 import { isNeutralInstance } from './operators';
-import { brightnessDef } from '../ops/brightness';
-import { blendDef, diffDef, layerDef, maskDef } from '../ops/blend';
+import { blendDef, layerDef, maskDef } from '../ops/blend';
 import { aDef, rDef } from '../ops/channel';
 import { colorDef } from '../ops/color';
-import { feedbackDef } from '../ops/feedback';
 import { grainDef } from '../ops/grain';
 import { kaleidDef } from '../ops/kaleid';
 import { modulateHueDef } from '../ops/modulateHue';
 import { modulateDisplaceDef } from '../ops/modulateDisplace';
 import { modulateKaleidDef } from '../ops/modulateKaleid';
 import { modulatePixelateDef } from '../ops/modulatePixelate';
-import { modulatePixelateRoutedDef } from '../ops/modulatePixelateRouted';
 import { modulateRepeatDef } from '../ops/modulateRepeat';
-import { modulateRepeatRoutedDef } from '../ops/modulateRepeatRouted';
 import { modulateRotateDef } from '../ops/modulateRotate';
-import { modulateRotateRoutedDef } from '../ops/modulateRotateRouted';
 import { modulateScaleDef } from '../ops/modulateScale';
-import { modulateScaleRoutedDef } from '../ops/modulateScaleRouted';
 import { modulateScrollXDef } from '../ops/modulateScrollX';
 import { modulateScrollYDef } from '../ops/modulateScrollY';
 import { rotateDef } from '../ops/rotate';
-import { scaleDef } from '../ops/scale';
 import { saturateDef } from '../ops/saturate';
 import { sumDef } from '../ops/sum';
 import { selfModDef } from '../ops/selfMod';
@@ -46,81 +34,29 @@ const ctx = {
   videoFeatures: EMPTY_VIDEO_FEATURES,
 };
 
-describe('coupling evaluation', () => {
-  it('preserves raw rotate values in both domains', () => {
-    const raw = { angle: Math.PI / 3 };
-    expect(evaluateVideoParams(rotateDef.coupling, raw, ctx)).toEqual(raw);
-    expect(evaluateAudioParams(rotateDef.coupling, raw, ctx)).toEqual(raw);
-  });
-
-  it('keeps feedback audio delay in raw seconds and preserves scale pitch ratio', () => {
-    expect(
-      evaluateAudioParams(feedbackDef.coupling, { feedback: 0.4, delayTime: 0.22 }, ctx),
-    ).toEqual({
-      feedback: 0.4,
-      delayTime: 0.22,
-    });
-    expect(evaluateAudioParams(scaleDef.coupling, { amount: 1.4 }, ctx)).toEqual({
-      amount: 1.4,
+describe('evaluateVideoParams', () => {
+  it('preserves raw rotate values', () => {
+    expect(evaluateVideoParams(rotateDef.coupling, { angle: Math.PI / 3 }, ctx)).toEqual({
+      angle: Math.PI / 3,
     });
   });
 
-  it('maps shape smoothing into an audio cutoff while leaving the video value untouched', () => {
+  it('keeps shape, color, blend, and sum params untouched on the video side', () => {
     expect(evaluateVideoParams(shapeDef.coupling, { smoothing: 0.01 }, ctx)).toEqual({
       smoothing: 0.01,
       sides: 3,
       radius: 0.3,
     });
-    expect(evaluateAudioParams(shapeDef.coupling, { smoothing: 0.01 }, ctx)).toEqual({
-      sides: 3,
-      radius: 0.3,
-      smoothing: 200,
-    });
-  });
-
-  it('maps brightness into gain and keeps color band gains literal', () => {
-    expect(evaluateAudioParams(brightnessDef.coupling, { amount: 0.5 }, ctx)).toEqual({
-      amount: Math.sqrt(10),
-    });
-    expect(evaluateAudioParams(colorDef.coupling, { r: 1.2, g: 0.8, b: 1.5, a: 0.9 }, ctx)).toEqual(
+    expect(evaluateVideoParams(colorDef.coupling, { r: 1.2, g: 0.8, b: 1.5, a: 0.9 }, ctx)).toEqual(
       { r: 1.2, g: 0.8, b: 1.5, a: 0.9 },
     );
-    expect(COLOR_BAND_CROSSOVERS_HZ).toEqual({ lowMid: 300, midHigh: 3000 });
-  });
-
-  it('keeps blend-family amount values literal in both domains', () => {
-    expect(evaluateVideoParams(blendDef.coupling, { amount: 0.35 }, ctx)).toEqual({
-      amount: 0.35,
-    });
+    expect(evaluateVideoParams(blendDef.coupling, { amount: 0.35 }, ctx)).toEqual({ amount: 0.35 });
     expect(
       evaluateVideoParams(sumDef.coupling, { amount: 0.42, r: 1.6, g: 0.2, a: 1.1 }, ctx),
-    ).toEqual({
-      amount: 0.42,
-      r: 1.6,
-      g: 0.2,
-      b: 1,
-      a: 1.1,
-    });
-    expect(evaluateAudioParams(diffDef.coupling, { amount: 0.6 }, ctx)).toEqual({
-      amount: 0.6,
-    });
+    ).toEqual({ amount: 0.42, r: 1.6, g: 0.2, b: 1, a: 1.1 });
     expect(
-      evaluateAudioParams(sumDef.coupling, { amount: 0.42, r: 1.6, g: 0.2, a: 1.1 }, ctx),
-    ).toEqual({
-      amount: 0.42,
-      r: 1.6,
-      g: 0.2,
-      b: 1,
-      a: 1.1,
-    });
-    expect(
-      evaluateAudioParams(maskDef.coupling, { amount: 0.8, threshold: 0.4, invert: 1 }, ctx),
-    ).toEqual({
-      amount: 0.8,
-      threshold: 0.4,
-      tolerance: 0.12,
-      invert: 1,
-    });
+      evaluateVideoParams(maskDef.coupling, { amount: 0.8, threshold: 0.4, invert: 1 }, ctx),
+    ).toEqual({ amount: 0.8, threshold: 0.4, tolerance: 0.12, invert: 1 });
     expect(evaluateVideoParams(layerDef.coupling, { amount: 0.5, tolerance: 0.2 }, ctx)).toEqual({
       amount: 0.5,
       threshold: 0.5,
@@ -129,8 +65,8 @@ describe('coupling evaluation', () => {
     });
   });
 
-  it('keeps grain params live in both domains so the effect stays AV-coupled', () => {
-    const raw = {
+  it('keeps grain, selfMod, and kaleid params untouched on the video side', () => {
+    const grainRaw = {
       mix: 0.62,
       size: 0.14,
       density: 21,
@@ -141,12 +77,9 @@ describe('coupling evaluation', () => {
       shape: 0.8,
       spread: 0.55,
     };
-    expect(evaluateVideoParams(grainDef.coupling, raw, ctx)).toEqual(raw);
-    expect(evaluateAudioParams(grainDef.coupling, raw, ctx)).toEqual(raw);
-  });
+    expect(evaluateVideoParams(grainDef.coupling, grainRaw, ctx)).toEqual(grainRaw);
 
-  it('keeps selfMod params live in both domains so FM stays visibly coupled', () => {
-    const raw = {
+    const selfModRaw = {
       amount: 0.7,
       ratio: 2.5,
       index: 0.64,
@@ -155,12 +88,9 @@ describe('coupling evaluation', () => {
       tone: 0.8,
       mix: 0.6,
     };
-    expect(evaluateVideoParams(selfModDef.coupling, raw, ctx)).toEqual(raw);
-    expect(evaluateAudioParams(selfModDef.coupling, raw, ctx)).toEqual(raw);
-  });
+    expect(evaluateVideoParams(selfModDef.coupling, selfModRaw, ctx)).toEqual(selfModRaw);
 
-  it('keeps upgraded kaleid fold params live in both domains', () => {
-    const raw = {
+    const kaleidRaw = {
       nSides: 7,
       drive: 2.4,
       symmetry: -0.35,
@@ -169,88 +99,41 @@ describe('coupling evaluation', () => {
       output: 0.92,
       mix: 0.8,
     };
-    expect(evaluateVideoParams(kaleidDef.coupling, raw, ctx)).toEqual(raw);
-    expect(evaluateAudioParams(kaleidDef.coupling, raw, ctx)).toEqual(raw);
+    expect(evaluateVideoParams(kaleidDef.coupling, kaleidRaw, ctx)).toEqual(kaleidRaw);
   });
 
-  it('keeps modulateRotate params live in both domains', () => {
-    const raw = {
-      multiple: 0.003,
-      offset: -0.12,
-    };
-    expect(evaluateVideoParams(modulateRotateDef.coupling, raw, ctx)).toEqual(raw);
-    expect(evaluateAudioParams(modulateRotateDef.coupling, raw, ctx)).toEqual(raw);
-  });
-
-  it('keeps the rest of the modulate family params live in both domains', () => {
+  it('keeps the modulate family params untouched on the video side', () => {
+    expect(
+      evaluateVideoParams(modulateRotateDef.coupling, { multiple: 0.003, offset: -0.12 }, ctx),
+    ).toEqual({ multiple: 0.003, offset: -0.12 });
     expect(
       evaluateVideoParams(modulateScaleDef.coupling, { multiple: 0.4, offset: 1.1 }, ctx),
     ).toEqual({ multiple: 0.4, offset: 1.1 });
     expect(
-      evaluateAudioParams(modulateScaleDef.coupling, { multiple: 0.4, offset: 1.1 }, ctx),
-    ).toEqual({ multiple: 0.4, offset: 1.1 });
-    expect(
-      evaluateVideoParams(modulateScaleRoutedDef.coupling, { multiple: 0.4, offset: 1.1 }, ctx),
-    ).toEqual({ multiple: 0.4, offset: 1.1 });
-    expect(
-      evaluateAudioParams(modulateScaleRoutedDef.coupling, { multiple: 0.4, offset: 1.1 }, ctx),
-    ).toEqual({ multiple: 0.4, offset: 1.1 });
-
-    expect(
       evaluateVideoParams(modulatePixelateDef.coupling, { multiple: 80, offset: 320 }, ctx),
     ).toEqual({ multiple: 80, offset: 320 });
     expect(
-      evaluateAudioParams(modulatePixelateDef.coupling, { multiple: 80, offset: 320 }, ctx),
-    ).toEqual({ multiple: 80, offset: 320 });
+      evaluateVideoParams(
+        modulateRepeatDef.coupling,
+        { repeatX: 4, repeatY: 6, offsetX: 0.2, offsetY: 0.7 },
+        ctx,
+      ),
+    ).toEqual({ repeatX: 4, repeatY: 6, offsetX: 0.2, offsetY: 0.7 });
     expect(
-      evaluateVideoParams(modulatePixelateRoutedDef.coupling, { multiple: 80, offset: 320 }, ctx),
-    ).toEqual({ multiple: 80, offset: 320 });
+      evaluateVideoParams(modulateScrollXDef.coupling, { amount: 0.4, speed: -1.2 }, ctx),
+    ).toEqual({ amount: 0.4, speed: -1.2 });
     expect(
-      evaluateAudioParams(modulatePixelateRoutedDef.coupling, { multiple: 80, offset: 320 }, ctx),
-    ).toEqual({ multiple: 80, offset: 320 });
-
-    const repeatRaw = { repeatX: 4, repeatY: 6, offsetX: 0.2, offsetY: 0.7 };
-    expect(evaluateVideoParams(modulateRepeatDef.coupling, repeatRaw, ctx)).toEqual(repeatRaw);
-    expect(evaluateAudioParams(modulateRepeatDef.coupling, repeatRaw, ctx)).toEqual(repeatRaw);
-    expect(evaluateVideoParams(modulateRepeatRoutedDef.coupling, repeatRaw, ctx)).toEqual(repeatRaw);
-    expect(evaluateAudioParams(modulateRepeatRoutedDef.coupling, repeatRaw, ctx)).toEqual(repeatRaw);
-
-    const scrollRaw = { amount: 0.4, speed: -1.2 };
-    expect(evaluateVideoParams(modulateScrollXDef.coupling, scrollRaw, ctx)).toEqual(scrollRaw);
-    expect(evaluateAudioParams(modulateScrollXDef.coupling, scrollRaw, ctx)).toEqual(scrollRaw);
-    expect(evaluateVideoParams(modulateScrollYDef.coupling, scrollRaw, ctx)).toEqual(scrollRaw);
-    expect(evaluateAudioParams(modulateScrollYDef.coupling, scrollRaw, ctx)).toEqual(scrollRaw);
-
+      evaluateVideoParams(modulateScrollYDef.coupling, { amount: 0.4, speed: -1.2 }, ctx),
+    ).toEqual({ amount: 0.4, speed: -1.2 });
     expect(evaluateVideoParams(modulateKaleidDef.coupling, { nSides: 9 }, ctx)).toEqual({
       nSides: 9,
     });
-    expect(evaluateAudioParams(modulateKaleidDef.coupling, { nSides: 9 }, ctx)).toEqual({
-      nSides: 9,
-    });
-
     expect(evaluateVideoParams(modulateHueDef.coupling, { amount: -0.65 }, ctx)).toEqual({
       amount: -0.65,
     });
-    expect(evaluateAudioParams(modulateHueDef.coupling, { amount: -0.65 }, ctx)).toEqual({
-      amount: -0.65,
-    });
-
-    const rotateRaw = { multiple: 0.003, offset: -0.12 };
-    expect(evaluateVideoParams(modulateRotateRoutedDef.coupling, rotateRaw, ctx)).toEqual(
-      rotateRaw,
-    );
-    expect(evaluateAudioParams(modulateRotateRoutedDef.coupling, rotateRaw, ctx)).toEqual(
-      rotateRaw,
-    );
-
-    expect(evaluateVideoParams(modulateDisplaceDef.coupling, { amount: 0.6, bias: -0.2 }, ctx)).toEqual({
-      amount: 0.6,
-      bias: -0.2,
-    });
-    expect(evaluateAudioParams(modulateDisplaceDef.coupling, { amount: 0.6, bias: -0.2 }, ctx)).toEqual({
-      amount: 0.6,
-      bias: -0.2,
-    });
+    expect(
+      evaluateVideoParams(modulateDisplaceDef.coupling, { amount: 0.6, bias: -0.2 }, ctx),
+    ).toEqual({ amount: 0.6, bias: -0.2 });
   });
 });
 

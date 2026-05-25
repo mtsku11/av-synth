@@ -1,10 +1,5 @@
 import frag from '../video/shaders/flow.frag?raw';
-import type {
-  AudioStage,
-  OperatorDef,
-  VideoStage,
-  VideoStageRendererResources,
-} from '../core/operators';
+import type { OperatorDef, VideoStage, VideoStageRendererResources } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
 
@@ -76,25 +71,6 @@ class FlowVideoStage implements VideoStage {
   }
 }
 
-class FlowAudioStage implements AudioStage {
-  readonly op = 'flow';
-  readonly input: GainNode;
-  readonly output: GainNode;
-
-  constructor(ctx: AudioContext) {
-    this.input = ctx.createGain();
-    this.output = ctx.createGain();
-    this.input.connect(this.output);
-  }
-
-  setParams(_params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {}
-
-  dispose(): void {
-    this.input.disconnect();
-    this.output.disconnect();
-  }
-}
-
 export const flowDef: OperatorDef = {
   op: 'flow',
   paramOrder: ['mix', 'strength', 'smear', 'memory', 'gate', 'glitch', 'chroma'],
@@ -109,7 +85,6 @@ export const flowDef: OperatorDef = {
   },
   coupling: {
     op: 'flow',
-    kind: 'fully-coupled',
     params: {
       mix: {
         spec: {
@@ -122,7 +97,6 @@ export const flowDef: OperatorDef = {
           hint: 'dry-to-motion blend; 0 is bypass',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       strength: {
         spec: {
@@ -135,7 +109,6 @@ export const flowDef: OperatorDef = {
           hint: 'how far the motion field pushes the current frame',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       smear: {
         spec: {
@@ -148,7 +121,6 @@ export const flowDef: OperatorDef = {
           hint: 'directional drag along detected motion',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       memory: {
         spec: {
@@ -161,7 +133,6 @@ export const flowDef: OperatorDef = {
           hint: 'how strongly the previous frame re-enters the motion smear',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       gate: {
         spec: {
@@ -174,7 +145,6 @@ export const flowDef: OperatorDef = {
           hint: 'minimum motion energy required before the field opens up',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       glitch: {
         spec: {
@@ -187,7 +157,6 @@ export const flowDef: OperatorDef = {
           hint: 'blocky datamosh quantization on the motion samples',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       chroma: {
         spec: {
@@ -200,14 +169,10 @@ export const flowDef: OperatorDef = {
           hint: 'color-channel drift around the moving tear field',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
     },
   },
   createVideoStage(gl) {
     return new FlowVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new FlowAudioStage(ctx);
   },
 };

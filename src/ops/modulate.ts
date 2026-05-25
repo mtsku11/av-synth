@@ -12,7 +12,7 @@
 // is no longer k-rate DelayNode automation.
 
 import frag from '../video/shaders/modulate.frag?raw';
-import type { OperatorDef, VideoStage, AudioStage } from '../core/operators';
+import type { OperatorDef, VideoStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
 
@@ -48,51 +48,12 @@ class ModulateVideoStage implements VideoStage {
   }
 }
 
-class ModulateAudioStage implements AudioStage {
-  readonly op = 'modulate';
-  readonly input: GainNode;
-  readonly output: GainNode;
-  readonly #worklet: AudioWorkletNode;
-  readonly #amount: AudioParam;
-  readonly #rate: AudioParam;
-
-  constructor(ctx: AudioContext) {
-    this.input = ctx.createGain();
-    this.output = ctx.createGain();
-    this.#worklet = new AudioWorkletNode(ctx, 'phase-modulator', {
-      parameterData: { amount: 0, rate: 0.3 },
-    });
-    const amount = this.#worklet.parameters.get('amount');
-    const rate = this.#worklet.parameters.get('rate');
-    if (!amount || !rate) throw new Error('modulate: missing worklet params');
-    this.#amount = amount;
-    this.#rate = rate;
-    this.input.connect(this.#worklet);
-    this.#worklet.connect(this.output);
-  }
-
-  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
-    const amount = Math.max(0, Math.min(1, params['amount'] ?? 0));
-    const rate = Math.max(0.01, ctx.rate);
-    const now = this.input.context.currentTime;
-    this.#amount.setTargetAtTime(amount, now, 0.02);
-    this.#rate.setTargetAtTime(rate, now, 0.02);
-  }
-
-  dispose(): void {
-    this.input.disconnect();
-    this.#worklet.disconnect();
-    this.output.disconnect();
-  }
-}
-
 export const modulateDef: OperatorDef = {
   op: 'modulate',
   paramOrder: ['amount'],
   defaults: { amount: 0 },
   coupling: {
     op: 'modulate',
-    kind: 'fully-coupled',
     params: {
       amount: {
         spec: {
@@ -105,14 +66,10 @@ export const modulateDef: OperatorDef = {
           hint: 'UV displacement (video) / delay-time PM depth (audio); LFO from ctx.rate',
         },
         toVideo: (c01) => c01,
-        toAudio: (c01) => c01,
       },
     },
   },
   createVideoStage(gl) {
     return new ModulateVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new ModulateAudioStage(ctx);
   },
 };

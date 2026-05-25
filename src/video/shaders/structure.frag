@@ -81,10 +81,10 @@ void main() {
   float contour = max(analysis.g, analysis.a);
   float glow = clamp(u_glow, 0.0, 1.0) * max(mask, contour * 0.75);
   vec3 glowTint = mix(vec3(0.94, 0.98, 1.0), vec3(1.0, 0.92, 0.84), analysis.r);
-  wet += glowTint * contour * glow * (0.18 + analysis.b * 0.16);
+  wet += glowTint * contour * glow * (0.10 + analysis.b * 0.10);
 
-  float edgeLift = glow * analysis.g * 0.35;
-  wet = mix(wet, max(wet, current + vec3(edgeLift)), glow * 0.45);
+  float edgeLift = glow * analysis.g * 0.22;
+  wet = mix(wet, max(wet, current + vec3(edgeLift)), glow * 0.28);
 
   o_color = vec4(mix(current, wet, clamp(u_mix, 0.0, 1.0)), 1.0);
 }

@@ -134,7 +134,21 @@ export interface GranulatorRuntimeSnapshot {
 export interface GranulatorOptions {
   seed?: number;
   emitInterpModeMessages?: boolean;
-  emitDiagnosticMessages?: boolean;
+  forceNoSpawn?: boolean;
+  provisionRuntimeDiagnostics?: boolean;
+  enableRuntimeSnapshotWrites?: boolean;
+}
+
+export interface GranulatorControlAudit {
+  readonly controlSeqChanges: number;
+  readonly cacheCopyCount: number;
+  readonly parameterLookupCount: number;
+  readonly syncCallCount: number;
+  readonly activeVoices: number;
+  readonly fadingVoices: number;
+  readonly spawnCount: number;
+  readonly stealCount: number;
+  readonly pitchLoad: number;
 }
 
 export class Granulator {
@@ -151,6 +165,10 @@ export class Granulator {
     resolve: () => void;
     reject: (reason?: unknown) => void;
   } | null = null;
+  #controlAuditPending: {
+    resolve: (audit: GranulatorControlAudit | null) => void;
+    reject: (reason?: unknown) => void;
+  } | null = null;
 
   constructor(ctx: BaseAudioContext, opts: GranulatorOptions = {}) {
     this.ctx = ctx;
@@ -164,10 +182,12 @@ export class Granulator {
       runtimeDiagHeader?: SharedArrayBuffer;
       runtimeDiagData?: SharedArrayBuffer;
       emitInterpModeMessages?: boolean;
-      emitDiagnosticMessages?: boolean;
+      forceNoSpawn?: boolean;
+      enableRuntimeSnapshotWrites?: boolean;
     } = {
       emitInterpModeMessages: opts.emitInterpModeMessages ?? true,
-      emitDiagnosticMessages: opts.emitDiagnosticMessages ?? false,
+      forceNoSpawn: opts.forceNoSpawn ?? false,
+      enableRuntimeSnapshotWrites: opts.enableRuntimeSnapshotWrites ?? true,
     };
     if (typeof SharedArrayBuffer === 'function') {
       this.#controlHeader = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
@@ -182,25 +202,30 @@ export class Granulator {
           Float64Array.BYTES_PER_ELEMENT * GRAIN_EVENT_RING_CAPACITY * 10,
         ),
       };
-      this.#runtimeDiagnostics = {
-        capacity: RUNTIME_DIAG_RING_CAPACITY,
-        header: new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT),
-        data: new SharedArrayBuffer(
-          Float64Array.BYTES_PER_ELEMENT * RUNTIME_DIAG_RING_CAPACITY * RUNTIME_DIAG_RING_FIELDS,
-        ),
-      };
+      if (opts.provisionRuntimeDiagnostics ?? true) {
+        this.#runtimeDiagnostics = {
+          capacity: RUNTIME_DIAG_RING_CAPACITY,
+          header: new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT),
+          data: new SharedArrayBuffer(
+            Float64Array.BYTES_PER_ELEMENT * RUNTIME_DIAG_RING_CAPACITY * RUNTIME_DIAG_RING_FIELDS,
+          ),
+        };
+      }
       processorOptions = {
         controlHeader: this.#controlHeader.buffer as SharedArrayBuffer,
         controlData: this.#controlData.buffer as SharedArrayBuffer,
         grainRingCapacity: this.#grainRing.capacity,
         grainRingHeader: this.#grainRing.header,
         grainRingData: this.#grainRing.data,
-        runtimeDiagCapacity: this.#runtimeDiagnostics.capacity,
-        runtimeDiagHeader: this.#runtimeDiagnostics.header,
-        runtimeDiagData: this.#runtimeDiagnostics.data,
         emitInterpModeMessages: opts.emitInterpModeMessages ?? true,
-        emitDiagnosticMessages: opts.emitDiagnosticMessages ?? false,
+        forceNoSpawn: opts.forceNoSpawn ?? false,
+        enableRuntimeSnapshotWrites: opts.enableRuntimeSnapshotWrites ?? true,
       };
+      if (this.#runtimeDiagnostics) {
+        processorOptions.runtimeDiagCapacity = this.#runtimeDiagnostics.capacity;
+        processorOptions.runtimeDiagHeader = this.#runtimeDiagnostics.header;
+        processorOptions.runtimeDiagData = this.#runtimeDiagnostics.data;
+      }
     }
     this.node = new AudioWorkletNode(ctx, 'granulator-v1', {
       numberOfInputs: 0,
@@ -210,10 +235,23 @@ export class Granulator {
     });
     this.output = this.node;
     this.node.port.onmessage = (ev: MessageEvent): void => {
-      const data = ev.data as { type?: string } | null;
+      const data = ev.data as ({ type?: string } & Partial<GranulatorControlAudit>) | null;
       if (data?.type === 'loaded') {
         this.#loadPending?.resolve();
         this.#loadPending = null;
+      } else if (data?.type === 'controlAudit') {
+        this.#controlAuditPending?.resolve({
+          controlSeqChanges: Number(data.controlSeqChanges) || 0,
+          cacheCopyCount: Number(data.cacheCopyCount) || 0,
+          parameterLookupCount: Number(data.parameterLookupCount) || 0,
+          syncCallCount: Number(data.syncCallCount) || 0,
+          activeVoices: Number(data.activeVoices) || 0,
+          fadingVoices: Number(data.fadingVoices) || 0,
+          spawnCount: Number(data.spawnCount) || 0,
+          stealCount: Number(data.stealCount) || 0,
+          pitchLoad: Number(data.pitchLoad) || 0,
+        });
+        this.#controlAuditPending = null;
       }
     };
     if (typeof opts.seed === 'number') {
@@ -394,9 +432,26 @@ export class Granulator {
     this.node.port.postMessage({ type: 'setDiagnostics', emitInterpModeMessages: !!enabled });
   }
 
-  setEmitDiagnosticMessages(enabled: boolean): void {
+  setForceNoSpawn(enabled: boolean): void {
     if (this.#disposed) return;
-    this.node.port.postMessage({ type: 'setDiagnostics', emitDiagnosticMessages: !!enabled });
+    this.node.port.postMessage({ type: 'setDiagnostics', forceNoSpawn: !!enabled });
+  }
+
+  setEnableRuntimeSnapshotWrites(enabled: boolean): void {
+    if (this.#disposed) return;
+    this.node.port.postMessage({ type: 'setDiagnostics', enableRuntimeSnapshotWrites: !!enabled });
+  }
+
+  readControlAudit(): Promise<GranulatorControlAudit | null> {
+    if (this.#disposed) return Promise.resolve(null);
+    if (this.#controlAuditPending) {
+      this.#controlAuditPending.reject(new Error('Superseded by a newer control audit request'));
+      this.#controlAuditPending = null;
+    }
+    return new Promise<GranulatorControlAudit | null>((resolve, reject) => {
+      this.#controlAuditPending = { resolve, reject };
+      this.node.port.postMessage({ type: 'getControlAudit' });
+    });
   }
 
   dispose(): void {
@@ -404,6 +459,8 @@ export class Granulator {
     this.#disposed = true;
     this.#loadPending?.reject(new Error('granulator disposed'));
     this.#loadPending = null;
+    this.#controlAuditPending?.reject(new Error('granulator disposed'));
+    this.#controlAuditPending = null;
     try {
       this.node.port.postMessage({ type: 'clear' });
     } catch {

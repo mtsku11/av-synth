@@ -5,6 +5,10 @@ import { feedbackDef } from './feedback';
 import { timeDisplaceDef } from './timeDisplace';
 import { structureDef } from './structure';
 import { flowDef } from './flow';
+import { vortexDef } from './vortex';
+import { vortexPacketDef } from './vortexPacket';
+import { curlNoiseDef } from './curlNoise';
+import { saddleFieldDef } from './saddleField';
 import { aDef, bDef, gDef, rDef } from './channel';
 import { grainDef } from './grain';
 import { modulateDef } from './modulate';
@@ -57,6 +61,10 @@ export function registerAllOps(): void {
   registerOp(timeDisplaceDef);
   registerOp(structureDef);
   registerOp(flowDef);
+  registerOp(vortexDef);
+  registerOp(vortexPacketDef);
+  registerOp(curlNoiseDef);
+  registerOp(saddleFieldDef);
   registerOp(rDef);
   registerOp(gDef);
   registerOp(bDef);
@@ -120,6 +128,10 @@ export const DEFAULT_CHAIN: readonly string[] = [
   'timeDisplace',
   'structure',
   'flow',
+  'vortex',
+  'vortexPacket',
+  'curlNoise',
+  'saddleField',
   'r',
   'g',
   'b',

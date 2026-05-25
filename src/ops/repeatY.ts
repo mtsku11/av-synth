@@ -6,7 +6,6 @@ import frag from '../video/shaders/repeatY.frag?raw';
 import type { OperatorDef, VideoStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
-import { RepeatAxisAudioStage } from './repeat-audio';
 
 class RepeatYVideoStage implements VideoStage {
   readonly op = 'repeatY';
@@ -44,7 +43,6 @@ export const repeatYDef: OperatorDef = {
   defaults: { reps: 1, offset: 0 },
   coupling: {
     op: 'repeatY',
-    kind: 'fully-coupled',
     params: {
       reps: {
         spec: {
@@ -57,7 +55,6 @@ export const repeatYDef: OperatorDef = {
           hint: 'Y tiles (video) / right-biased grain freeze density (audio)',
         },
         toVideo: (c01) => c01,
-        toAudio: (c01) => c01,
       },
       offset: {
         spec: {
@@ -70,14 +67,10 @@ export const repeatYDef: OperatorDef = {
           hint: 'Y tile phase / freeze window position bias',
         },
         toVideo: (c01) => c01,
-        toAudio: (c01) => c01,
       },
     },
   },
   createVideoStage(gl) {
     return new RepeatYVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new RepeatAxisAudioStage(ctx, 'y');
   },
 };

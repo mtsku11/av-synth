@@ -58,18 +58,10 @@ export interface ParamCoupling {
   readonly spec: ParamSpec;
   /** Map raw control value to the value the video shader / op consumes. */
   readonly toVideo: (raw: number, ctx: CouplingContext) => number;
-  /**
-   * Map raw control value to the value the audio worklet / node consumes,
-   * or return null for visual-only operators.
-   */
-  readonly toAudio: (raw: number, ctx: CouplingContext) => number | null;
 }
-
-export type CouplingKind = 'fully-coupled' | 'visual-only' | 'audio-only';
 
 export interface OperatorCoupling {
   readonly op: string;
-  readonly kind: CouplingKind;
   readonly params: Readonly<Record<string, ParamCoupling>>;
 }
 
@@ -90,35 +82,17 @@ export function listOperators(): readonly string[] {
   return [...registry.keys()];
 }
 
-function evaluateParams(
-  spec: OperatorCoupling,
-  rawParams: Readonly<Record<string, number>>,
-  ctx: CouplingContext,
-  domain: 'video' | 'audio',
-): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const [paramId, coupling] of Object.entries(spec.params)) {
-    const raw = rawParams[paramId] ?? coupling.spec.default;
-    const value = domain === 'video' ? coupling.toVideo(raw, ctx) : coupling.toAudio(raw, ctx);
-    if (value !== null) out[paramId] = value;
-  }
-  return out;
-}
-
 export function evaluateVideoParams(
   spec: OperatorCoupling,
   rawParams: Readonly<Record<string, number>>,
   ctx: CouplingContext,
 ): Record<string, number> {
-  return evaluateParams(spec, rawParams, ctx, 'video');
-}
-
-export function evaluateAudioParams(
-  spec: OperatorCoupling,
-  rawParams: Readonly<Record<string, number>>,
-  ctx: CouplingContext,
-): Record<string, number> {
-  return evaluateParams(spec, rawParams, ctx, 'audio');
+  const out: Record<string, number> = {};
+  for (const [paramId, coupling] of Object.entries(spec.params)) {
+    const raw = rawParams[paramId] ?? coupling.spec.default;
+    out[paramId] = coupling.toVideo(raw, ctx);
+  }
+  return out;
 }
 
 /** Test-only escape hatch — never call from production code. */

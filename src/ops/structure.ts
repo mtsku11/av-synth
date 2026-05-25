@@ -1,10 +1,5 @@
 import frag from '../video/shaders/structure.frag?raw';
-import type {
-  AudioStage,
-  OperatorDef,
-  VideoStage,
-  VideoStageRendererResources,
-} from '../core/operators';
+import type { OperatorDef, VideoStage, VideoStageRendererResources } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
 
@@ -66,25 +61,6 @@ class StructureVideoStage implements VideoStage {
   }
 }
 
-class StructureAudioStage implements AudioStage {
-  readonly op = 'structure';
-  readonly input: GainNode;
-  readonly output: GainNode;
-
-  constructor(ctx: AudioContext) {
-    this.input = ctx.createGain();
-    this.output = ctx.createGain();
-    this.input.connect(this.output);
-  }
-
-  setParams(_params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {}
-
-  dispose(): void {
-    this.input.disconnect();
-    this.output.disconnect();
-  }
-}
-
 export const structureDef: OperatorDef = {
   op: 'structure',
   paramOrder: ['mix', 'mode', 'threshold', 'softness', 'displace', 'memory', 'glow'],
@@ -95,11 +71,10 @@ export const structureDef: OperatorDef = {
     softness: 0.12,
     displace: 0.28,
     memory: 0.32,
-    glow: 0.25,
+    glow: 0.18,
   },
   coupling: {
     op: 'structure',
-    kind: 'fully-coupled',
     params: {
       mix: {
         spec: {
@@ -112,7 +87,6 @@ export const structureDef: OperatorDef = {
           hint: 'dry-to-structure blend; 0 is bypass',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       mode: {
         spec: {
@@ -125,7 +99,6 @@ export const structureDef: OperatorDef = {
           hint: '0 = luma mask, 0.5 = edge contour, 1 = motion residue/flux',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       threshold: {
         spec: {
@@ -138,7 +111,6 @@ export const structureDef: OperatorDef = {
           hint: 'structure energy required before the effect opens up',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       softness: {
         spec: {
@@ -151,7 +123,6 @@ export const structureDef: OperatorDef = {
           hint: 'soft edge on the structure mask',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       displace: {
         spec: {
@@ -164,7 +135,6 @@ export const structureDef: OperatorDef = {
           hint: 'gradient-driven UV drift around the selected structure',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       memory: {
         spec: {
@@ -177,27 +147,22 @@ export const structureDef: OperatorDef = {
           hint: 'how much previous-frame memory gets reinjected through the mask',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       glow: {
         spec: {
           id: 'glow',
           label: 'glow',
           range: [0, 1],
-          default: 0.25,
+          default: 0.18,
           curve: 'lin',
           unit: 'norm',
           hint: 'contour lift around edges and motion residue',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
     },
   },
   createVideoStage(gl) {
     return new StructureVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new StructureAudioStage(ctx);
   },
 };

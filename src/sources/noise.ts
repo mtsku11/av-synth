@@ -11,11 +11,8 @@ import frag from '../video/shaders/source-noise.frag?raw';
 import type { CouplingContext, OperatorCoupling } from '../core/coupling';
 import type { SourceDef } from '../core/sources';
 import type { VideoSourceStage } from '../video/sources';
-import type { AudioSourceStage } from '../audio/sources';
-import { compileProgram, reqUniform } from '../video/glsl';
 
-const NOISE_BUFFER_SECONDS = 2;
-const LFO_DEPTH = 0.5; // ±50% around the base cutoff
+import { compileProgram, reqUniform } from '../video/glsl';
 
 class NoiseVideoStage implements VideoSourceStage {
   readonly kind = 'noise';
@@ -48,59 +45,8 @@ class NoiseVideoStage implements VideoSourceStage {
   }
 }
 
-class NoiseAudioStage implements AudioSourceStage {
-  readonly kind = 'noise';
-  readonly output: GainNode;
-  readonly #source: AudioBufferSourceNode;
-  readonly #filter: BiquadFilterNode;
-  readonly #nyquist: number;
-
-  constructor(ctx: AudioContext) {
-    this.#nyquist = ctx.sampleRate / 2;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * NOISE_BUFFER_SECONDS, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-
-    this.#source = ctx.createBufferSource();
-    this.#source.buffer = buf;
-    this.#source.loop = true;
-
-    this.#filter = ctx.createBiquadFilter();
-    this.#filter.type = 'lowpass';
-    this.#filter.frequency.value = 10;
-    this.#filter.Q.value = 0.707;
-
-    this.output = ctx.createGain();
-    this.output.gain.value = 1;
-
-    this.#source.connect(this.#filter).connect(this.output);
-    this.#source.start();
-  }
-
-  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
-    const scale = Math.max(0, params['scale'] ?? 10);
-    const offset = params['offset'] ?? 0.1;
-    const baseCutoff = scale;
-    const lfo = 1 + LFO_DEPTH * Math.sin(2 * Math.PI * offset * ctx.time);
-    const cutoff = Math.min(this.#nyquist - 1, Math.max(1, baseCutoff * lfo));
-    this.#filter.frequency.setTargetAtTime(cutoff, ctx.time, 0.02);
-  }
-
-  dispose(): void {
-    try {
-      this.#source.stop();
-    } catch {
-      // already stopped
-    }
-    this.#source.disconnect();
-    this.#filter.disconnect();
-    this.output.disconnect();
-  }
-}
-
 const coupling: OperatorCoupling = {
   op: 'noise',
-  kind: 'fully-coupled',
   params: {
     scale: {
       spec: {
@@ -113,7 +59,6 @@ const coupling: OperatorCoupling = {
         hint: 'cycles-per-screen (video) / lowpass cutoff Hz (audio) via baseFreq',
       },
       toVideo: (v) => v,
-      toAudio: (v, ctx) => v * ctx.baseFreq,
     },
     offset: {
       spec: {
@@ -126,7 +71,6 @@ const coupling: OperatorCoupling = {
         hint: 'temporal evolution Hz of the noise field / cutoff LFO rate',
       },
       toVideo: (v) => v,
-      toAudio: (v) => v,
     },
   },
 };
@@ -138,8 +82,5 @@ export const noiseDef: SourceDef = {
   defaults: { scale: 10, offset: 0.1 },
   createVideoStage(gl) {
     return new NoiseVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new NoiseAudioStage(ctx);
   },
 };

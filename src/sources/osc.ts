@@ -15,11 +15,8 @@ import frag from '../video/shaders/source-osc.frag?raw';
 import type { CouplingContext, OperatorCoupling } from '../core/coupling';
 import type { SourceDef } from '../core/sources';
 import type { VideoSourceStage } from '../video/sources';
-import type { AudioSourceStage } from '../audio/sources';
-import { compileProgram, reqUniform } from '../video/glsl';
 
-const MAX_DETUNE = 0.005; // ~8.6 cents per step at offset=1
-const T_DRIFT = 60; // seconds — slow LFO period from sync=1
+import { compileProgram, reqUniform } from '../video/glsl';
 
 class OscVideoStage implements VideoSourceStage {
   readonly kind = 'osc';
@@ -55,64 +52,8 @@ class OscVideoStage implements VideoSourceStage {
   }
 }
 
-class OscAudioStage implements AudioSourceStage {
-  readonly kind = 'osc';
-  readonly output: GainNode;
-  readonly #oscs: [OscillatorNode, OscillatorNode, OscillatorNode];
-  readonly #gain: GainNode;
-
-  constructor(ctx: AudioContext) {
-    this.output = ctx.createGain();
-    this.output.gain.value = 1;
-    this.#gain = ctx.createGain();
-    this.#gain.gain.value = 1 / 3; // sum of three -> normalise
-    this.#gain.connect(this.output);
-
-    const make = (): OscillatorNode => {
-      const o = ctx.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = 220;
-      o.connect(this.#gain);
-      o.start();
-      return o;
-    };
-    this.#oscs = [make(), make(), make()];
-  }
-
-  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
-    const freq = Math.max(0, params['frequency'] ?? 60);
-    const sync = params['sync'] ?? 0.1;
-    const offset = params['offset'] ?? 0;
-    const delta = offset * MAX_DETUNE;
-
-    // Slow LFO on frequency: f(t) = f₀ · (1 + sync · sin(2π t / T_drift))
-    // Using sin rather than a linear ramp keeps the audio bounded over time.
-    const drift = Math.sin((2 * Math.PI * ctx.time) / T_DRIFT);
-    const f0 = freq * (1 + sync * drift);
-    const now = ctx.time;
-    // setTargetAtTime smooths jumps from UI changes without dezippering noise
-    this.#oscs[0].frequency.setTargetAtTime(f0, now, 0.02);
-    this.#oscs[1].frequency.setTargetAtTime(f0 * (1 + delta), now, 0.02);
-    this.#oscs[2].frequency.setTargetAtTime(f0 * (1 + 2 * delta), now, 0.02);
-  }
-
-  dispose(): void {
-    for (const o of this.#oscs) {
-      try {
-        o.stop();
-      } catch {
-        // already stopped
-      }
-      o.disconnect();
-    }
-    this.#gain.disconnect();
-    this.output.disconnect();
-  }
-}
-
 const coupling: OperatorCoupling = {
   op: 'osc',
-  kind: 'fully-coupled',
   params: {
     frequency: {
       spec: {
@@ -125,7 +66,6 @@ const coupling: OperatorCoupling = {
         hint: 'cycles-per-screen (video) / fundamental Hz (audio) via baseFreq',
       },
       toVideo: (v) => v,
-      toAudio: (v, ctx) => v * ctx.baseFreq,
     },
     sync: {
       spec: {
@@ -138,7 +78,6 @@ const coupling: OperatorCoupling = {
         hint: 'temporal drift: shader phase velocity / slow LFO on audio freq',
       },
       toVideo: (v) => v,
-      toAudio: (v) => v,
     },
     offset: {
       spec: {
@@ -151,7 +90,6 @@ const coupling: OperatorCoupling = {
         hint: 'per-channel R/G/B phase (video) ↔ stereo detune depth (audio)',
       },
       toVideo: (v) => v,
-      toAudio: (v) => v,
     },
   },
 };
@@ -163,8 +101,5 @@ export const oscDef: SourceDef = {
   defaults: { frequency: 60, sync: 0.1, offset: 0 },
   createVideoStage(gl) {
     return new OscVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new OscAudioStage(ctx);
   },
 };

@@ -1,10 +1,5 @@
 import frag from '../video/shaders/timeDisplace.frag?raw';
-import type {
-  AudioStage,
-  OperatorDef,
-  VideoStage,
-  VideoStageRendererResources,
-} from '../core/operators';
+import type { OperatorDef, VideoStage, VideoStageRendererResources } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
 
@@ -76,25 +71,6 @@ class TimeDisplaceVideoStage implements VideoStage {
   }
 }
 
-class TimeDisplaceAudioStage implements AudioStage {
-  readonly op = 'timeDisplace';
-  readonly input: GainNode;
-  readonly output: GainNode;
-
-  constructor(ctx: AudioContext) {
-    this.input = ctx.createGain();
-    this.output = ctx.createGain();
-    this.input.connect(this.output);
-  }
-
-  setParams(_params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {}
-
-  dispose(): void {
-    this.input.disconnect();
-    this.output.disconnect();
-  }
-}
-
 export const timeDisplaceDef: OperatorDef = {
   op: 'timeDisplace',
   paramOrder: ['mix', 'depth', 'scan', 'smear', 'decay'],
@@ -107,7 +83,6 @@ export const timeDisplaceDef: OperatorDef = {
   },
   coupling: {
     op: 'timeDisplace',
-    kind: 'fully-coupled',
     params: {
       mix: {
         spec: {
@@ -120,7 +95,6 @@ export const timeDisplaceDef: OperatorDef = {
           hint: 'dry-to-history blend on the video side; audio path stays neutral',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       depth: {
         spec: {
@@ -133,7 +107,6 @@ export const timeDisplaceDef: OperatorDef = {
           hint: 'maximum temporal lookback through the shared frame-history ring',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       scan: {
         spec: {
@@ -146,7 +119,6 @@ export const timeDisplaceDef: OperatorDef = {
           hint: '0 = vertical slit-scan indexing, 1 = luma-driven time displacement',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       smear: {
         spec: {
@@ -159,7 +131,6 @@ export const timeDisplaceDef: OperatorDef = {
           hint: 'temporal combing and motion-directed UV drift',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
       decay: {
         spec: {
@@ -172,14 +143,10 @@ export const timeDisplaceDef: OperatorDef = {
           hint: 'how strongly older history frames fade before they re-enter the image',
         },
         toVideo: (raw) => raw,
-        toAudio: () => 0,
       },
     },
   },
   createVideoStage(gl) {
     return new TimeDisplaceVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new TimeDisplaceAudioStage(ctx);
   },
 };

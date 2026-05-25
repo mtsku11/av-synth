@@ -1,6 +1,6 @@
 import frag from '../video/shaders/modulateKaleid.frag?raw';
-import type { AudioStage, OperatorDef, VideoStage } from '../core/operators';
-import type { CouplingContext } from '../core/coupling';
+import type { OperatorDef, VideoStage } from '../core/operators';
+
 import { compileProgram, reqUniform } from '../video/glsl';
 
 class ModulateKaleidVideoStage implements VideoStage {
@@ -28,44 +28,12 @@ class ModulateKaleidVideoStage implements VideoStage {
   }
 }
 
-class ModulateKaleidAudioStage implements AudioStage {
-  readonly op = 'modulateKaleid';
-  readonly input: GainNode;
-  readonly output: GainNode;
-  readonly #worklet: AudioWorkletNode;
-  readonly #nSides: AudioParam;
-
-  constructor(ctx: AudioContext) {
-    this.input = ctx.createGain();
-    this.output = ctx.createGain();
-    this.#worklet = new AudioWorkletNode(ctx, 'modulate-kaleid', {
-      parameterData: { nSides: 1 },
-    });
-    const nSides = this.#worklet.parameters.get('nSides');
-    if (!nSides) throw new Error('modulateKaleid: missing worklet params');
-    this.#nSides = nSides;
-    this.input.connect(this.#worklet);
-    this.#worklet.connect(this.output);
-  }
-
-  setParams(params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {
-    this.#nSides.setTargetAtTime(params['nSides'] ?? 1, this.input.context.currentTime, 0.02);
-  }
-
-  dispose(): void {
-    this.input.disconnect();
-    this.#worklet.disconnect();
-    this.output.disconnect();
-  }
-}
-
 export const modulateKaleidDef: OperatorDef = {
   op: 'modulateKaleid',
   paramOrder: ['nSides'],
   defaults: { nSides: 1 },
   coupling: {
     op: 'modulateKaleid',
-    kind: 'fully-coupled',
     params: {
       nSides: {
         spec: {
@@ -78,14 +46,10 @@ export const modulateKaleidDef: OperatorDef = {
           hint: 'max reflective side count / max self-modulated fold count',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
     },
   },
   createVideoStage(gl) {
     return new ModulateKaleidVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new ModulateKaleidAudioStage(ctx);
   },
 };

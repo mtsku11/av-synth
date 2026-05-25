@@ -23,6 +23,7 @@
   import { SilentSource, VideoElementAudioSource } from './audio/sources';
   import {
     Granulator,
+    type GranulatorControlAudit,
     type GranulatorEnvelope,
     type GranulatorMode,
     type GranulatorRuntimeSnapshot,
@@ -56,12 +57,7 @@
     graph,
     type BusIndex,
   } from './core/graph.svelte';
-  import {
-    createSourceInstance,
-    attachSourceAudio,
-    disposeSourceAudio,
-    type SourceInstance,
-  } from './core/sources';
+  import { createSourceInstance, type SourceInstance } from './core/sources';
   import { DEFAULT_CHAIN } from './ops';
   import {
     EMPTY_VIDEO_FEATURES,
@@ -84,12 +80,7 @@
     type VideoEffectProgram,
     type VideoEffectRenderStyle,
   } from './core/presets';
-  import {
-    buildPatchNodeViews,
-    compileGraphExecution,
-    orderInstancesByGraph,
-    type GraphExecutionPlan,
-  } from './core/patch-chain';
+  import { buildPatchNodeViews, compileGraphExecution, orderInstancesByGraph } from './core/patch-chain';
   import { BLEND_OPS } from './ops/blend';
   import FeedbackDelayCard from './ui/FeedbackDelayCard.svelte';
   import GranulatorCard from './ui/GranulatorCard.svelte';
@@ -136,7 +127,9 @@
   let granulatorEnvelope = $state<GranulatorEnvelope>('hann');
   let granulatorMode = $state<GranulatorMode>('classic');
   let granulatorEmitInterpModeMessages = true;
-  let granulatorEmitDiagnosticMessages = false;
+  let granulatorForceNoSpawn = false;
+  let granulatorProvisionRuntimeDiagnostics = true;
+  let granulatorEnableRuntimeSnapshotWrites = true;
   let feedbackDelay: FeedbackDelay | null = null;
   let feedbackDelayDisconnect: (() => void) | null = null;
   let feedbackDelayParams = $state<Record<FeedbackDelayParamName, number>>({
@@ -158,15 +151,6 @@
   let grainDecodedSrc: string | null = null;
   let grainDecodeGen = 0;
   let grainVideoFps = $state<number | null>(null);
-  const EMPTY_AUDIO_PLAN: GraphExecutionPlan = {
-    monitorBus: 0,
-    monitorNodeId: null,
-    busOutputIds: {},
-    steps: [],
-    executableInstances: [],
-    executableIds: new Set<string>(),
-    diagnostics: [],
-  };
   // Granulator raw param values (what the sliders show) and per-param LFO assignment
   // indices. The raw values flow through applyGlobalLfoAssignments() each animation
   // frame and the modulated result is pushed into the worklet's shared control snapshot.
@@ -219,6 +203,10 @@
     'freezeFeedback',
     'granularVideoCloud',
     'grainField',
+    'vortexField',
+    'curlTurbulence',
+    'vortexPacketStorm',
+    'saddleSweep',
   ]);
 
   const VIDEO_FEATURE_SAMPLE_WIDTH = 96;
@@ -257,7 +245,6 @@
   const orderedInstances = $derived(orderInstancesByGraph(instances, graphNodes));
 
   const graphPlan = $derived(compileGraphExecution(graphNodes, orderedInstances, monitorBus));
-  const activeAudioPlan = $derived(sourceInstance ? graphPlan : EMPTY_AUDIO_PLAN);
 
   const patchNodes = $derived(buildPatchNodeViews(graphNodes, orderedInstances, graphPlan));
   const visiblePrograms = $derived(
@@ -322,11 +309,15 @@
     setSourceParam(paramId: string, value: number): Promise<boolean>;
     applyProgram(name: string): Promise<boolean>;
     setGranulatorParam(name: string, value: number): Promise<boolean>;
+    setGranulatorEnabled(enabled: boolean): Promise<boolean>;
     setGranulatorDiagnostics(options: {
       emitInterpModeMessages?: boolean;
-      emitDiagnosticMessages?: boolean;
+      forceNoSpawn?: boolean;
+      provisionRuntimeDiagnostics?: boolean;
+      enableRuntimeSnapshotWrites?: boolean;
     }): Promise<boolean>;
     getGranulatorRuntimeDiagnostics(): GranulatorRuntimeSnapshot[];
+    getGranulatorControlAudit(): Promise<GranulatorControlAudit | null>;
     setFeedbackDelayParam(name: string, value: number): Promise<boolean>;
     getAudioContext(): AudioContext | null;
     isGrainDecoded(): boolean;
@@ -940,7 +931,7 @@
     const nextParams = { ...sourceInstance.params, [paramId]: value };
     sourceInstance = { ...sourceInstance, params: nextParams };
     renderer.setSourceParams(nextParams);
-    if (audio.isInitialised && sourceInstance.audioStage) {
+    if (audio.isInitialised) {
       audio.setSourceParams(nextParams);
     }
     activeProgram = null;
@@ -1359,19 +1350,33 @@
         await tick();
         return true;
       },
+      setGranulatorEnabled: async (enabled) => {
+        if (!granulator) return false;
+        setGranulatorEnabled(!!enabled);
+        await tick();
+        return true;
+      },
       setGranulatorDiagnostics: async (options) => {
         if (typeof options.emitInterpModeMessages === 'boolean') {
           granulatorEmitInterpModeMessages = options.emitInterpModeMessages;
           granulator?.setEmitInterpModeMessages(options.emitInterpModeMessages);
         }
-        if (typeof options.emitDiagnosticMessages === 'boolean') {
-          granulatorEmitDiagnosticMessages = options.emitDiagnosticMessages;
-          granulator?.setEmitDiagnosticMessages(options.emitDiagnosticMessages);
+        if (typeof options.forceNoSpawn === 'boolean') {
+          granulatorForceNoSpawn = options.forceNoSpawn;
+          granulator?.setForceNoSpawn(options.forceNoSpawn);
+        }
+        if (typeof options.provisionRuntimeDiagnostics === 'boolean') {
+          granulatorProvisionRuntimeDiagnostics = options.provisionRuntimeDiagnostics;
+        }
+        if (typeof options.enableRuntimeSnapshotWrites === 'boolean') {
+          granulatorEnableRuntimeSnapshotWrites = options.enableRuntimeSnapshotWrites;
+          granulator?.setEnableRuntimeSnapshotWrites(options.enableRuntimeSnapshotWrites);
         }
         await tick();
         return true;
       },
       getGranulatorRuntimeDiagnostics: () => granulator?.readRuntimeDiagnostics() ?? [],
+      getGranulatorControlAudit: () => granulator?.readControlAudit() ?? Promise.resolve(null),
       setFeedbackDelayParam: async (name, value) => {
         if (!feedbackDelay) return false;
         setFeedbackDelayParam(name as FeedbackDelayParamName, value);
@@ -1696,38 +1701,22 @@
     if (granulator) return;
     try {
       const g = await Granulator.create(audio.ctx, {
-        emitDiagnosticMessages: granulatorEmitDiagnosticMessages,
         emitInterpModeMessages: granulatorEmitInterpModeMessages,
+        forceNoSpawn: granulatorForceNoSpawn,
+        provisionRuntimeDiagnostics: granulatorProvisionRuntimeDiagnostics,
+        enableRuntimeSnapshotWrites: granulatorEnableRuntimeSnapshotWrites,
       });
       const delay = new FeedbackDelay(audio.ctx, feedbackDelayParams);
       granulator = g;
       granulatorAppliedParams = {};
-      // TEMP DIAGNOSTIC (B2.3 allocation audit): capture worklet diag pings via the port.
-      const __diag: { sabAvail: number | null; interpToggles: number } = {
-        sabAvail: null,
-        interpToggles: 0,
-      };
-      (window as unknown as { __GRANULATOR_DIAG__?: typeof __diag }).__GRANULATOR_DIAG__ = __diag;
-      const prevPortHandler = g.node.port.onmessage;
-      g.node.port.onmessage = (ev: MessageEvent): void => {
-        const d = ev.data as { type?: string; kind?: string; avail?: number } | null;
-        if (!d) {
-          prevPortHandler?.call(g.node.port, ev);
-          return;
-        }
-        if (d.type === 'diag' && d.kind === 'sab' && typeof d.avail === 'number') {
-          __diag.sabAvail = d.avail;
-        } else if (d.type === 'diag' && d.kind === 'toggle') {
-          __diag.interpToggles += 1;
-        }
-        prevPortHandler?.call(g.node.port, ev);
-      };
       feedbackDelay = delay;
       g.output.connect(delay.input);
       feedbackDelayDisconnect = audio.attachAuxiliarySource(delay.output);
       g.setEnabled(granulatorEnabled);
       g.setEnvelope(granulatorEnvelope);
       g.setMode(granulatorMode);
+      g.setForceNoSpawn(granulatorForceNoSpawn);
+      g.setEnableRuntimeSnapshotWrites(granulatorEnableRuntimeSnapshotWrites);
       pushGranulatorParams(granulatorRawParams);
       for (const [name, value] of Object.entries(feedbackDelayParams) as [
         FeedbackDelayParamName,
@@ -1867,7 +1856,6 @@
 
     // Tear down any current procedural source instance.
     if (sourceInstance) {
-      disposeSourceAudio(sourceInstance);
       sourceInstance = null;
     }
 
@@ -1953,10 +1941,6 @@
     const inst = createSourceInstance(kind, renderer.gl);
     sourceInstance = inst;
     renderer.setSource(inst.videoStage, inst.params, inst.def.coupling);
-    if (audio.isInitialised) {
-      attachSourceAudio(inst, audio.ctx);
-      if (inst.audioStage) audio.setSource(inst.audioStage, inst.params, inst.def.coupling);
-    }
     sourceLoaded = false;
   }
 
@@ -2192,8 +2176,6 @@
 
   $effect(() => {
     renderer?.setPlan(graphPlan);
-    if (!audio.isInitialised) return;
-    audio.setPlan(activeAudioPlan);
   });
 
   onDestroy(() => {
@@ -2229,22 +2211,9 @@
 
   async function onStart() {
     await audio.init();
-    audio.setPlan(activeAudioPlan);
     await ensureGranulatorPipeline();
 
-    // Audio side of the active source needs the AudioContext, so wire it now
-    // if a procedural source is selected. For input sources we leave whatever
-    // SilentSource the engine init() created in place until the user picks one.
-    if (sourceInstance) {
-      attachSourceAudio(sourceInstance, audio.ctx);
-      if (sourceInstance.audioStage) {
-        audio.setSource(
-          sourceInstance.audioStage,
-          sourceInstance.params,
-          sourceInstance.def.coupling,
-        );
-      }
-    } else if (sourceKind === 'video' && videoEl && videoEl.src) {
+    if (sourceKind === 'video' && videoEl && videoEl.src) {
       try {
         routeVideoAudioThroughGraph();
         audio.setSource(new VideoElementAudioSource(audio.ctx, videoEl), {});
@@ -2295,7 +2264,6 @@
 
     if (!audio.isInitialised) {
       await audio.init();
-      audio.setPlan(activeAudioPlan);
     }
     await ensureGranulatorPipeline();
     void loadClipIntoGranulator(file);

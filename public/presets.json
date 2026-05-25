@@ -612,7 +612,6 @@
     "values": {
       "clock.rate": 0.15,
       "feedback.feedback": 0.92,
-      "feedback.delayTime": 0.18,
       "modulate.amount": 0.1,
       "scale.amount": 1.05,
       "rotate.angle": 0.02,
@@ -638,7 +637,6 @@
     "values": {
       "clock.rate": 1.2,
       "feedback.feedback": 0.88,
-      "feedback.delayTime": 0.32,
       "modulate.amount": 0.55,
       "scale.amount": 1.0,
       "rotate.angle": 0.0,
@@ -664,7 +662,6 @@
     "values": {
       "clock.rate": 2.4,
       "feedback.feedback": 0.78,
-      "feedback.delayTime": 0.09,
       "modulate.amount": 0.35,
       "scale.amount": 1.0,
       "rotate.angle": 0.0,
@@ -690,7 +687,6 @@
     "values": {
       "clock.rate": 1.8,
       "feedback.feedback": 0.93,
-      "feedback.delayTime": 0.45,
       "modulate.amount": 0.7,
       "scale.amount": 0.97,
       "rotate.angle": 0.18,
@@ -716,7 +712,6 @@
     "values": {
       "clock.rate": 0.5,
       "feedback.feedback": 0.95,
-      "feedback.delayTime": 0.62,
       "modulate.amount": 0.2,
       "scale.amount": 1.01,
       "rotate.angle": -0.01,
@@ -742,7 +737,6 @@
     "values": {
       "clock.rate": 0.8,
       "feedback.feedback": 0.82,
-      "feedback.delayTime": 0.24,
       "modulate.amount": 0.25,
       "scale.amount": 1.01,
       "rotate.angle": 0.04,
@@ -768,7 +762,6 @@
     "values": {
       "clock.rate": 0.42,
       "feedback.feedback": 0.72,
-      "feedback.delayTime": 0.24,
       "timeDisplace.mix": 0.46,
       "timeDisplace.depth": 0.6,
       "timeDisplace.scan": 0.38,
@@ -857,7 +850,6 @@
     "values": {
       "clock.rate": 0.68,
       "feedback.feedback": 0.54,
-      "feedback.delayTime": 0.2,
       "timeDisplace.mix": 0.8,
       "timeDisplace.depth": 0.95,
       "timeDisplace.scan": 0.0,
@@ -947,7 +939,6 @@
     "values": {
       "clock.rate": 0.5,
       "feedback.feedback": 0.63,
-      "feedback.delayTime": 0.26,
       "timeDisplace.mix": 0.68,
       "timeDisplace.depth": 0.9,
       "timeDisplace.scan": 1.0,
@@ -1039,7 +1030,6 @@
     "values": {
       "clock.rate": 0.56,
       "feedback.feedback": 0.66,
-      "feedback.delayTime": 0.22,
       "structure.mix": 0.78,
       "structure.mode": 0.6,
       "structure.threshold": 0.18,
@@ -1130,7 +1120,6 @@
     "values": {
       "clock.rate": 0.38,
       "feedback.feedback": 0.58,
-      "feedback.delayTime": 0.24,
       "timeDisplace.mix": 0.32,
       "timeDisplace.depth": 0.44,
       "timeDisplace.scan": 0.8,
@@ -1229,7 +1218,6 @@
     "values": {
       "clock.rate": 0.52,
       "feedback.feedback": 0.61,
-      "feedback.delayTime": 0.18,
       "flow.mix": 0.76,
       "flow.strength": 0.64,
       "flow.smear": 0.58,
@@ -1334,7 +1322,6 @@
     "values": {
       "clock.rate": 0.41,
       "feedback.feedback": 0.54,
-      "feedback.delayTime": 0.22,
       "timeDisplace.mix": 0.18,
       "timeDisplace.depth": 0.34,
       "timeDisplace.scan": 0.42,
@@ -1446,7 +1433,6 @@
     "values": {
       "clock.rate": 0.36,
       "feedback.feedback": 0.57,
-      "feedback.delayTime": 0.24,
       "timeDisplace.mix": 0.24,
       "timeDisplace.depth": 0.46,
       "timeDisplace.scan": 0.3,
@@ -1561,7 +1547,6 @@
     "values": {
       "clock.rate": 0.46,
       "feedback.feedback": 0.7,
-      "feedback.delayTime": 0.2,
       "timeDisplace.mix": 0.42,
       "timeDisplace.depth": 0.58,
       "timeDisplace.scan": 0.18,
@@ -1650,7 +1635,6 @@
     "values": {
       "clock.rate": 0.24,
       "feedback.feedback": 0.67,
-      "feedback.delayTime": 0.3,
       "timeDisplace.mix": 0.9,
       "timeDisplace.depth": 1.0,
       "timeDisplace.scan": 0.12,
@@ -1746,7 +1730,6 @@
     "values": {
       "clock.rate": 0.48,
       "feedback.feedback": 0.6,
-      "feedback.delayTime": 0.23,
       "structure.mix": 0.46,
       "structure.mode": 0.38,
       "structure.threshold": 0.15,
@@ -1857,7 +1840,6 @@
     "values": {
       "clock.rate": 0.4,
       "feedback.feedback": 0.78,
-      "feedback.delayTime": 0.28,
       "modulate.amount": 0.08,
       "scale.amount": 1.005,
       "rotate.angle": 0.0,
@@ -1925,6 +1907,338 @@
       }
     }
   },
+  "vortexField": {
+    "title": "Vortex Field",
+    "tagline": "Authored point-vortex velocity field swirls the clip while feedback trails hold the motion in place.",
+    "videoIntent": "Best on footage with strong colour contrast and gentle motion — faces, foliage, water — where the Biot-Savart swirl reads as designed flow rather than damage.",
+    "audioIntent": "Quiet granulator bed so the visual swirl carries the piece; feedback delay stays light.",
+    "operatorFocus": ["vortex", "feedback", "saturate"],
+    "chain": ["feedback", "vortex", "saturate", "contrast", "chromaShift"],
+    "render": {
+      "look": "clean",
+      "quality": "standard",
+      "lut": "none",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.6,
+      "feedback.feedback": 0.86,
+      "vortex.mix": 1.0,
+      "vortex.strength": 0.28,
+      "vortex.drift": 0.55,
+      "vortex.softness": 0.05,
+      "saturate.amount": 1.4,
+      "contrast.amount": 1.18,
+      "chromaShift.amount": 0.022
+    },
+    "macros": [
+      {
+        "id": "swirl",
+        "label": "Swirl",
+        "default": 0.6,
+        "targets": [
+          { "key": "vortex.strength", "min": 0.08, "max": 0.45 },
+          { "key": "vortex.drift", "min": 0.2, "max": 0.85 }
+        ]
+      },
+      {
+        "id": "persistence",
+        "label": "Persistence",
+        "default": 0.7,
+        "targets": [
+          { "key": "feedback.feedback", "min": 0.55, "max": 0.94 },
+          { "key": "vortex.softness", "min": 0.025, "max": 0.12 }
+        ]
+      },
+      {
+        "id": "palette",
+        "label": "Palette",
+        "default": 0.55,
+        "targets": [
+          { "key": "saturate.amount", "min": 1.0, "max": 1.85 },
+          { "key": "contrast.amount", "min": 1.0, "max": 1.32 },
+          { "key": "chromaShift.amount", "min": 0.0, "max": 0.05 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.22,
+        "feedback": 0.34,
+        "damping": 6800,
+        "cross": 0.7853981634,
+        "mix": 0.08
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 8,
+        "duration": 220,
+        "durationJitter": 0.22,
+        "position": 0.5,
+        "positionJitter": 0.06,
+        "pitch": 0,
+        "pitchJitter": 2,
+        "panSpread": 0.42,
+        "ySpread": 0.22,
+        "reverseProbability": 0.04,
+        "distribution": 0.2,
+        "voiceCount": 16,
+        "gain": 0.36
+      }
+    }
+  },
+  "curlTurbulence": {
+    "title": "Curl Turbulence",
+    "tagline": "Divergence-free curl-of-noise warps the clip like slow fluid — no piling, no thinning, just flow.",
+    "videoIntent": "Best on footage with mid-frequency texture (skin, foliage, fabric) where the turbulence reads as motion rather than blur.",
+    "audioIntent": "Granulator stays in a wide cloud so the audio breathes with the visual drift; feedback delay light.",
+    "operatorFocus": ["curlNoise", "feedback", "saturate"],
+    "chain": ["feedback", "curlNoise", "saturate", "contrast", "chromaShift"],
+    "render": {
+      "look": "clean",
+      "quality": "standard",
+      "lut": "none",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.55,
+      "feedback.feedback": 0.78,
+      "feedback.delayTime": 0.16,
+      "curlNoise.mix": 1.0,
+      "curlNoise.strength": 0.18,
+      "curlNoise.scale": 2.6,
+      "curlNoise.speed": 0.45,
+      "curlNoise.warp": 0.55,
+      "saturate.amount": 1.3,
+      "contrast.amount": 1.12,
+      "chromaShift.amount": 0.018
+    },
+    "macros": [
+      {
+        "id": "flow",
+        "label": "Flow",
+        "default": 0.55,
+        "targets": [
+          { "key": "curlNoise.strength", "min": 0.05, "max": 0.32 },
+          { "key": "curlNoise.speed", "min": 0.15, "max": 0.9 }
+        ]
+      },
+      {
+        "id": "scale",
+        "label": "Scale",
+        "default": 0.5,
+        "targets": [
+          { "key": "curlNoise.scale", "min": 1.2, "max": 6.0 },
+          { "key": "curlNoise.warp", "min": 0.2, "max": 0.85 }
+        ]
+      },
+      {
+        "id": "persistence",
+        "label": "Persistence",
+        "default": 0.6,
+        "targets": [
+          { "key": "feedback.feedback", "min": 0.55, "max": 0.92 },
+          { "key": "saturate.amount", "min": 1.0, "max": 1.7 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.24,
+        "feedback": 0.3,
+        "damping": 7000,
+        "cross": 0.7853981634,
+        "mix": 0.07
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 9,
+        "duration": 260,
+        "durationJitter": 0.25,
+        "position": 0.5,
+        "positionJitter": 0.08,
+        "pitch": 0,
+        "pitchJitter": 3,
+        "panSpread": 0.6,
+        "ySpread": 0.3,
+        "reverseProbability": 0.1,
+        "distribution": 0.3,
+        "voiceCount": 20,
+        "gain": 0.5
+      }
+    }
+  },
+  "vortexPacketStorm": {
+    "title": "Vortex Packet Storm",
+    "tagline": "Broad slow swirls anchor the frame while a dense cloud of fast eddies stipples the surface.",
+    "videoIntent": "Best on busy, high-contrast footage — crowds, water, foliage in wind — where the two-band field separates into a readable macro/micro structure.",
+    "audioIntent": "Granulator pushed denser and slightly pitched, mirroring the micro-eddy stipple in the audio domain.",
+    "operatorFocus": ["vortexPacket", "feedback", "contrast"],
+    "chain": ["feedback", "vortexPacket", "saturate", "contrast", "chromaShift"],
+    "render": {
+      "look": "clean",
+      "quality": "standard",
+      "lut": "none",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.65,
+      "feedback.feedback": 0.82,
+      "feedback.delayTime": 0.2,
+      "vortexPacket.mix": 1.0,
+      "vortexPacket.strength": 0.3,
+      "vortexPacket.drift": 0.5,
+      "vortexPacket.macroBalance": 0.55,
+      "vortexPacket.macroSoftness": 0.22,
+      "vortexPacket.microSoftness": 0.035,
+      "saturate.amount": 1.35,
+      "contrast.amount": 1.22,
+      "chromaShift.amount": 0.026
+    },
+    "macros": [
+      {
+        "id": "energy",
+        "label": "Energy",
+        "default": 0.6,
+        "targets": [
+          { "key": "vortexPacket.strength", "min": 0.1, "max": 0.5 },
+          { "key": "vortexPacket.drift", "min": 0.2, "max": 0.9 }
+        ]
+      },
+      {
+        "id": "grain",
+        "label": "Grain Balance",
+        "default": 0.55,
+        "targets": [
+          { "key": "vortexPacket.macroBalance", "min": 0.2, "max": 0.85 },
+          { "key": "vortexPacket.microSoftness", "min": 0.02, "max": 0.08 }
+        ]
+      },
+      {
+        "id": "trails",
+        "label": "Trails",
+        "default": 0.65,
+        "targets": [
+          { "key": "feedback.feedback", "min": 0.6, "max": 0.94 },
+          { "key": "chromaShift.amount", "min": 0.005, "max": 0.04 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.18,
+        "feedback": 0.4,
+        "damping": 6400,
+        "cross": 1.0471975512,
+        "mix": 0.09
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 14,
+        "duration": 140,
+        "durationJitter": 0.35,
+        "position": 0.5,
+        "positionJitter": 0.12,
+        "pitch": 0,
+        "pitchJitter": 4,
+        "panSpread": 0.7,
+        "ySpread": 0.35,
+        "reverseProbability": 0.18,
+        "distribution": 0.4,
+        "voiceCount": 28,
+        "gain": 0.45
+      }
+    }
+  },
+  "saddleSweep": {
+    "title": "Saddle Sweep",
+    "tagline": "Oriented saddle currents sweep the clip in directional streaks rather than swirls.",
+    "videoIntent": "Best on footage with existing horizontal or diagonal motion — landscapes from a moving vehicle, dance — where the saddle axes amplify the existing direction.",
+    "audioIntent": "Granulator in classic mode with light spray so the sound stays focused; feedback delay adds spatial depth.",
+    "operatorFocus": ["saddleField", "feedback", "chromaShift"],
+    "chain": ["feedback", "saddleField", "saturate", "contrast", "chromaShift"],
+    "render": {
+      "look": "clean",
+      "quality": "standard",
+      "lut": "none",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.5,
+      "feedback.feedback": 0.84,
+      "feedback.delayTime": 0.17,
+      "saddleField.mix": 1.0,
+      "saddleField.strength": 0.24,
+      "saddleField.softness": 0.16,
+      "saddleField.anisotropy": 0.6,
+      "saddleField.drift": 0.5,
+      "saturate.amount": 1.25,
+      "contrast.amount": 1.16,
+      "chromaShift.amount": 0.028
+    },
+    "macros": [
+      {
+        "id": "sweep",
+        "label": "Sweep",
+        "default": 0.55,
+        "targets": [
+          { "key": "saddleField.strength", "min": 0.08, "max": 0.38 },
+          { "key": "saddleField.drift", "min": 0.15, "max": 1.0 }
+        ]
+      },
+      {
+        "id": "shape",
+        "label": "Shape",
+        "default": 0.5,
+        "targets": [
+          { "key": "saddleField.softness", "min": 0.06, "max": 0.3 },
+          { "key": "saddleField.anisotropy", "min": 0.2, "max": 1.8 }
+        ]
+      },
+      {
+        "id": "persistence",
+        "label": "Persistence",
+        "default": 0.65,
+        "targets": [
+          { "key": "feedback.feedback", "min": 0.55, "max": 0.94 },
+          { "key": "chromaShift.amount", "min": 0.005, "max": 0.05 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.28,
+        "feedback": 0.42,
+        "damping": 6200,
+        "cross": 1.2566370614,
+        "mix": 0.1
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "classic",
+        "density": 11,
+        "duration": 180,
+        "durationJitter": 0.2,
+        "position": 0.5,
+        "positionJitter": 0.07,
+        "pitch": 0,
+        "pitchJitter": 2,
+        "panSpread": 0.5,
+        "ySpread": 0.25,
+        "reverseProbability": 0.08,
+        "distribution": 0.25,
+        "voiceCount": 18,
+        "gain": 0.48
+      }
+    }
+  },
   "zero": {
     "title": "Near Clean",
     "tagline": "Return the clip close to a neutral baseline for comparison and reset.",
@@ -1941,7 +2255,6 @@
     "values": {
       "clock.rate": 0.3,
       "feedback.feedback": 0.0,
-      "feedback.delayTime": 0.18,
       "modulate.amount": 0.0,
       "scale.amount": 1.0,
       "rotate.angle": 0.0,

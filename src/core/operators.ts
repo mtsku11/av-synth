@@ -62,19 +62,6 @@ export interface VideoStageRendererResources {
   } | null;
 }
 
-export interface AudioStage {
-  readonly op: string;
-  /** Upstream connects into this. */
-  readonly input: AudioNode;
-  /** Optional second inlet for binary Blend operators. */
-  readonly secondaryInput?: AudioNode;
-  /** Downstream connects from this. */
-  readonly output: AudioNode;
-  /** Push current parameter values to AudioParams. Called on every UI change. */
-  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void;
-  dispose(): void;
-}
-
 export interface OperatorDef {
   readonly op: string;
   readonly coupling: OperatorCoupling;
@@ -85,7 +72,6 @@ export interface OperatorDef {
   /** Defaults for every coupled param (raw effective values, not normalised). */
   readonly defaults: Readonly<Record<string, number>>;
   createVideoStage(gl: WebGL2RenderingContext): VideoStage;
-  createAudioStage(audioCtx: AudioContext): AudioStage;
 }
 
 export type OperatorFamily =
@@ -108,8 +94,6 @@ export interface OperatorInstance {
   readonly id: string;
   readonly def: OperatorDef;
   readonly videoStage: VideoStage;
-  /** Created lazily after AudioContext.init(); null until then. */
-  audioStage: AudioStage | null;
   /** Effective parameter values consumed by stages. Direct mutation is fine. */
   params: Record<string, number>;
   lfoAssignments: ParamLfoAssignments;
@@ -132,7 +116,7 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     family: 'Feedback',
     blurb: 'previous-frame trails and audio freeze-smear',
     intents: ['feedback', 'motion trails'],
-    coreParams: ['feedback', 'delayTime'],
+    coreParams: ['feedback'],
   },
   timeDisplace: {
     family: 'Feedback',
@@ -144,13 +128,37 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     family: 'Feedback',
     blurb: 'edge / luma / flux masks drive contour memory and displacement',
     intents: ['feedback', 'contours', 'video texture'],
-    coreParams: ['mix', 'mode', 'memory', 'displace', 'glow'],
+    coreParams: ['mix', 'mode', 'threshold', 'softness', 'displace', 'memory', 'glow'],
   },
   flow: {
     family: 'Feedback',
     blurb: 'motion-field smear and datamosh drag from consecutive frames',
     intents: ['feedback', 'motion', 'video texture'],
     coreParams: ['mix', 'strength', 'smear', 'memory', 'glitch'],
+  },
+  vortex: {
+    family: 'Feedback',
+    blurb: 'authored point-vortex velocity field — Biot-Savart swirl displacement',
+    intents: ['feedback', 'video texture', 'motion'],
+    coreParams: ['mix', 'strength', 'drift', 'softness'],
+  },
+  vortexPacket: {
+    family: 'Feedback',
+    blurb: 'two-band vortex packet — broad slow swirls layered with fast fine eddies',
+    intents: ['feedback', 'video texture', 'motion'],
+    coreParams: ['mix', 'strength', 'drift', 'macroBalance', 'macroSoftness', 'microSoftness'],
+  },
+  curlNoise: {
+    family: 'Feedback',
+    blurb: 'divergence-free curl-of-noise displacement — fluid-style turbulence',
+    intents: ['feedback', 'video texture', 'motion'],
+    coreParams: ['mix', 'strength', 'scale', 'speed', 'warp'],
+  },
+  saddleField: {
+    family: 'Feedback',
+    blurb: 'oriented saddle packet — anisotropic directional flow rather than rotation',
+    intents: ['feedback', 'video texture', 'motion'],
+    coreParams: ['mix', 'strength', 'softness', 'anisotropy', 'drift'],
   },
   r: {
     family: 'Finish',
@@ -517,7 +525,6 @@ export function createInstance(
     id: `${opName}-${++_instanceId}`,
     def,
     videoStage,
-    audioStage: null,
     params: { ...def.defaults, ...initialParams },
     lfoAssignments: Object.fromEntries(
       def.paramOrder.map((paramId) => [paramId, createParamLfoAssignment()]),
@@ -525,15 +532,8 @@ export function createInstance(
   };
 }
 
-export function attachAudio(instance: OperatorInstance, audioCtx: AudioContext): void {
-  if (instance.audioStage) return;
-  instance.audioStage = instance.def.createAudioStage(audioCtx);
-}
-
 export function disposeInstance(instance: OperatorInstance, gl: WebGL2RenderingContext): void {
   instance.videoStage.dispose(gl);
-  instance.audioStage?.dispose();
-  instance.audioStage = null;
 }
 
 export function isNeutralInstance(instance: OperatorInstance): boolean {

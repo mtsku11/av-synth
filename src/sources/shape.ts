@@ -16,11 +16,8 @@ import frag from '../video/shaders/source-shape.frag?raw';
 import type { CouplingContext, OperatorCoupling } from '../core/coupling';
 import type { SourceDef } from '../core/sources';
 import type { VideoSourceStage } from '../video/sources';
-import type { AudioSourceStage } from '../audio/sources';
-import { compileProgram, reqUniform } from '../video/glsl';
 
-const FUNDAMENTAL_REF = 110; // Hz when baseFreq = 1
-const HARMONIC_COUNT = 8;
+import { compileProgram, reqUniform } from '../video/glsl';
 
 class ShapeVideoStage implements VideoSourceStage {
   readonly kind = 'shape';
@@ -53,76 +50,8 @@ class ShapeVideoStage implements VideoSourceStage {
   }
 }
 
-class ShapeAudioStage implements AudioSourceStage {
-  readonly kind = 'shape';
-  readonly output: GainNode;
-  readonly #oscs: OscillatorNode[];
-  readonly #gains: GainNode[];
-  readonly #filter: BiquadFilterNode;
-  readonly #nyquist: number;
-
-  constructor(ctx: AudioContext) {
-    this.#nyquist = ctx.sampleRate / 2;
-    this.#filter = ctx.createBiquadFilter();
-    this.#filter.type = 'lowpass';
-    this.#filter.frequency.value = 1000;
-    this.#filter.Q.value = 0.707;
-
-    this.output = ctx.createGain();
-    this.output.gain.value = 0.3;
-    this.#filter.connect(this.output);
-
-    this.#oscs = [];
-    this.#gains = [];
-    for (let k = 0; k < HARMONIC_COUNT; k++) {
-      const o = ctx.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = FUNDAMENTAL_REF;
-      const g = ctx.createGain();
-      // Sawtooth-like 1/n harmonic roll-off keeps the polygon timbre bounded.
-      g.gain.value = 1 / (k + 1);
-      o.connect(g).connect(this.#filter);
-      o.start();
-      this.#oscs.push(o);
-      this.#gains.push(g);
-    }
-  }
-
-  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
-    const sides = Math.max(3, params['sides'] ?? 3);
-    const radius = Math.max(0, params['radius'] ?? 0.3);
-    const smoothingCutoff = Math.max(20, params['smoothing'] ?? 100);
-
-    const fundamental = FUNDAMENTAL_REF * ctx.baseFreq;
-    for (let k = 0; k < HARMONIC_COUNT; k++) {
-      const f = (k * sides + 1) * fundamental;
-      const clamped = Math.min(this.#nyquist - 1, Math.max(1, f));
-      this.#oscs[k]!.frequency.setTargetAtTime(clamped, ctx.time, 0.02);
-    }
-
-    const cutoff = Math.min(this.#nyquist - 1, smoothingCutoff);
-    this.#filter.frequency.setTargetAtTime(cutoff, ctx.time, 0.02);
-    this.output.gain.setTargetAtTime(radius, ctx.time, 0.02);
-  }
-
-  dispose(): void {
-    for (const o of this.#oscs) {
-      try {
-        o.stop();
-      } catch {
-        // already stopped
-      }
-      o.disconnect();
-    }
-    for (const g of this.#gains) g.disconnect();
-    this.#filter.disconnect();
-    this.output.disconnect();
-  }
-}
-
 const coupling: OperatorCoupling = {
   op: 'shape',
-  kind: 'fully-coupled',
   params: {
     sides: {
       spec: {
@@ -135,7 +64,6 @@ const coupling: OperatorCoupling = {
         hint: 'polygon corner count ↔ harmonic spacing (k·sides + 1)',
       },
       toVideo: (v) => v,
-      toAudio: (v) => v,
     },
     radius: {
       spec: {
@@ -148,7 +76,6 @@ const coupling: OperatorCoupling = {
         hint: 'polygon radius ↔ fundamental amplitude',
       },
       toVideo: (v) => v,
-      toAudio: (v) => v,
     },
     smoothing: {
       spec: {
@@ -161,7 +88,6 @@ const coupling: OperatorCoupling = {
         hint: 'edge softness (video) / lowpass cutoff = baseFreq / smoothing (audio)',
       },
       toVideo: (v) => v,
-      toAudio: (v, ctx) => ctx.baseFreq / Math.max(1e-4, v),
     },
   },
 };
@@ -173,8 +99,5 @@ export const shapeDef: SourceDef = {
   defaults: { sides: 3, radius: 0.3, smoothing: 0.01 },
   createVideoStage(gl) {
     return new ShapeVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new ShapeAudioStage(ctx);
   },
 };

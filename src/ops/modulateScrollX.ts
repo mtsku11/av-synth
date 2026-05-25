@@ -1,5 +1,5 @@
 import frag from '../video/shaders/modulateScrollX.frag?raw';
-import type { AudioStage, OperatorDef, VideoStage } from '../core/operators';
+import type { OperatorDef, VideoStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
 
@@ -38,50 +38,12 @@ class ModulateScrollXVideoStage implements VideoStage {
   }
 }
 
-class ModulateScrollXAudioStage implements AudioStage {
-  readonly op = 'modulateScrollX';
-  readonly input: GainNode;
-  readonly output: GainNode;
-  readonly #worklet: AudioWorkletNode;
-  readonly #amount: AudioParam;
-  readonly #speed: AudioParam;
-
-  constructor(ctx: AudioContext) {
-    this.input = ctx.createGain();
-    this.output = ctx.createGain();
-    this.#worklet = new AudioWorkletNode(ctx, 'modulate-scrollx', {
-      outputChannelCount: [2],
-      parameterData: { amount: 0, speed: 0 },
-    });
-    const amount = this.#worklet.parameters.get('amount');
-    const speed = this.#worklet.parameters.get('speed');
-    if (!amount || !speed) throw new Error('modulateScrollX: missing worklet params');
-    this.#amount = amount;
-    this.#speed = speed;
-    this.input.connect(this.#worklet);
-    this.#worklet.connect(this.output);
-  }
-
-  setParams(params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {
-    const now = this.input.context.currentTime;
-    this.#amount.setTargetAtTime(params['amount'] ?? 0, now, 0.02);
-    this.#speed.setTargetAtTime(params['speed'] ?? 0, now, 0.02);
-  }
-
-  dispose(): void {
-    this.input.disconnect();
-    this.#worklet.disconnect();
-    this.output.disconnect();
-  }
-}
-
 export const modulateScrollXDef: OperatorDef = {
   op: 'modulateScrollX',
   paramOrder: ['amount', 'speed'],
   defaults: { amount: 0, speed: 0 },
   coupling: {
     op: 'modulateScrollX',
-    kind: 'fully-coupled',
     params: {
       amount: {
         spec: {
@@ -94,7 +56,6 @@ export const modulateScrollXDef: OperatorDef = {
           hint: 'self-modulated horizontal drift depth / self-modulated phase-offset depth',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
       speed: {
         spec: {
@@ -107,14 +68,10 @@ export const modulateScrollXDef: OperatorDef = {
           hint: 'base scroll rate / stereo motion rate applied to the offset layer',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
     },
   },
   createVideoStage(gl) {
     return new ModulateScrollXVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new ModulateScrollXAudioStage(ctx);
   },
 };

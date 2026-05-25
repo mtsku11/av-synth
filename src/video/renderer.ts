@@ -756,8 +756,6 @@ export class VideoRenderer {
   #uBlurDirection: WebGLUniformLocation;
   #historyProgram: WebGLProgram;
   #uHistoryTex: WebGLUniformLocation;
-  #uHistoryResolution: WebGLUniformLocation;
-  #uHistoryFeedbackAmount: WebGLUniformLocation;
   #structureAnalysisProgram: WebGLProgram;
   #uStructureAnalysisTex: WebGLUniformLocation;
   #uStructureAnalysisPrevTex: WebGLUniformLocation;
@@ -939,8 +937,6 @@ export class VideoRenderer {
     const uBlurTexel = gl.getUniformLocation(this.#blurProgram, 'u_texel');
     const uBlurDirection = gl.getUniformLocation(this.#blurProgram, 'u_direction');
     const uHistoryTex = gl.getUniformLocation(this.#historyProgram, 'u_tex');
-    const uHistoryResolution = gl.getUniformLocation(this.#historyProgram, 'u_resolution');
-    const uHistoryFeedbackAmount = gl.getUniformLocation(this.#historyProgram, 'u_feedback_amount');
     const uStructureAnalysisTex = gl.getUniformLocation(this.#structureAnalysisProgram, 'u_tex');
     const uStructureAnalysisPrevTex = gl.getUniformLocation(
       this.#structureAnalysisProgram,
@@ -987,8 +983,6 @@ export class VideoRenderer {
       !uBlurTexel ||
       !uBlurDirection ||
       !uHistoryTex ||
-      !uHistoryResolution ||
-      !uHistoryFeedbackAmount ||
       !uStructureAnalysisTex ||
       !uStructureAnalysisPrevTex ||
       !uStructureAnalysisResolution ||
@@ -1016,8 +1010,6 @@ export class VideoRenderer {
     this.#uBlurTexel = uBlurTexel;
     this.#uBlurDirection = uBlurDirection;
     this.#uHistoryTex = uHistoryTex;
-    this.#uHistoryResolution = uHistoryResolution;
-    this.#uHistoryFeedbackAmount = uHistoryFeedbackAmount;
     this.#uStructureAnalysisTex = uStructureAnalysisTex;
     this.#uStructureAnalysisPrevTex = uStructureAnalysisPrevTex;
     this.#uStructureAnalysisResolution = uStructureAnalysisResolution;
@@ -1531,8 +1523,6 @@ export class VideoRenderer {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, final.tex);
     gl.uniform1i(this.#uHistoryTex, 0);
-    gl.uniform2f(this.#uHistoryResolution, this.#prevFrame.width, this.#prevFrame.height);
-    gl.uniform1f(this.#uHistoryFeedbackAmount, feedbackAmount);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     this.#writeTemporalHistoryFrame(this.#prevFrame);
     for (const bus of BUS_INDICES) {

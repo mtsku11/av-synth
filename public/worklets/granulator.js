@@ -283,7 +283,12 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     this.controlSeq = -1;
     this.controlCache = new Float32Array(DEFAULT_CONTROL_VALUES);
     this.emitInterpModeMessages = true;
-    this.emitDiagnosticMessages = false;
+    this.forceNoSpawn = false;
+    this.enableRuntimeSnapshotWrites = true;
+    this.controlSyncCallCount = 0;
+    this.controlSeqChangeCount = 0;
+    this.controlCacheCopyCount = 0;
+    this.parameterLookupCount = 0;
 
     this.grainRingHeader = null;
     this.grainRingData = null;
@@ -296,10 +301,6 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     this.runtimeDiagNextSampleSec = 0;
     this.totalSpawnCount = 0;
     this.totalStealCount = 0;
-
-    // TEMP DIAGNOSTIC (B2.3 allocation audit): reported from the first process() call
-    // because the main-side handler isn't installed until after construction.
-    this.diagSabReported = false;
 
     const processorOptions = options?.processorOptions;
     if (
@@ -331,8 +332,11 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     if (typeof processorOptions?.emitInterpModeMessages === 'boolean') {
       this.emitInterpModeMessages = processorOptions.emitInterpModeMessages;
     }
-    if (typeof processorOptions?.emitDiagnosticMessages === 'boolean') {
-      this.emitDiagnosticMessages = processorOptions.emitDiagnosticMessages;
+    if (typeof processorOptions?.forceNoSpawn === 'boolean') {
+      this.forceNoSpawn = processorOptions.forceNoSpawn;
+    }
+    if (typeof processorOptions?.enableRuntimeSnapshotWrites === 'boolean') {
+      this.enableRuntimeSnapshotWrites = processorOptions.enableRuntimeSnapshotWrites;
     }
 
     this.port.onmessage = (ev) => this.handleMessage(ev.data);
@@ -345,6 +349,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     this.srcReady = this.srcLen >= SINC_TAPS;
     this.samplesUntilNextSpawn = 0;
     this.lastPositionK = -1;
+    this.resetControlAudit();
     this.resetRuntimeDiagnostics();
     this.port.postMessage({
       type: 'loaded',
@@ -385,6 +390,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       }
       case 'enable':
         this.enabled = !!msg.value;
+        this.resetControlAudit();
         if (!this.enabled) this.resetRuntimeDiagnostics();
         break;
       case 'clear':
@@ -401,6 +407,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         this.pendingNoteRead = 0;
         this.pendingNoteWrite = 0;
         this.pendingNoteCount = 0;
+        this.resetControlAudit();
         this.resetRuntimeDiagnostics();
         break;
       case 'reseed':
@@ -417,8 +424,28 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         if (typeof msg.emitInterpModeMessages === 'boolean') {
           this.emitInterpModeMessages = msg.emitInterpModeMessages;
         }
-        if (typeof msg.emitDiagnosticMessages === 'boolean') {
-          this.emitDiagnosticMessages = msg.emitDiagnosticMessages;
+        if (typeof msg.forceNoSpawn === 'boolean') {
+          this.forceNoSpawn = msg.forceNoSpawn;
+        }
+        if (typeof msg.enableRuntimeSnapshotWrites === 'boolean') {
+          this.enableRuntimeSnapshotWrites = msg.enableRuntimeSnapshotWrites;
+        }
+        break;
+      case 'getControlAudit':
+        {
+          const audit = this.sampleControlAuditState();
+          this.port.postMessage({
+            type: 'controlAudit',
+            controlSeqChanges: this.controlSeqChangeCount,
+            cacheCopyCount: this.controlCacheCopyCount,
+            parameterLookupCount: this.parameterLookupCount,
+            syncCallCount: this.controlSyncCallCount,
+            activeVoices: audit.activeVoices,
+            fadingVoices: audit.fadingVoices,
+            spawnCount: audit.spawnCount,
+            stealCount: audit.stealCount,
+            pitchLoad: audit.pitchLoad,
+          });
         }
         break;
       case 'noteOn': {
@@ -461,22 +488,37 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     this.pendingNoteCount++;
   }
 
+  resetControlAudit() {
+    this.controlSyncCallCount = 0;
+    this.controlSeqChangeCount = 0;
+    this.controlCacheCopyCount = 0;
+    this.parameterLookupCount = 0;
+  }
+
   syncSharedControls() {
+    this.controlSyncCallCount++;
     const header = this.controlHeader;
     const data = this.controlData;
     if (!header || !data) return;
     const seq = Atomics.load(header, CONTROL_WRITE_SEQ_IDX);
     if (seq === this.controlSeq) return;
     this.controlSeq = seq;
+    this.controlSeqChangeCount++;
     this.controlCache.set(data);
+    this.controlCacheCopyCount++;
   }
 
   readControl(parameters, name, index) {
+    this.parameterLookupCount++;
     const block = parameters[name];
     if (block && block.length > 0) {
       const value = block[0];
       if (Number.isFinite(value)) return value;
     }
+    return this.controlCache[index];
+  }
+
+  readCachedControl(index) {
     return this.controlCache[index];
   }
 
@@ -746,6 +788,26 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     Atomics.store(this.runtimeDiagHeader, RUNTIME_DIAG_WRITE_SEQ_IDX, this.runtimeDiagWriteSeq);
   }
 
+  sampleControlAuditState() {
+    let activeVoices = 0;
+    let fadingVoices = 0;
+    let pitchLoad = 0;
+    for (let i = 0; i < POOL_SIZE; i++) {
+      if (!this.vActive[i]) continue;
+      activeVoices++;
+      if (this.vFading[i]) fadingVoices++;
+      const ratio = this.vRatio[i];
+      pitchLoad += Math.max(1, ratio < 0 ? -ratio : ratio);
+    }
+    return {
+      activeVoices,
+      fadingVoices,
+      spawnCount: this.totalSpawnCount,
+      stealCount: this.totalStealCount,
+      pitchLoad,
+    };
+  }
+
   process(_inputs, outputs, parameters) {
     const out = outputs[0];
     if (!out || out.length === 0) return true;
@@ -759,44 +821,68 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     }
 
     if (!this.enabled || !this.srcReady) return true;
-
-    // TEMP DIAGNOSTIC (B2.3 allocation audit): one-time SAB-availability ping.
-    if (this.emitDiagnosticMessages && !this.diagSabReported) {
-      this.diagSabReported = true;
-      this.port.postMessage({
-        type: 'diag',
-        kind: 'sab',
-        avail: this.grainRingHeader ? 1 : 0,
-      });
-    }
-
     this.syncSharedControls();
 
-    const position = this.readControl(parameters, 'position', CONTROL_POSITION);
-    const positionJitter = this.readControl(parameters, 'positionJitter', CONTROL_POSITION_JITTER);
-    const pitchSt = this.readControl(parameters, 'pitch', CONTROL_PITCH);
-    const pitchJitter = this.readControl(parameters, 'pitchJitter', CONTROL_PITCH_JITTER);
-    const duration = this.readControl(parameters, 'duration', CONTROL_DURATION);
-    const durationJitter = this.readControl(parameters, 'durationJitter', CONTROL_DURATION_JITTER);
-    const density = Math.max(0.1, this.readControl(parameters, 'density', CONTROL_DENSITY));
-    const distribution = this.readControl(parameters, 'distribution', CONTROL_DISTRIBUTION);
-    const envelopeIdx = Math.max(
-      0,
-      Math.min(ENV_COUNT - 1, this.readControl(parameters, 'envelope', CONTROL_ENVELOPE) | 0),
-    );
-    const panSpread = this.readControl(parameters, 'panSpread', CONTROL_PAN_SPREAD);
-    const ySpread = this.readControl(parameters, 'ySpread', CONTROL_Y_SPREAD);
-    const reverseProbability = this.readControl(
-      parameters,
-      'reverseProbability',
-      CONTROL_REVERSE_PROBABILITY,
-    );
-    const voiceCount = Math.max(
-      1,
-      Math.min(POOL_SIZE, this.readControl(parameters, 'voiceCount', CONTROL_VOICE_COUNT) | 0),
-    );
-    const mode = Math.max(0, Math.min(2, this.readControl(parameters, 'mode', CONTROL_MODE) | 0));
-    const gain = this.readControl(parameters, 'gain', CONTROL_GAIN);
+    let position;
+    let positionJitter;
+    let pitchSt;
+    let pitchJitter;
+    let duration;
+    let durationJitter;
+    let density;
+    let distribution;
+    let envelopeIdx;
+    let panSpread;
+    let ySpread;
+    let reverseProbability;
+    let voiceCount;
+    let mode;
+    let gain;
+    const hasSharedControls = !!this.controlHeader && !!this.controlData;
+    if (hasSharedControls) {
+      const cache = this.controlCache;
+      position = cache[CONTROL_POSITION];
+      positionJitter = cache[CONTROL_POSITION_JITTER];
+      pitchSt = cache[CONTROL_PITCH];
+      pitchJitter = cache[CONTROL_PITCH_JITTER];
+      duration = cache[CONTROL_DURATION];
+      durationJitter = cache[CONTROL_DURATION_JITTER];
+      density = Math.max(0.1, cache[CONTROL_DENSITY]);
+      distribution = cache[CONTROL_DISTRIBUTION];
+      envelopeIdx = Math.max(0, Math.min(ENV_COUNT - 1, cache[CONTROL_ENVELOPE] | 0));
+      panSpread = cache[CONTROL_PAN_SPREAD];
+      ySpread = cache[CONTROL_Y_SPREAD];
+      reverseProbability = cache[CONTROL_REVERSE_PROBABILITY];
+      voiceCount = Math.max(1, Math.min(POOL_SIZE, cache[CONTROL_VOICE_COUNT] | 0));
+      mode = Math.max(0, Math.min(2, cache[CONTROL_MODE] | 0));
+      gain = cache[CONTROL_GAIN];
+    } else {
+      position = this.readControl(parameters, 'position', CONTROL_POSITION);
+      positionJitter = this.readControl(parameters, 'positionJitter', CONTROL_POSITION_JITTER);
+      pitchSt = this.readControl(parameters, 'pitch', CONTROL_PITCH);
+      pitchJitter = this.readControl(parameters, 'pitchJitter', CONTROL_PITCH_JITTER);
+      duration = this.readControl(parameters, 'duration', CONTROL_DURATION);
+      durationJitter = this.readControl(parameters, 'durationJitter', CONTROL_DURATION_JITTER);
+      density = Math.max(0.1, this.readControl(parameters, 'density', CONTROL_DENSITY));
+      distribution = this.readControl(parameters, 'distribution', CONTROL_DISTRIBUTION);
+      envelopeIdx = Math.max(
+        0,
+        Math.min(ENV_COUNT - 1, this.readControl(parameters, 'envelope', CONTROL_ENVELOPE) | 0),
+      );
+      panSpread = this.readControl(parameters, 'panSpread', CONTROL_PAN_SPREAD);
+      ySpread = this.readControl(parameters, 'ySpread', CONTROL_Y_SPREAD);
+      reverseProbability = this.readControl(
+        parameters,
+        'reverseProbability',
+        CONTROL_REVERSE_PROBABILITY,
+      );
+      voiceCount = Math.max(
+        1,
+        Math.min(POOL_SIZE, this.readControl(parameters, 'voiceCount', CONTROL_VOICE_COUNT) | 0),
+      );
+      mode = Math.max(0, Math.min(2, this.readControl(parameters, 'mode', CONTROL_MODE) | 0));
+      gain = this.readControl(parameters, 'gain', CONTROL_GAIN);
+    }
 
     const basePitchRatio = Math.pow(2, pitchSt / 12);
     const meanSamplesPerGrain = Math.max(1, (sampleRate / density) | 0);
@@ -814,7 +900,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     // subStartFrame=0 with baked per-grain velocity gain. Triggered-note pitch now stays
     // local to the tagged grain voices; the ambient cloud remains on the shared `pitch`
     // control slot.
-    if (this.pendingNoteCount > 0) {
+    if (!this.forceNoSpawn && this.pendingNoteCount > 0) {
       while (this.pendingNoteCount > 0) {
         const idx = this.pendingNoteRead;
         this.spawnGrain(
@@ -840,7 +926,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     }
 
     let scanCursor = 0;
-    while (scanCursor < N) {
+    while (!this.forceNoSpawn && scanCursor < N) {
       if (this.samplesUntilNextSpawn <= 0) {
         this.spawnGrain(
           scanCursor,
@@ -901,10 +987,6 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       pitchLoad * SINC_TAPS > INTERP_COST_BUDGET ? INTERP_HERMITE : INTERP_SINC;
     if (nextInterpMode !== this.interpMode) {
       this.interpMode = nextInterpMode;
-      if (this.emitDiagnosticMessages) {
-        // TEMP DIAGNOSTIC (B2.3 allocation audit): dedicated diag channel for the toggle.
-        this.port.postMessage({ type: 'diag', kind: 'toggle', mode: nextInterpMode });
-      }
       if (this.emitInterpModeMessages) {
         this.port.postMessage({
           type: 'interpMode',
@@ -913,7 +995,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       }
     }
 
-    while (this.runtimeDiagElapsedSec >= this.runtimeDiagNextSampleSec) {
+    while (this.enableRuntimeSnapshotWrites && this.runtimeDiagElapsedSec >= this.runtimeDiagNextSampleSec) {
       this.writeRuntimeDiagnosticSnapshot(
         activeNow,
         fadingNow,

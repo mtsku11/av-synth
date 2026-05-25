@@ -15,28 +15,8 @@ import frag from '../video/shaders/source-voronoi.frag?raw';
 import type { CouplingContext, OperatorCoupling } from '../core/coupling';
 import type { SourceDef } from '../core/sources';
 import type { VideoSourceStage } from '../video/sources';
-import type { AudioSourceStage } from '../audio/sources';
+
 import { compileProgram, reqUniform } from '../video/glsl';
-
-const CURVE_SAMPLES = 256;
-const BASE_FILTER_HZ = 2000;
-const SPEED_LFO_DEPTH_HZ = 1200;
-const NOISE_BUFFER_SECONDS = 2;
-
-function makeEnvelopeCurve(blending: number): Float32Array<ArrayBuffer> {
-  // Smoothstep with edges at ±b, applied to a sinusoid in [-1, 1].
-  // b → 0 yields a hard step (rect-like grains); b → 1 yields a smooth
-  // ramp (Hann-like grains).
-  // ArrayBuffer-backed (not ArrayBufferLike) so WaveShaperNode.curve accepts it.
-  const b = Math.max(0.01, blending);
-  const c = new Float32Array(new ArrayBuffer(CURVE_SAMPLES * 4));
-  for (let i = 0; i < CURVE_SAMPLES; i++) {
-    const x = (i / (CURVE_SAMPLES - 1)) * 2 - 1;
-    const t = Math.max(0, Math.min(1, (x + b) / (2 * b)));
-    c[i] = t * t * (3 - 2 * t);
-  }
-  return c;
-}
 
 class VoronoiVideoStage implements VideoSourceStage {
   readonly kind = 'voronoi';
@@ -72,98 +52,8 @@ class VoronoiVideoStage implements VideoSourceStage {
   }
 }
 
-class VoronoiAudioStage implements AudioSourceStage {
-  readonly kind = 'voronoi';
-  readonly output: GainNode;
-  readonly #noise: AudioBufferSourceNode;
-  readonly #filter: BiquadFilterNode;
-  readonly #vca: GainNode;
-  readonly #grainLfo: OscillatorNode;
-  readonly #shaper: WaveShaperNode;
-  readonly #nyquist: number;
-  #lastBlending = -1;
-
-  constructor(ctx: AudioContext) {
-    this.#nyquist = ctx.sampleRate / 2;
-
-    const buf = ctx.createBuffer(1, ctx.sampleRate * NOISE_BUFFER_SECONDS, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-    this.#noise = ctx.createBufferSource();
-    this.#noise.buffer = buf;
-    this.#noise.loop = true;
-
-    this.#filter = ctx.createBiquadFilter();
-    this.#filter.type = 'lowpass';
-    this.#filter.frequency.value = BASE_FILTER_HZ;
-    this.#filter.Q.value = 1.2;
-
-    this.#vca = ctx.createGain();
-    this.#vca.gain.value = 0; // gain comes entirely from the modulator
-
-    this.#grainLfo = ctx.createOscillator();
-    this.#grainLfo.type = 'sine';
-    this.#grainLfo.frequency.value = 5;
-
-    this.#shaper = ctx.createWaveShaper();
-    this.#shaper.curve = makeEnvelopeCurve(0.3);
-    this.#shaper.oversample = '2x';
-
-    this.output = ctx.createGain();
-    this.output.gain.value = 1;
-
-    this.#noise.connect(this.#filter).connect(this.#vca).connect(this.output);
-    this.#grainLfo.connect(this.#shaper).connect(this.#vca.gain);
-
-    this.#noise.start();
-    this.#grainLfo.start();
-  }
-
-  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
-    const scale = Math.max(0, params['scale'] ?? 5);
-    const speed = params['speed'] ?? 0.3;
-    const blending = Math.max(0, Math.min(1, params['blending'] ?? 0.3));
-
-    const density = Math.min(this.#nyquist / 2, scale);
-    this.#grainLfo.frequency.setTargetAtTime(density, ctx.time, 0.02);
-
-    // Filter wobble via JS-driven k-rate update (no continuous schedule).
-    const wobble = Math.sin(2 * Math.PI * speed * ctx.time);
-    const cutoff = Math.min(
-      this.#nyquist - 1,
-      Math.max(80, BASE_FILTER_HZ + SPEED_LFO_DEPTH_HZ * wobble),
-    );
-    this.#filter.frequency.setTargetAtTime(cutoff, ctx.time, 0.02);
-
-    if (blending !== this.#lastBlending) {
-      this.#shaper.curve = makeEnvelopeCurve(blending);
-      this.#lastBlending = blending;
-    }
-  }
-
-  dispose(): void {
-    try {
-      this.#noise.stop();
-    } catch {
-      // already stopped
-    }
-    try {
-      this.#grainLfo.stop();
-    } catch {
-      // already stopped
-    }
-    this.#noise.disconnect();
-    this.#filter.disconnect();
-    this.#vca.disconnect();
-    this.#grainLfo.disconnect();
-    this.#shaper.disconnect();
-    this.output.disconnect();
-  }
-}
-
 const coupling: OperatorCoupling = {
   op: 'voronoi',
-  kind: 'fully-coupled',
   params: {
     scale: {
       spec: {
@@ -176,7 +66,6 @@ const coupling: OperatorCoupling = {
         hint: 'cells-per-screen (video) / grain density Hz (audio) via baseFreq',
       },
       toVideo: (v) => v,
-      toAudio: (v, ctx) => v * ctx.baseFreq,
     },
     speed: {
       spec: {
@@ -189,7 +78,6 @@ const coupling: OperatorCoupling = {
         hint: 'cell motion (video) / filter LFO Hz (audio, k-rate)',
       },
       toVideo: (v) => v,
-      toAudio: (v) => v,
     },
     blending: {
       spec: {
@@ -202,7 +90,6 @@ const coupling: OperatorCoupling = {
         hint: 'cell-boundary smoothness ↔ grain-envelope smoothness',
       },
       toVideo: (v) => v,
-      toAudio: (v) => v,
     },
   },
 };
@@ -214,8 +101,5 @@ export const voronoiDef: SourceDef = {
   defaults: { scale: 5, speed: 0.3, blending: 0.3 },
   createVideoStage(gl) {
     return new VoronoiVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new VoronoiAudioStage(ctx);
   },
 };

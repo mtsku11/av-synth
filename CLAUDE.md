@@ -103,10 +103,10 @@ Do not reintroduce the old assumption that "coupled" means "every Hydra operator
 
 ### Audio rules
 
-- The shipped public audio surface is: **granulator + feedback delay + master limiter**.
+- The shipped public audio surface is: **granulator + feedback delay + master limiter**. This is now structurally enforced — `OperatorDef` has no `createAudioStage`, every per-op `AudioStage` class has been deleted, and `OperatorCoupling` has no audio side. See `plan.md §10.4.9` for the 2026-05-25 strip.
 - Before touching audio, MIDI, or modulation routing, read `references/granulator-port-spec.md`.
-- Do **not** add new public audio-engine families (`FM`, `fold`, `freeze`, `tone`, `space`, etc.) unless the user explicitly changes scope and the docs are updated first.
-- Legacy worklets/rack engines can be reused internally if they materially help implementation, but do not keep or expand them as public cards just because they already exist.
+- Do **not** add new public audio-engine families (`FM`, `fold`, `freeze`, `tone`, `space`, etc.) unless the user explicitly changes scope and the docs are updated first. Reintroducing the `AudioStage` interface or any per-op audio worklet is a scope change, not a cleanup; require an explicit decision before doing it.
+- The legacy AudioRack (`src/core/audio-rack.ts`, `src/ui/AudioRack.svelte`) and 24 video-op worklets (`feedback-freeze.js`, `modulate-*.js`, `phase-*.js`, `pitch-shifter.js`, `pixelate-*.js`, `self-modulator.js`, etc.) are deleted, not commented out. Do not resurrect them by reading git history without re-justifying scope.
 - **Sample-accurate timing matters.** Anything that schedules events uses the `AudioContext.currentTime` clock, not `setTimeout` or `requestAnimationFrame`.
 - **k-rate vs a-rate parameter automation** is a deliberate choice per operator. Document which in the worklet header.
 - **No clipping by default.** Master bus has a brick-wall limiter and a measurement tap. Loud presets must still measure under 0 dBFS true-peak.
@@ -132,13 +132,19 @@ Do not reintroduce the old assumption that "coupled" means "every Hydra operator
 
 ## 5. MCP servers & tools available
 
-This project's `.mcp.json` is not yet configured (see `todo.md`). Tools currently available from the harness:
+This project's `.mcp.json` registers `chrome-devtools`. Available tools:
 
 | Server | What it does | When to use |
 |---|---|---|
-| `github` | Repo, PR, issue, branch, commit operations. | Once we push this to a GitHub repo. For PR reviews use the pending-review workflow (`pull_request_review_write` → `add_comment_to_pending_review` → `submit_pending`). |
-| `playwright` | Headless browser automation. Navigate, screenshot, click, evaluate JS. | **Mandatory post-deploy visual verification** per global rules. Also for end-to-end UI tests of the synth UI once it's hosted. |
+| `github` | Repo, PR, issue, branch, commit operations. | For PR reviews use the pending-review workflow (`pull_request_review_write` → `add_comment_to_pending_review` → `submit_pending`). |
+| `playwright` | Headless browser automation. Navigate, screenshot, click, evaluate JS. | **Mandatory post-deploy visual verification** per global rules. Also for end-to-end UI tests of the synth UI. |
+| `chrome-devtools` | Drives a real Chrome over the DevTools Protocol — Performance profiler, allocation timeline, console, AudioContext inspection, network throttling. | **Manual** perf / audio verification on this app: profiling worklet GC, listening to granulator output, watching the AudioContext graph. Use it where Playwright is weakest (real-time perf and audio). |
 | `claude_ai_Gmail` / `Google_Calendar` / `Google_Drive` | Personal Google account integrations. | Not relevant to product work; do not invoke without an explicit ask. |
+
+Project-local Claude Code skills (in `.claude/skills/`):
+
+- `/granulator-soak` — run the B2.3 soak gate (canary, full 4h, `--no-spawn`, `--cold`) and print a parsed verdict. See `.claude/skills/granulator-soak/SKILL.md`.
+- `/verify` — diff-driven gate runner. Classifies changed files, runs only the matching gates (check, worklet-unit, audit-case, soak-canary, screenshot), and prints one verdict block. Shadows the built-in `/verify` in this repo.
 
 CLI tools (always available, see `~/.claude/CLAUDE.md`):
 
@@ -157,6 +163,12 @@ Inherits the global Post-Push Verification Protocol. Plus, for this project spec
 - **Any video shader change** → load the app, run each preset, scrub each slider end-to-end. Capture screenshots via Playwright for regressions.
 - **Any coupling or LFO-routing change** → both domains must reflect the same source assignment and depth, and no bespoke per-operator modulation UI should appear unless the user explicitly asks for it.
 - **Any granulator implementation step** → verify against `references/granulator-port-spec.md` instead of the old rack behavior. Legacy operator-audio tests are not enough to claim success on the new audio direction.
+
+### Automated gates
+
+- **Pre-push hook** (`scripts/hooks/pre-push`) runs `svelte-check` and worklet/core unit tests locally before every push. Enable once per clone with `git config core.hooksPath scripts/hooks`. Do not bypass with `--no-verify` except in a declared emergency.
+- **CI: `qa.yml`** runs the full audit matrix on every push/PR to `main`.
+- **CI: `granulator-soak.yml`** runs the 60s warmed B2.3 canary on push/PR to `main` when the diff touches `src/audio/**`, `public/worklets/**`, `src/core/mod-bank.ts`, `src/core/grain-scheduler.ts`, the soak spec, or the Playwright config. This is the path-filtered release gate for the granulator hot path — the honest 4-hour soak (`/granulator-soak --full`) stays local.
 
 ---
 

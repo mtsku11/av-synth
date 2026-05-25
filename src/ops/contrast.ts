@@ -1,18 +1,7 @@
 import frag from '../video/shaders/contrast.frag?raw';
-import type { OperatorDef, VideoStage, AudioStage } from '../core/operators';
+import type { OperatorDef, VideoStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
-
-function makeContrastCurve(amount: number, samples = 2048): Float32Array<ArrayBuffer> {
-  const curve = new Float32Array(samples);
-  const drive = Math.max(0.05, amount);
-  const norm = Math.tanh(drive);
-  for (let i = 0; i < samples; i++) {
-    const x = (i / (samples - 1)) * 2 - 1;
-    curve[i] = Math.tanh(x * drive) / norm;
-  }
-  return curve;
-}
 
 class ContrastVideoStage implements VideoStage {
   readonly op = 'contrast';
@@ -40,47 +29,12 @@ class ContrastVideoStage implements VideoStage {
   }
 }
 
-class ContrastAudioStage implements AudioStage {
-  readonly op = 'contrast';
-  readonly input: GainNode;
-  readonly output: GainNode;
-  readonly #shaper: WaveShaperNode;
-  #lastAmount = -1;
-
-  constructor(ctx: AudioContext) {
-    this.input = ctx.createGain();
-    this.output = ctx.createGain();
-    this.#shaper = ctx.createWaveShaper();
-    this.#shaper.oversample = '4x';
-    this.input.connect(this.#shaper);
-    this.#shaper.connect(this.output);
-    this.#rebuildCurve(1);
-  }
-
-  #rebuildCurve(amount: number): void {
-    if (Math.abs(amount - this.#lastAmount) < 1e-6) return;
-    this.#shaper.curve = makeContrastCurve(amount);
-    this.#lastAmount = amount;
-  }
-
-  setParams(params: Readonly<Record<string, number>>, _ctx: CouplingContext): void {
-    this.#rebuildCurve(Math.max(0.05, params['amount'] ?? 1));
-  }
-
-  dispose(): void {
-    this.input.disconnect();
-    this.#shaper.disconnect();
-    this.output.disconnect();
-  }
-}
-
 export const contrastDef: OperatorDef = {
   op: 'contrast',
   paramOrder: ['amount'],
   defaults: { amount: 1 },
   coupling: {
     op: 'contrast',
-    kind: 'fully-coupled',
     params: {
       amount: {
         spec: {
@@ -93,14 +47,10 @@ export const contrastDef: OperatorDef = {
           hint: 'contrast around mid-grey / soft-clip drive around zero',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
     },
   },
   createVideoStage(gl) {
     return new ContrastVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new ContrastAudioStage(ctx);
   },
 };

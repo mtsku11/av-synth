@@ -14,7 +14,6 @@ function makeInstance(
 ): OperatorInstance {
   const coupling: OperatorCoupling = {
     op,
-    kind: 'fully-coupled',
     params: Object.fromEntries(
       Object.keys(defaults).map((paramId) => [
         paramId,
@@ -28,7 +27,6 @@ function makeInstance(
             unit: 'norm',
           },
           toVideo: (raw) => raw,
-          toAudio: (raw) => raw,
         },
       ]),
     ),
@@ -46,20 +44,12 @@ function makeInstance(
       setUniforms: () => {},
       dispose: () => {},
     }),
-    createAudioStage: () => ({
-      op,
-      input: null as never,
-      output: null as never,
-      setParams: () => {},
-      dispose: () => {},
-    }),
   };
 
   return {
     id,
     def,
     videoStage: null as never,
-    audioStage: null,
     params,
     lfoAssignments: Object.fromEntries(
       Object.keys(defaults).map((paramId) => [paramId, createParamLfoAssignment()]),

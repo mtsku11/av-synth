@@ -7,7 +7,6 @@ import frag from '../video/shaders/repeat.frag?raw';
 import type { OperatorDef, VideoStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
-import { RepeatTextureAudioStage } from './repeat-audio';
 
 class RepeatVideoStage implements VideoStage {
   readonly op = 'repeat';
@@ -51,7 +50,6 @@ export const repeatDef: OperatorDef = {
   defaults: { repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0 },
   coupling: {
     op: 'repeat',
-    kind: 'fully-coupled',
     params: {
       repeatX: {
         spec: {
@@ -64,7 +62,6 @@ export const repeatDef: OperatorDef = {
           hint: 'X tiles (video) / recent-time grain repeat density (audio)',
         },
         toVideo: (c01) => c01,
-        toAudio: (c01) => c01,
       },
       repeatY: {
         spec: {
@@ -77,7 +74,6 @@ export const repeatDef: OperatorDef = {
           hint: 'Y tiles (video) / stereo grain repeat density (audio)',
         },
         toVideo: (c01) => c01,
-        toAudio: (c01) => c01,
       },
       offsetX: {
         spec: {
@@ -90,7 +86,6 @@ export const repeatDef: OperatorDef = {
           hint: 'X tile phase shift / grain loop position bias',
         },
         toVideo: (c01) => c01,
-        toAudio: (c01) => c01,
       },
       offsetY: {
         spec: {
@@ -103,14 +98,10 @@ export const repeatDef: OperatorDef = {
           hint: 'Y tile phase shift / stereo grain phase bias',
         },
         toVideo: (c01) => c01,
-        toAudio: (c01) => c01,
       },
     },
   },
   createVideoStage(gl) {
     return new RepeatVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new RepeatTextureAudioStage(ctx);
   },
 };

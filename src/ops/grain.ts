@@ -1,5 +1,5 @@
 import frag from '../video/shaders/grain.frag?raw';
-import type { AudioStage, OperatorDef, VideoStage } from '../core/operators';
+import type { OperatorDef, VideoStage } from '../core/operators';
 import type { CouplingContext } from '../core/coupling';
 import { compileProgram, reqUniform } from '../video/glsl';
 
@@ -59,121 +59,6 @@ class GrainVideoStage implements VideoStage {
   }
 }
 
-class GrainAudioStage implements AudioStage {
-  readonly op = 'grain';
-  readonly input: GainNode;
-  readonly output: GainNode;
-  readonly #worklet: AudioWorkletNode;
-  readonly #size: AudioParam;
-  readonly #density: AudioParam;
-  readonly #spray: AudioParam;
-  readonly #position: AudioParam;
-  readonly #pitch: AudioParam;
-  readonly #reverse: AudioParam;
-  readonly #shape: AudioParam;
-  readonly #spread: AudioParam;
-  readonly #mix: AudioParam;
-  readonly #dcBlocker: BiquadFilterNode;
-  readonly #compensate: GainNode;
-
-  constructor(ctx: AudioContext) {
-    this.input = ctx.createGain();
-    this.output = ctx.createGain();
-    this.#worklet = new AudioWorkletNode(ctx, 'granular-processor', {
-      numberOfInputs: 1,
-      numberOfOutputs: 1,
-      outputChannelCount: [2],
-      parameterData: {
-        size: 0.08,
-        density: 8,
-        spray: 0.2,
-        position: 0.35,
-        pitch: 0,
-        reverse: 0,
-        shape: 0.55,
-        spread: 0.2,
-        mix: 0,
-      },
-    });
-    const size = this.#worklet.parameters.get('size');
-    const density = this.#worklet.parameters.get('density');
-    const spray = this.#worklet.parameters.get('spray');
-    const position = this.#worklet.parameters.get('position');
-    const pitch = this.#worklet.parameters.get('pitch');
-    const reverse = this.#worklet.parameters.get('reverse');
-    const shape = this.#worklet.parameters.get('shape');
-    const spread = this.#worklet.parameters.get('spread');
-    const mix = this.#worklet.parameters.get('mix');
-    if (
-      !size ||
-      !density ||
-      !spray ||
-      !position ||
-      !pitch ||
-      !reverse ||
-      !shape ||
-      !spread ||
-      !mix
-    ) {
-      throw new Error('grain: missing worklet params');
-    }
-    this.#size = size;
-    this.#density = density;
-    this.#spray = spray;
-    this.#position = position;
-    this.#pitch = pitch;
-    this.#reverse = reverse;
-    this.#shape = shape;
-    this.#spread = spread;
-    this.#mix = mix;
-    this.#dcBlocker = ctx.createBiquadFilter();
-    this.#dcBlocker.type = 'highpass';
-    this.#dcBlocker.frequency.value = 18;
-    this.#dcBlocker.Q.value = 0.0001;
-    this.#compensate = ctx.createGain();
-    this.#compensate.gain.value = 1;
-    this.input.connect(this.#worklet);
-    this.#worklet.connect(this.#dcBlocker);
-    this.#dcBlocker.connect(this.#compensate);
-    this.#compensate.connect(this.output);
-  }
-
-  setParams(params: Readonly<Record<string, number>>, ctx: CouplingContext): void {
-    const now = ctx.time;
-    const density = params['density'] ?? 8;
-    const spray = params['spray'] ?? 0.2;
-    const pitch = params['pitch'] ?? 0;
-    const mix = params['mix'] ?? 0;
-    this.#size.setTargetAtTime(params['size'] ?? 0.08, now, 0.03);
-    this.#density.setTargetAtTime(density, now, 0.03);
-    this.#spray.setTargetAtTime(spray, now, 0.03);
-    this.#position.setTargetAtTime(params['position'] ?? 0.35, now, 0.03);
-    this.#pitch.setTargetAtTime(pitch, now, 0.03);
-    this.#reverse.setTargetAtTime(params['reverse'] ?? 0, now, 0.03);
-    this.#shape.setTargetAtTime(params['shape'] ?? 0.55, now, 0.03);
-    this.#spread.setTargetAtTime(params['spread'] ?? 0.2, now, 0.03);
-    this.#mix.setTargetAtTime(mix, now, 0.03);
-    const compensation =
-      1 -
-      mix +
-      mix *
-        (1 /
-          (1 +
-            Math.max(0, density - 8) * 0.015 +
-            Math.abs(pitch) * 0.12 +
-            spray * 0.18));
-    this.#compensate.gain.setTargetAtTime(compensation, now, 0.03);
-  }
-
-  dispose(): void {
-    this.input.disconnect();
-    this.#worklet.disconnect();
-    this.#dcBlocker.disconnect();
-    this.#compensate.disconnect();
-    this.output.disconnect();
-  }
-}
-
 export const grainDef: OperatorDef = {
   op: 'grain',
   paramOrder: [
@@ -200,7 +85,6 @@ export const grainDef: OperatorDef = {
   },
   coupling: {
     op: 'grain',
-    kind: 'fully-coupled',
     params: {
       mix: {
         spec: {
@@ -213,7 +97,6 @@ export const grainDef: OperatorDef = {
           hint: 'dry/wet amount for the live granulator and the visual held-sample layer',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
       size: {
         spec: {
@@ -226,7 +109,6 @@ export const grainDef: OperatorDef = {
           hint: 'grain duration in seconds / visual grain footprint',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
       density: {
         spec: {
@@ -239,7 +121,6 @@ export const grainDef: OperatorDef = {
           hint: 'grains per second / visual reseed cadence and coverage',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
       position: {
         spec: {
@@ -252,7 +133,6 @@ export const grainDef: OperatorDef = {
           hint: 'lookback position inside the recent audio buffer / held-sample orbit bias',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
       spray: {
         spec: {
@@ -265,7 +145,6 @@ export const grainDef: OperatorDef = {
           hint: 'random start-position jitter per grain / random held-sample jitter',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
       pitch: {
         spec: {
@@ -278,7 +157,6 @@ export const grainDef: OperatorDef = {
           hint: 'per-grain pitch offset in octaves / held-sample drift scale',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
       reverse: {
         spec: {
@@ -291,7 +169,6 @@ export const grainDef: OperatorDef = {
           hint: 'probability that a grain plays backward / mirrored held-sample direction',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
       shape: {
         spec: {
@@ -304,7 +181,6 @@ export const grainDef: OperatorDef = {
           hint: 'window sharpness from pillowy to peaky / soft to sharp grain mask',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
       spread: {
         spec: {
@@ -317,14 +193,10 @@ export const grainDef: OperatorDef = {
           hint: 'stereo pan and offset spread per grain / channel spread between held samples',
         },
         toVideo: (raw) => raw,
-        toAudio: (raw) => raw,
       },
     },
   },
   createVideoStage(gl) {
     return new GrainVideoStage(gl);
-  },
-  createAudioStage(ctx) {
-    return new GrainAudioStage(ctx);
   },
 };
