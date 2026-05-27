@@ -1,10 +1,10 @@
 // Granulator — main-thread façade for the granulator-v1 AudioWorklet.
 //
-// Spec: references/granulator-port-spec.md. Implements the full 14-control surface (§6) plus
-// internal `gain`. Envelope and mode are exposed as string-typed helpers — internally they
-// reach the worklet as integer control-slot values inside a shared snapshot. The wrapper still
-// exposes a raw `output` node; the caller owns whether that output goes straight to the master
-// bus or through an intermediate post-effect such as the shared feedback delay.
+// Spec: references/granulator-port-spec.md. Implements the shipped public granulator surface plus
+// internal `gain`. Envelope, mode, and quality are exposed as string-typed helpers — internally
+// they reach the worklet as integer control-slot values inside a shared snapshot. The wrapper
+// still exposes a raw `output` node; the caller owns whether that output goes straight to the
+// master bus or through an intermediate post-effect such as the shared feedback delay.
 
 import { ensureAudioWorklets } from './worklets';
 import type { MidiChannel } from '../core/midi';
@@ -24,6 +24,7 @@ export type GranulatorParamName =
   | 'reverseProbability'
   | 'voiceCount'
   | 'mode'
+  | 'quality'
   | 'gain'
   | 'mix'
   | 'fmAmount'
@@ -37,6 +38,8 @@ export const GRANULATOR_ENVELOPES = ['hann', 'tukey-25', 'gaussian', 'expdec', '
 export type GranulatorEnvelope = (typeof GRANULATOR_ENVELOPES)[number];
 export const GRANULATOR_MODES = ['classic', 'loop', 'cloud'] as const;
 export type GranulatorMode = (typeof GRANULATOR_MODES)[number];
+export const GRANULATOR_QUALITIES = ['eco', 'balanced', 'high'] as const;
+export type GranulatorQuality = (typeof GRANULATOR_QUALITIES)[number];
 
 const ENVELOPE_INDEX: Record<GranulatorEnvelope, number> = {
   hann: 0,
@@ -50,6 +53,11 @@ const MODE_INDEX: Record<GranulatorMode, number> = {
   classic: 0,
   loop: 1,
   cloud: 2,
+};
+const QUALITY_INDEX: Record<GranulatorQuality, number> = {
+  eco: 0,
+  balanced: 1,
+  high: 2,
 };
 const CONTROL_ORDER: readonly GranulatorParamName[] = [
   'position',
@@ -66,6 +74,7 @@ const CONTROL_ORDER: readonly GranulatorParamName[] = [
   'reverseProbability',
   'voiceCount',
   'mode',
+  'quality',
   'gain',
   'mix',
   'fmAmount',
@@ -96,6 +105,7 @@ const CONTROL_DEFAULTS: Readonly<Record<GranulatorParamName, number>> = Object.f
   reverseProbability: 0,
   voiceCount: 32,
   mode: MODE_INDEX.classic,
+  quality: QUALITY_INDEX.balanced,
   gain: 0.7,
   mix: 1,
   fmAmount: 0,
@@ -108,7 +118,7 @@ const CONTROL_DEFAULTS: Readonly<Record<GranulatorParamName, number>> = Object.f
 const CONTROL_WRITE_SEQ_IDX = 0;
 const GRAIN_EVENT_RING_CAPACITY = 2048;
 const RUNTIME_DIAG_RING_CAPACITY = 256;
-const RUNTIME_DIAG_RING_FIELDS = 13;
+const RUNTIME_DIAG_RING_FIELDS = 17;
 const RUNTIME_DIAG_WRITE_SEQ_IDX = 0;
 const RUNTIME_DIAG_F_REL_TIME_SEC = 0;
 const RUNTIME_DIAG_F_ACTIVE_VOICES = 1;
@@ -123,6 +133,10 @@ const RUNTIME_DIAG_F_NORM_GAIN = 9;
 const RUNTIME_DIAG_F_DENSITY = 10;
 const RUNTIME_DIAG_F_VOICE_COUNT = 11;
 const RUNTIME_DIAG_F_MEAN_SAMPLES_PER_GRAIN = 12;
+const RUNTIME_DIAG_F_REQUESTED_QUALITY = 13;
+const RUNTIME_DIAG_F_EFFECTIVE_QUALITY = 14;
+const RUNTIME_DIAG_F_BUDGET_LIMITED = 15;
+const RUNTIME_DIAG_F_ADAPTIVE_QUALITY = 16;
 
 export interface GranulatorGrainRingTransport {
   readonly capacity: number;
@@ -150,6 +164,10 @@ export interface GranulatorRuntimeSnapshot {
   readonly density: number;
   readonly voiceCount: number;
   readonly meanSamplesPerGrain: number;
+  readonly requestedQuality: GranulatorQuality;
+  readonly effectiveQuality: GranulatorQuality;
+  readonly budgetLimited: boolean;
+  readonly adaptiveQuality: boolean;
 }
 
 export interface GranulatorOptions {
@@ -172,6 +190,12 @@ export interface GranulatorControlAudit {
   readonly pitchLoad: number;
 }
 
+const QUALITY_BY_INDEX: readonly GranulatorQuality[] = ['eco', 'balanced', 'high'];
+
+function decodeQualityIndex(value: number): GranulatorQuality {
+  return QUALITY_BY_INDEX[Math.max(0, Math.min(QUALITY_BY_INDEX.length - 1, value | 0))]!;
+}
+
 export class Granulator {
   readonly node: AudioWorkletNode;
   readonly output: AudioNode;
@@ -190,6 +214,7 @@ export class Granulator {
     resolve: (audit: GranulatorControlAudit | null) => void;
     reject: (reason?: unknown) => void;
   } | null = null;
+  #adaptiveQuality = false;
 
   constructor(ctx: BaseAudioContext, opts: GranulatorOptions = {}) {
     this.ctx = ctx;
@@ -313,6 +338,10 @@ export class Granulator {
         density: data[off + RUNTIME_DIAG_F_DENSITY] ?? 0,
         voiceCount: data[off + RUNTIME_DIAG_F_VOICE_COUNT] ?? 0,
         meanSamplesPerGrain: data[off + RUNTIME_DIAG_F_MEAN_SAMPLES_PER_GRAIN] ?? 0,
+        requestedQuality: decodeQualityIndex(data[off + RUNTIME_DIAG_F_REQUESTED_QUALITY] ?? 1),
+        effectiveQuality: decodeQualityIndex(data[off + RUNTIME_DIAG_F_EFFECTIVE_QUALITY] ?? 1),
+        budgetLimited: (data[off + RUNTIME_DIAG_F_BUDGET_LIMITED] ?? 0) >= 1,
+        adaptiveQuality: (data[off + RUNTIME_DIAG_F_ADAPTIVE_QUALITY] ?? 0) >= 1,
       });
     }
     return snapshots;
@@ -421,6 +450,16 @@ export class Granulator {
 
   setMode(name: GranulatorMode, atTime?: number): void {
     this.setParam('mode', MODE_INDEX[name], atTime);
+  }
+
+  setQuality(name: GranulatorQuality, atTime?: number): void {
+    this.setParam('quality', QUALITY_INDEX[name], atTime);
+  }
+
+  setAdaptiveQuality(enabled: boolean): void {
+    if (this.#disposed) return;
+    this.#adaptiveQuality = !!enabled;
+    this.node.port.postMessage({ type: 'setDiagnostics', adaptiveQuality: this.#adaptiveQuality });
   }
 
   setVoiceCount(count: number, atTime?: number): void {

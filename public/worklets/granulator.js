@@ -13,7 +13,6 @@
 
 const ENV_TABLE_LEN = 2048;
 const SINC_PHASES = 256;
-const SINC_TAPS = 8;
 const KAISER_BETA = 8.6;
 const POOL_SIZE = 64;
 const MIDI_CHANNELS = 16;
@@ -21,7 +20,6 @@ const PENDING_NOTE_CAPACITY = 128;
 const STEAL_FADE_SAMPLES = 64;
 const INTERP_SINC = 0;
 const INTERP_HERMITE = 1;
-const INTERP_COST_BUDGET = 192;
 const GRAIN_EVENT_RING_CAPACITY = 2048;
 const GRAIN_EVENT_RING_FIELDS = 10;
 const GRAIN_EVENT_WRITE_SEQ_IDX = 0;
@@ -35,7 +33,7 @@ const GRAIN_EVENT_F_PAN_X = 6;
 const GRAIN_EVENT_F_PAN_Y = 7;
 const GRAIN_EVENT_F_REVERSE = 8;
 const GRAIN_EVENT_F_ENVELOPE_INDEX = 9;
-const RUNTIME_DIAG_RING_FIELDS = 13;
+const RUNTIME_DIAG_RING_FIELDS = 17;
 const RUNTIME_DIAG_WRITE_SEQ_IDX = 0;
 const RUNTIME_DIAG_SAMPLE_INTERVAL_SEC = 0.125;
 const RUNTIME_DIAG_F_REL_TIME_SEC = 0;
@@ -51,6 +49,10 @@ const RUNTIME_DIAG_F_NORM_GAIN = 9;
 const RUNTIME_DIAG_F_DENSITY = 10;
 const RUNTIME_DIAG_F_VOICE_COUNT = 11;
 const RUNTIME_DIAG_F_MEAN_SAMPLES_PER_GRAIN = 12;
+const RUNTIME_DIAG_F_REQUESTED_QUALITY = 13;
+const RUNTIME_DIAG_F_EFFECTIVE_QUALITY = 14;
+const RUNTIME_DIAG_F_BUDGET_LIMITED = 15;
+const RUNTIME_DIAG_F_ADAPTIVE_QUALITY = 16;
 // Voice-count-aware normalisation: divide output by √(active voices) to keep
 // the sum of uncorrelated grains bounded (gate #6, spec §13). Smoothed over
 // ~30 ms to avoid zipper noise as polyphony changes.
@@ -62,7 +64,7 @@ const ENV_GAUSSIAN = 2;
 const ENV_EXPDEC = 3;
 const ENV_REXPDEC = 4;
 const ENV_COUNT = 5;
-const CONTROL_PARAM_COUNT = 22;
+const CONTROL_PARAM_COUNT = 23;
 const CONTROL_WRITE_SEQ_IDX = 0;
 const CONTROL_POSITION = 0;
 const CONTROL_POSITION_JITTER = 1;
@@ -78,26 +80,35 @@ const CONTROL_Y_SPREAD = 10;
 const CONTROL_REVERSE_PROBABILITY = 11;
 const CONTROL_VOICE_COUNT = 12;
 const CONTROL_MODE = 13;
-const CONTROL_GAIN = 14;
-const CONTROL_MIX = 15;
-const CONTROL_FM_AMOUNT = 16;
-const CONTROL_FM_FREQ = 17;
-const CONTROL_ENV_ATTACK = 18;
-const CONTROL_ENV_DECAY = 19;
-const CONTROL_ENV_SUSTAIN = 20;
-const CONTROL_ENV_RELEASE = 21;
+const CONTROL_QUALITY = 14;
+const CONTROL_GAIN = 15;
+const CONTROL_MIX = 16;
+const CONTROL_FM_AMOUNT = 17;
+const CONTROL_FM_FREQ = 18;
+const CONTROL_ENV_ATTACK = 19;
+const CONTROL_ENV_DECAY = 20;
+const CONTROL_ENV_SUSTAIN = 21;
+const CONTROL_ENV_RELEASE = 22;
 // ln(2)/12 — converts semitones to the exponent for 2^(st/12) via Math.exp.
 const LN2_12 = 0.05776226504666211;
 const TWO_PI = 6.283185307179586;
 const DEFAULT_CONTROL_VALUES = new Float32Array([
-  // pos  posJ  pit  pitJ  dur  durJ  den  dist  env  panS  yS  revP  vc  mode  gain  mix
-  0.5,     0,    0,   0,   80,   0,   20,   0,    0,   0,   0,   0,  32,   0,  0.7,  1.0,
+  // pos  posJ  pit  pitJ  dur  durJ  den  dist  env  panS  yS  revP  vc  mode qual gain  mix
+  0.5,     0,    0,   0,   80,   0,   20,   0,    0,   0,   0,   0,  32,   0,   1, 0.7,  1.0,
   // fmAmt  fmFreq  envAtk  envDcy  envSus  envRel
   0,        10,     10,     100,    1.0,    300,
 ]);
 
 const MODE_CLASSIC = 0;
 const MODE_CLOUD = 2;
+const QUALITY_ECO = 0;
+const QUALITY_BALANCED = 1;
+const QUALITY_HIGH = 2;
+const SINC_TAPS_BALANCED = 8;
+const SINC_TAPS_HIGH = 12;
+const INTERP_COST_BUDGET_ECO = 64;
+const INTERP_COST_BUDGET_BALANCED = 192;
+const INTERP_COST_BUDGET_HIGH = 384;
 
 function besselI0(x) {
   let sum = 1;
@@ -123,24 +134,25 @@ function sincSampled(t) {
   return Math.sin(pt) / pt;
 }
 
-function buildSincLut() {
-  const lut = new Float32Array(SINC_PHASES * SINC_TAPS);
-  const halfWidth = SINC_TAPS / 2; // 4
+function buildSincLut(taps) {
+  const lut = new Float32Array(SINC_PHASES * taps);
+  const halfWidth = taps / 2;
+  const centerOffset = Math.floor((taps - 1) / 2);
   const i0Beta = besselI0(KAISER_BETA);
   for (let phase = 0; phase < SINC_PHASES; phase++) {
     const frac = phase / SINC_PHASES;
     let rowSum = 0;
-    for (let k = 0; k < SINC_TAPS; k++) {
-      const m = k - 3; // tap offsets relative to i0: -3..+4
+    for (let k = 0; k < taps; k++) {
+      const m = k - centerOffset;
       const t = m - frac;
       const c = sincSampled(t) * kaiserSampled(t, halfWidth, KAISER_BETA, i0Beta);
-      lut[phase * SINC_TAPS + k] = c;
+      lut[phase * taps + k] = c;
       rowSum += c;
     }
     if (rowSum !== 0) {
       const inv = 1 / rowSum;
-      for (let k = 0; k < SINC_TAPS; k++) {
-        lut[phase * SINC_TAPS + k] *= inv;
+      for (let k = 0; k < taps; k++) {
+        lut[phase * taps + k] *= inv;
       }
     }
   }
@@ -231,7 +243,8 @@ function hermite4(y0, y1, y2, y3, t) {
   return ((c3 * t + c2) * t + c1) * t + c0;
 }
 
-const SINC_LUT = buildSincLut();
+const SINC_LUT_BALANCED = buildSincLut(SINC_TAPS_BALANCED);
+const SINC_LUT_HIGH = buildSincLut(SINC_TAPS_HIGH);
 const ENV_LUTS = buildEnvelopeLuts();
 
 class GranulatorV1Processor extends AudioWorkletProcessor {
@@ -309,6 +322,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     this.controlCache = new Float32Array(DEFAULT_CONTROL_VALUES);
     this.emitInterpModeMessages = true;
     this.forceNoSpawn = false;
+    this.adaptiveQuality = false;
     this.enableRuntimeSnapshotWrites = true;
     this.controlSyncCallCount = 0;
     this.controlSeqChangeCount = 0;
@@ -371,7 +385,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     this.srcL = left;
     this.srcR = right;
     this.srcLen = left.length;
-    this.srcReady = this.srcLen >= SINC_TAPS;
+    this.srcReady = this.srcLen >= SINC_TAPS_HIGH;
     this.samplesUntilNextSpawn = 0;
     this.lastPositionK = -1;
     this.resetControlAudit();
@@ -451,6 +465,9 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         }
         if (typeof msg.forceNoSpawn === 'boolean') {
           this.forceNoSpawn = msg.forceNoSpawn;
+        }
+        if (typeof msg.adaptiveQuality === 'boolean') {
+          this.adaptiveQuality = msg.adaptiveQuality;
         }
         if (typeof msg.enableRuntimeSnapshotWrites === 'boolean') {
           this.enableRuntimeSnapshotWrites = msg.enableRuntimeSnapshotWrites;
@@ -813,6 +830,9 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     density,
     voiceCount,
     meanSamplesPerGrain,
+    requestedQuality,
+    effectiveQuality,
+    budgetLimited,
   ) {
     if (!this.runtimeDiagHeader || !this.runtimeDiagData || this.runtimeDiagCapacity <= 0) return;
     const seq = this.runtimeDiagWriteSeq;
@@ -831,6 +851,10 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     ring[off + RUNTIME_DIAG_F_DENSITY] = density;
     ring[off + RUNTIME_DIAG_F_VOICE_COUNT] = voiceCount;
     ring[off + RUNTIME_DIAG_F_MEAN_SAMPLES_PER_GRAIN] = meanSamplesPerGrain;
+    ring[off + RUNTIME_DIAG_F_REQUESTED_QUALITY] = requestedQuality;
+    ring[off + RUNTIME_DIAG_F_EFFECTIVE_QUALITY] = effectiveQuality;
+    ring[off + RUNTIME_DIAG_F_BUDGET_LIMITED] = budgetLimited ? 1 : 0;
+    ring[off + RUNTIME_DIAG_F_ADAPTIVE_QUALITY] = this.adaptiveQuality ? 1 : 0;
     this.runtimeDiagWriteSeq = seq + 1;
     Atomics.store(this.runtimeDiagHeader, RUNTIME_DIAG_WRITE_SEQ_IDX, this.runtimeDiagWriteSeq);
   }
@@ -884,6 +908,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     let reverseProbability;
     let voiceCount;
     let mode;
+    let quality;
     let gain;
     let mix;
     let fmAmount;
@@ -909,6 +934,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       reverseProbability = cache[CONTROL_REVERSE_PROBABILITY];
       voiceCount = Math.max(1, Math.min(POOL_SIZE, cache[CONTROL_VOICE_COUNT] | 0));
       mode = Math.max(0, Math.min(2, cache[CONTROL_MODE] | 0));
+      quality = Math.max(QUALITY_ECO, Math.min(QUALITY_HIGH, cache[CONTROL_QUALITY] | 0));
       gain = cache[CONTROL_GAIN];
       mix = Math.max(0, Math.min(1, cache[CONTROL_MIX]));
       fmAmount = Math.max(0, cache[CONTROL_FM_AMOUNT]);
@@ -942,6 +968,10 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         Math.min(POOL_SIZE, this.readControl(parameters, 'voiceCount', CONTROL_VOICE_COUNT) | 0),
       );
       mode = Math.max(0, Math.min(2, this.readControl(parameters, 'mode', CONTROL_MODE) | 0));
+      quality = Math.max(
+        QUALITY_ECO,
+        Math.min(QUALITY_HIGH, this.readCachedControl(CONTROL_QUALITY) | 0),
+      );
       gain = this.readControl(parameters, 'gain', CONTROL_GAIN);
       mix = this.readControl(parameters, 'mix', CONTROL_MIX);
       fmAmount = Math.max(0, this.readCachedControl(CONTROL_FM_AMOUNT));
@@ -1051,8 +1081,32 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       const ratio = this.vRatio[i];
       pitchLoad += Math.max(1, ratio < 0 ? -ratio : ratio);
     }
-    const nextInterpMode =
-      pitchLoad * SINC_TAPS > INTERP_COST_BUDGET ? INTERP_HERMITE : INTERP_SINC;
+    let effectiveQuality = quality;
+    let interpBudgetOverride = null;
+    if (
+      this.adaptiveQuality &&
+      quality === QUALITY_HIGH &&
+      pitchLoad * SINC_TAPS_HIGH > INTERP_COST_BUDGET_HIGH
+    ) {
+      if (pitchLoad * SINC_TAPS_BALANCED <= INTERP_COST_BUDGET_HIGH) {
+        effectiveQuality = QUALITY_BALANCED;
+        interpBudgetOverride = INTERP_COST_BUDGET_HIGH;
+      } else {
+        effectiveQuality = QUALITY_ECO;
+      }
+    }
+    const sincTapCount =
+      effectiveQuality === QUALITY_HIGH ? SINC_TAPS_HIGH : SINC_TAPS_BALANCED;
+    const interpBudget =
+      interpBudgetOverride ??
+      (effectiveQuality === QUALITY_ECO
+        ? INTERP_COST_BUDGET_ECO
+        : effectiveQuality === QUALITY_HIGH
+          ? INTERP_COST_BUDGET_HIGH
+          : INTERP_COST_BUDGET_BALANCED);
+    const interpBudgetExceeded = pitchLoad * sincTapCount > interpBudget;
+    const budgetLimited = interpBudgetExceeded || effectiveQuality !== quality;
+    const nextInterpMode = interpBudgetExceeded ? INTERP_HERMITE : INTERP_SINC;
     if (nextInterpMode !== this.interpMode) {
       this.interpMode = nextInterpMode;
       if (this.emitInterpModeMessages) {
@@ -1075,6 +1129,9 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         density,
         voiceCount,
         meanSamplesPerGrain,
+        quality,
+        effectiveQuality,
+        budgetLimited,
       );
       this.runtimeDiagNextSampleSec += RUNTIME_DIAG_SAMPLE_INTERVAL_SEC;
     }
@@ -1095,7 +1152,16 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       }
     }
 
-    this.renderActiveVoices(outL, outR, N, gain * mix * this.vNormGain * this.adsrGain, this.interpMode, fmAmount, fmFreq);
+    this.renderActiveVoices(
+      outL,
+      outR,
+      N,
+      gain * mix * this.vNormGain * this.adsrGain,
+      this.interpMode,
+      effectiveQuality,
+      fmAmount,
+      fmFreq,
+    );
 
     if (outR !== outL) {
       const midGain = Math.cos((ySpread * Math.PI) / 2);
@@ -1115,14 +1181,16 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     return true;
   }
 
-  renderActiveVoices(outL, outR, N, gain, interpMode, fmAmount, fmFreq) {
-    const sincLut = SINC_LUT;
+  renderActiveVoices(outL, outR, N, gain, interpMode, quality, fmAmount, fmFreq) {
+    const sincLut = quality === QUALITY_HIGH ? SINC_LUT_HIGH : SINC_LUT_BALANCED;
+    const sincTaps = quality === QUALITY_HIGH ? SINC_TAPS_HIGH : SINC_TAPS_BALANCED;
     const srcL = this.srcL;
     const srcR = this.srcR;
     const stereo = outR !== outL;
     const useHermite = interpMode === INTERP_HERMITE;
-    const srcMinIdx = useHermite ? 1 : 3;
-    const srcMaxIdx = useHermite ? this.srcLen - 3 : this.srcLen - 5;
+    const sincCenterOffset = Math.floor((sincTaps - 1) / 2);
+    const srcMinIdx = useHermite ? 1 : sincCenterOffset;
+    const srcMaxIdx = useHermite ? this.srcLen - 3 : this.srcLen - (sincTaps - sincCenterOffset);
     const envMaxIdx = ENV_TABLE_LEN - 1;
 
     for (let v = 0; v < POOL_SIZE; v++) {
@@ -1194,39 +1262,16 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
           }
         } else {
           const phase = (frac * SINC_PHASES) | 0;
-          const off = phase * SINC_TAPS;
-          const base = i0Idx - 3;
-          const c0 = sincLut[off];
-          const c1 = sincLut[off + 1];
-          const c2 = sincLut[off + 2];
-          const c3 = sincLut[off + 3];
-          const c4 = sincLut[off + 4];
-          const c5 = sincLut[off + 5];
-          const c6 = sincLut[off + 6];
-          const c7 = sincLut[off + 7];
-
-          sL =
-            srcL[base] * c0 +
-            srcL[base + 1] * c1 +
-            srcL[base + 2] * c2 +
-            srcL[base + 3] * c3 +
-            srcL[base + 4] * c4 +
-            srcL[base + 5] * c5 +
-            srcL[base + 6] * c6 +
-            srcL[base + 7] * c7;
-          if (srcR === srcL) {
-            sR = sL;
-          } else {
-            sR =
-              srcR[base] * c0 +
-              srcR[base + 1] * c1 +
-              srcR[base + 2] * c2 +
-              srcR[base + 3] * c3 +
-              srcR[base + 4] * c4 +
-              srcR[base + 5] * c5 +
-              srcR[base + 6] * c6 +
-              srcR[base + 7] * c7;
+          const off = phase * sincTaps;
+          const base = i0Idx - sincCenterOffset;
+          sL = 0;
+          sR = 0;
+          for (let tap = 0; tap < sincTaps; tap++) {
+            const coeff = sincLut[off + tap];
+            sL += srcL[base + tap] * coeff;
+            if (srcR !== srcL) sR += srcR[base + tap] * coeff;
           }
+          if (srcR === srcL) sR = sL;
         }
 
         if (aaActive) {

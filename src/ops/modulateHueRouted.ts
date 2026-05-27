@@ -1,56 +1,28 @@
 import frag from '../video/shaders/modulateHueRouted.frag?raw';
-import type { OperatorDef, VideoStage } from '../core/operators';
+import {
+  createVideoOperatorDef,
+  paramUniform,
+  passthroughParam,
+  PRIMARY_SOURCE_UNIFORM,
+  ROUTED_SOURCE_UNIFORM,
+} from './shared';
 
-import { compileProgram, reqUniform } from '../video/glsl';
-
-class ModulateHueRoutedVideoStage implements VideoStage {
-  readonly op = 'modulateHueRouted';
-  readonly program: WebGLProgram;
-  #uTex: WebGLUniformLocation;
-  #uTexB: WebGLUniformLocation;
-  #uAmount: WebGLUniformLocation;
-
-  constructor(gl: WebGL2RenderingContext) {
-    this.program = compileProgram(gl, frag, 'modulateHueRouted');
-    this.#uTex = reqUniform(gl, this.program, 'u_tex', 'modulateHueRouted');
-    this.#uTexB = reqUniform(gl, this.program, 'u_tex_b', 'modulateHueRouted');
-    this.#uAmount = reqUniform(gl, this.program, 'u_amount', 'modulateHueRouted');
-  }
-
-  setUniforms(gl: WebGL2RenderingContext, params: Readonly<Record<string, number>>): void {
-    gl.uniform1i(this.#uTex, 0);
-    gl.uniform1i(this.#uTexB, 2);
-    gl.uniform1f(this.#uAmount, params['amount'] ?? 0);
-  }
-
-  dispose(gl: WebGL2RenderingContext): void {
-    gl.deleteProgram(this.program);
-  }
-}
-
-export const modulateHueRoutedDef: OperatorDef = {
+export const modulateHueRoutedDef = createVideoOperatorDef({
   op: 'modulateHueRouted',
+  frag,
   inputArity: 2,
+  uniforms: [PRIMARY_SOURCE_UNIFORM, ROUTED_SOURCE_UNIFORM, paramUniform('u_amount', 'amount', 0)],
   paramOrder: ['amount'],
   defaults: { amount: 0 },
-  coupling: {
-    op: 'modulateHueRouted',
-    params: {
-      amount: {
-        spec: {
-          id: 'amount',
-          label: 'amount',
-          range: [-1, 1],
-          default: 0,
-          curve: 'lin',
-          unit: 'oct',
-          hint: 'secondary branch rotates the primary hue field / secondary signal drives pitch-color shift',
-        },
-        toVideo: (raw) => raw,
-      },
-    },
+  params: {
+    amount: passthroughParam({
+      id: 'amount',
+      label: 'amount',
+      range: [-1, 1],
+      default: 0,
+      curve: 'lin',
+      unit: 'oct',
+      hint: 'secondary branch rotates the primary hue field / secondary signal drives pitch-color shift',
+    }),
   },
-  createVideoStage(gl) {
-    return new ModulateHueRoutedVideoStage(gl);
-  },
-};
+});

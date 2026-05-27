@@ -111,6 +111,17 @@ export interface OperatorDef {
    * this op's shader via the named sampler on TEXTURE6.
    */
   readonly ownedState?: OwnedStateSpec;
+  /**
+   * Optional authoring-audit metadata for alias/helper-driven operators.
+   * Tests can use this to verify that the shader asset exists, the default
+   * state stays neutral where expected, and QA coverage remains wired.
+   */
+  readonly audit?: {
+    readonly shaderPath: string;
+    readonly neutralDefault: boolean;
+    readonly qaCaseIds: readonly string[];
+    readonly qaCoverage: 'dedicated' | 'shared';
+  };
   createVideoStage(gl: WebGL2RenderingContext): VideoStage;
 }
 
@@ -579,6 +590,14 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
 export function registerOp(def: OperatorDef): void {
   if (defs.has(def.op)) {
     throw new Error(`Operator '${def.op}' already registered`);
+  }
+  if (def.audit) {
+    if (!def.audit.shaderPath.trim()) {
+      throw new Error(`Operator '${def.op}' audit metadata is missing shaderPath`);
+    }
+    if (def.audit.qaCaseIds.length === 0) {
+      throw new Error(`Operator '${def.op}' audit metadata is missing QA coverage ids`);
+    }
   }
   registerCoupling(def.coupling);
   defs.set(def.op, def);

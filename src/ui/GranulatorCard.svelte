@@ -4,8 +4,10 @@
     GranulatorEnvelope,
     GranulatorMode,
     GranulatorParamName,
+    GranulatorQuality,
+    GranulatorRuntimeSnapshot,
   } from '../audio/granulator';
-  import { GRANULATOR_ENVELOPES, GRANULATOR_MODES } from '../audio/granulator';
+  import { GRANULATOR_ENVELOPES, GRANULATOR_MODES, GRANULATOR_QUALITIES } from '../audio/granulator';
   import { GRANULATOR_SLIDER_ORDER, type GranulatorSliderParam } from '../audio/granulator-params';
   import type { MidiBinding, MidiRouter } from '../core/midi';
   import {
@@ -20,12 +22,17 @@
     enabled: boolean;
     envelope: GranulatorEnvelope;
     mode: GranulatorMode;
+    quality: GranulatorQuality;
+    adaptiveQuality: boolean;
+    runtimeSnapshot: GranulatorRuntimeSnapshot | null;
     values: Readonly<Record<GranulatorSliderParam, number>>;
     lfoBank: readonly GlobalLfo[];
     lfoAssignments: Readonly<ParamLfoAssignments>;
     onSetEnabled: (next: boolean) => void;
     onSetEnvelope: (next: GranulatorEnvelope) => void;
     onSetMode: (next: GranulatorMode) => void;
+    onSetQuality: (next: GranulatorQuality) => void;
+    onSetAdaptiveQuality: (next: boolean) => void;
     onSetParam: (name: GranulatorSliderParam, value: number) => void;
     onSetParamLfo: (name: GranulatorSliderParam, lfoIndex: number | null) => void;
   }
@@ -36,12 +43,17 @@
     enabled,
     envelope,
     mode,
+    quality,
+    adaptiveQuality,
+    runtimeSnapshot,
     values,
     lfoBank,
     lfoAssignments,
     onSetEnabled,
     onSetEnvelope,
     onSetMode,
+    onSetQuality,
+    onSetAdaptiveQuality,
     onSetParam,
     onSetParamLfo,
   }: Props = $props();
@@ -132,6 +144,14 @@
       case 'noteVelocity': return `vel ${ch}`;
     }
   }
+
+  function formatVoiceSummary(snapshot: GranulatorRuntimeSnapshot | null): string {
+    if (!snapshot) return 'n/a';
+    const active = Math.round(snapshot.activeVoices);
+    const fading = Math.round(snapshot.fadingVoices);
+    const max = Math.round(snapshot.voiceCount);
+    return `${active}/${max}${fading > 0 ? ` +${fading} fading` : ''}`;
+  }
 </script>
 
 <article class="granulator-card" data-qa="granulator-card">
@@ -188,6 +208,70 @@
           </button>
         {/each}
       </div>
+    </div>
+    <div class="picker">
+      <span class="picker-label">quality</span>
+      <div class="picker-buttons">
+        {#each GRANULATOR_QUALITIES as q (q)}
+          <button
+            type="button"
+            class:active={quality === q}
+            onclick={() => onSetQuality(q)}
+            disabled={!granulator}
+          >
+            {q}
+          </button>
+        {/each}
+      </div>
+    </div>
+    <label class="adaptive-toggle">
+      <input
+        type="checkbox"
+        checked={adaptiveQuality}
+        onchange={(e) => onSetAdaptiveQuality((e.currentTarget as HTMLInputElement).checked)}
+        disabled={!granulator || quality !== 'high'}
+      />
+      <span>auto step-down in high</span>
+    </label>
+  </section>
+
+  <section class="diagnostics" data-qa="granulator-diagnostics">
+    <div class="diag-row">
+      <span class="diag-label">voices</span>
+      <span class="diag-value">{formatVoiceSummary(runtimeSnapshot)}</span>
+    </div>
+    <div class="diag-row">
+      <span class="diag-label">interp</span>
+      <span class="diag-value">{runtimeSnapshot?.interpMode ?? 'n/a'}</span>
+    </div>
+    <div class="diag-row">
+      <span class="diag-label">quality</span>
+      <span class="diag-value">
+        {#if runtimeSnapshot}
+          {runtimeSnapshot.requestedQuality}
+          {#if runtimeSnapshot.effectiveQuality !== runtimeSnapshot.requestedQuality}
+            → {runtimeSnapshot.effectiveQuality}
+          {/if}
+        {:else}
+          n/a
+        {/if}
+      </span>
+    </div>
+    <div class="diag-row">
+      <span class="diag-label">budget</span>
+      <span class="diag-value">
+        {#if !runtimeSnapshot}
+          n/a
+        {:else if runtimeSnapshot.budgetLimited}
+          limited
+        {:else}
+          clear
+        {/if}
+      </span>
+    </div>
+    <div class="diag-row">
+      <span class="diag-label">pitch load</span>
+      <span class="diag-value">{runtimeSnapshot ? runtimeSnapshot.pitchLoad.toFixed(1) : 'n/a'}</span>
     </div>
   </section>
 
@@ -295,6 +379,13 @@
     align-items: center;
     gap: 8px;
   }
+  .adaptive-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #a8acb6;
+  }
   .picker-label {
     font-size: 11px;
     color: #a8acb6;
@@ -322,6 +413,31 @@
   .picker-buttons button:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+  .diagnostics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px 12px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border: 1px solid #23262e;
+    border-radius: 6px;
+    background: #0f1014;
+  }
+  .diag-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .diag-label {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #7b7f88;
+  }
+  .diag-value {
+    font-size: 12px;
+    color: #e8e9ed;
   }
   .sliders {
     display: grid;

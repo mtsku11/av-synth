@@ -4,104 +4,63 @@
 // resonator when stacked in the product path.
 
 import frag from '../video/shaders/repeat.frag?raw';
-import type { OperatorDef, VideoStage } from '../core/operators';
-import type { CouplingContext } from '../core/coupling';
-import { compileProgram, reqUniform } from '../video/glsl';
+import { createVideoOperatorDef, paramUniform, passthroughParam, PRIMARY_SOURCE_UNIFORM } from './shared';
 
-class RepeatVideoStage implements VideoStage {
-  readonly op = 'repeat';
-  readonly program: WebGLProgram;
-  #uTex: WebGLUniformLocation;
-  #uRX: WebGLUniformLocation;
-  #uRY: WebGLUniformLocation;
-  #uOX: WebGLUniformLocation;
-  #uOY: WebGLUniformLocation;
-
-  constructor(gl: WebGL2RenderingContext) {
-    this.program = compileProgram(gl, frag, 'repeat');
-    this.#uTex = reqUniform(gl, this.program, 'u_tex', 'repeat');
-    this.#uRX = reqUniform(gl, this.program, 'u_repeatX', 'repeat');
-    this.#uRY = reqUniform(gl, this.program, 'u_repeatY', 'repeat');
-    this.#uOX = reqUniform(gl, this.program, 'u_offsetX', 'repeat');
-    this.#uOY = reqUniform(gl, this.program, 'u_offsetY', 'repeat');
-  }
-
-  setUniforms(
-    gl: WebGL2RenderingContext,
-    params: Readonly<Record<string, number>>,
-    _ctx: CouplingContext,
-  ): void {
-    gl.uniform1i(this.#uTex, 0);
-    gl.uniform1f(this.#uRX, params['repeatX'] ?? 3);
-    gl.uniform1f(this.#uRY, params['repeatY'] ?? 3);
-    gl.uniform1f(this.#uOX, params['offsetX'] ?? 0);
-    gl.uniform1f(this.#uOY, params['offsetY'] ?? 0);
-  }
-
-  dispose(gl: WebGL2RenderingContext): void {
-    gl.deleteProgram(this.program);
-  }
-}
-
-export const repeatDef: OperatorDef = {
+export const repeatDef = createVideoOperatorDef({
   op: 'repeat',
+  frag,
+  uniforms: [
+    PRIMARY_SOURCE_UNIFORM,
+    paramUniform('u_repeatX', 'repeatX', 1),
+    paramUniform('u_repeatY', 'repeatY', 1),
+    paramUniform('u_offsetX', 'offsetX', 0),
+    paramUniform('u_offsetY', 'offsetY', 0),
+  ],
   paramOrder: ['repeatX', 'repeatY', 'offsetX', 'offsetY'],
   // Identity default = 1×1 (no tiling). Hydra invocation default is 3×3.
   defaults: { repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0 },
-  coupling: {
-    op: 'repeat',
-    params: {
-      repeatX: {
-        spec: {
-          id: 'repeatX',
-          label: 'repeatX',
-          range: [1, 8],
-          default: 1,
-          curve: 'lin',
-          unit: 'sides',
-          hint: 'X tiles (video) / recent-time grain repeat density (audio)',
-        },
-        toVideo: (c01) => c01,
-      },
-      repeatY: {
-        spec: {
-          id: 'repeatY',
-          label: 'repeatY',
-          range: [1, 8],
-          default: 1,
-          curve: 'lin',
-          unit: 'sides',
-          hint: 'Y tiles (video) / stereo grain repeat density (audio)',
-        },
-        toVideo: (c01) => c01,
-      },
-      offsetX: {
-        spec: {
-          id: 'offsetX',
-          label: 'offsetX',
-          range: [0, 1],
-          default: 0,
-          curve: 'lin',
-          unit: 'norm',
-          hint: 'X tile phase shift / grain loop position bias',
-        },
-        toVideo: (c01) => c01,
-      },
-      offsetY: {
-        spec: {
-          id: 'offsetY',
-          label: 'offsetY',
-          range: [0, 1],
-          default: 0,
-          curve: 'lin',
-          unit: 'norm',
-          hint: 'Y tile phase shift / stereo grain phase bias',
-        },
-        toVideo: (c01) => c01,
-      },
-    },
+  params: {
+    repeatX: passthroughParam({
+      id: 'repeatX',
+      label: 'repeatX',
+      range: [1, 8],
+      default: 1,
+      curve: 'lin',
+      unit: 'sides',
+      hint: 'X tiles (video) / recent-time grain repeat density (audio)',
+    }),
+    repeatY: passthroughParam({
+      id: 'repeatY',
+      label: 'repeatY',
+      range: [1, 8],
+      default: 1,
+      curve: 'lin',
+      unit: 'sides',
+      hint: 'Y tiles (video) / stereo grain repeat density (audio)',
+    }),
+    offsetX: passthroughParam({
+      id: 'offsetX',
+      label: 'offsetX',
+      range: [0, 1],
+      default: 0,
+      curve: 'lin',
+      unit: 'norm',
+      hint: 'X tile phase shift / grain loop position bias',
+    }),
+    offsetY: passthroughParam({
+      id: 'offsetY',
+      label: 'offsetY',
+      range: [0, 1],
+      default: 0,
+      curve: 'lin',
+      unit: 'norm',
+      hint: 'Y tile phase shift / stereo grain phase bias',
+    }),
   },
-  createVideoStage(gl) {
-    return new RepeatVideoStage(gl);
+  audit: {
+    shaderPath: 'src/video/shaders/repeat.frag',
+    neutralDefault: true,
+    qaCaseIds: ['audit-repeat-osc-sweep', 'audit-repeat-video-cross-source'],
+    qaCoverage: 'dedicated',
   },
-};
+});

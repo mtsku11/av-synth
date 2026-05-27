@@ -379,13 +379,21 @@ describe('applyProgramAudio', () => {
     const calls: string[] = [];
     applyProgramAudio(
       program({
-        granulator: { density: 35, duration: 70, gain: 0.55, envelope: 'hann', mode: 'cloud' },
+        granulator: {
+          density: 35,
+          duration: 70,
+          gain: 0.55,
+          envelope: 'hann',
+          mode: 'cloud',
+          quality: 'high',
+        },
         feedbackDelay: { time: 0.28, feedback: 0.78, mix: 0.42 },
       }),
       {
         setGranulatorParam: (name, value) => calls.push(`${name}:${value}`),
         setGranulatorEnvelope: (value) => calls.push(`envelope:${value}`),
         setGranulatorMode: (value) => calls.push(`mode:${value}`),
+        setGranulatorQuality: (value) => calls.push(`quality:${value}`),
         setFeedbackDelayParam: (name, value) => calls.push(`delay-${name}:${value}`),
       },
     );
@@ -395,6 +403,7 @@ describe('applyProgramAudio', () => {
       'gain:0.55',
       'envelope:hann',
       'mode:cloud',
+      'quality:high',
       'delay-time:0.28',
       'delay-feedback:0.78',
       'delay-mix:0.42',
@@ -438,6 +447,7 @@ describe('applyProgramAudio', () => {
         setGranulatorParam: (name, value) => calls.push(`${name}:${value}`),
         setGranulatorEnvelope: (value) => calls.push(`envelope:${value}`),
         setGranulatorMode: (value) => calls.push(`mode:${value}`),
+        setGranulatorQuality: (value) => calls.push(`quality:${value}`),
       },
     );
     expect(calls).toEqual(['gain:0.4']);

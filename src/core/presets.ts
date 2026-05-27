@@ -11,8 +11,8 @@ import type { VideoFeatureState } from './coupling';
 import type { BusIndex } from './graph.svelte';
 import type { OperatorInstance } from './operators';
 import type { AutomationSource } from './params';
-import type { GranulatorEnvelope, GranulatorMode } from '../audio/granulator';
-import { GRANULATOR_ENVELOPES, GRANULATOR_MODES } from '../audio/granulator';
+import type { GranulatorEnvelope, GranulatorMode, GranulatorQuality } from '../audio/granulator';
+import { GRANULATOR_ENVELOPES, GRANULATOR_MODES, GRANULATOR_QUALITIES } from '../audio/granulator';
 import type { GranulatorSliderParam } from '../audio/granulator-params';
 import type { FeedbackDelayParamName } from '../audio/feedback-delay-params';
 import { TAU, clamp01, ease, lerp } from '../lib/math';
@@ -72,6 +72,7 @@ export interface VideoEffectProgramMacro {
 export type GranulatorProgramState = Partial<Record<GranulatorSliderParam, number>> & {
   envelope?: GranulatorEnvelope;
   mode?: GranulatorMode;
+  quality?: GranulatorQuality;
 };
 
 export type FeedbackDelayProgramState = Partial<Record<FeedbackDelayParamName, number>>;
@@ -392,11 +393,13 @@ export function applyPreset(preset: Preset, instances: readonly OperatorInstance
 
 const GRANULATOR_ENVELOPE_SET = new Set<string>(GRANULATOR_ENVELOPES);
 const GRANULATOR_MODE_SET = new Set<string>(GRANULATOR_MODES);
+const GRANULATOR_QUALITY_SET = new Set<string>(GRANULATOR_QUALITIES);
 
 export interface ApplyProgramAudioHandlers {
   setGranulatorParam?: (name: GranulatorSliderParam, value: number) => void;
   setGranulatorEnvelope?: (value: GranulatorEnvelope) => void;
   setGranulatorMode?: (value: GranulatorMode) => void;
+  setGranulatorQuality?: (value: GranulatorQuality) => void;
   setFeedbackDelayParam?: (name: FeedbackDelayParamName, value: number) => void;
 }
 
@@ -416,6 +419,12 @@ export function applyProgramAudioState(
       if (name === 'mode') {
         if (typeof value === 'string' && GRANULATOR_MODE_SET.has(value)) {
           handlers.setGranulatorMode?.(value as GranulatorMode);
+        }
+        continue;
+      }
+      if (name === 'quality') {
+        if (typeof value === 'string' && GRANULATOR_QUALITY_SET.has(value)) {
+          handlers.setGranulatorQuality?.(value as GranulatorQuality);
         }
         continue;
       }

@@ -1,7 +1,7 @@
 // granulator-v1 worklet — process() smoke + correctness checks.
 //
 // Covers spec §15 steps 2 + 3 + 4: skeleton plus 8-tap sinc / anti-alias / reverse, plus
-// the five envelope LUTs, three scheduling modes, and the full 14-control surface.
+// the five envelope LUTs, three scheduling modes, and the shipped control surface.
 
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -71,6 +71,7 @@ function defaultParams(
     reverseProbability: paramBlock(overrides.reverseProbability ?? 0),
     voiceCount: paramBlock(overrides.voiceCount ?? 32),
     mode: paramBlock(overrides.mode ?? 0),
+    quality: paramBlock(overrides.quality ?? 1),
     gain: paramBlock(overrides.gain ?? 1.0),
   };
 }
@@ -94,6 +95,7 @@ function makeSharedControls(overrides: Partial<Record<string, number>> = {}): {
     overrides.reverseProbability ?? 0,
     overrides.voiceCount ?? 32,
     overrides.mode ?? 0,
+    overrides.quality ?? 1,
     overrides.gain ?? 1.0,
   ];
   const header = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
@@ -122,7 +124,7 @@ function makeSharedRuntimeDiag(capacity = 256): {
   return {
     capacity,
     header: new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT),
-    data: new SharedArrayBuffer(Float64Array.BYTES_PER_ELEMENT * capacity * 13),
+    data: new SharedArrayBuffer(Float64Array.BYTES_PER_ELEMENT * capacity * 17),
   };
 }
 
@@ -194,11 +196,20 @@ function runBlocks(
   inst: WorkletInstance,
   params: Record<string, Float32Array>,
   blocks: number,
-): { peak: number; energyL: number; energyR: number; hasNaN: boolean } {
+): {
+  peak: number;
+  energyL: number;
+  energyR: number;
+  hasNaN: boolean;
+  samplesL: Float32Array;
+  samplesR: Float32Array;
+} {
   let peak = 0;
   let energyL = 0;
   let energyR = 0;
   let hasNaN = false;
+  const collectedL: number[] = [];
+  const collectedR: number[] = [];
   for (let b = 0; b < blocks; b++) {
     const outs = [[new Float32Array(BLOCK), new Float32Array(BLOCK)]];
     inst.process([], outs, params);
@@ -209,6 +220,8 @@ function runBlocks(
     for (let i = 0; i < BLOCK; i++) {
       const lv = L[i] ?? 0;
       const rv = R[i] ?? 0;
+      collectedL.push(lv);
+      collectedR.push(rv);
       if (!Number.isFinite(lv) || !Number.isFinite(rv)) hasNaN = true;
       const a = Math.abs(lv);
       if (a > peak) peak = a;
@@ -216,7 +229,46 @@ function runBlocks(
       if (ar > peak) peak = ar;
     }
   }
-  return { peak, energyL, energyR, hasNaN };
+  return {
+    peak,
+    energyL,
+    energyR,
+    hasNaN,
+    samplesL: Float32Array.from(collectedL),
+    samplesR: Float32Array.from(collectedR),
+  };
+}
+
+function meanSquareDifference(buf: Float32Array): number {
+  if (buf.length < 2) return 0;
+  let sum = 0;
+  for (let i = 1; i < buf.length; i++) {
+    const delta = (buf[i] ?? 0) - (buf[i - 1] ?? 0);
+    sum += delta * delta;
+  }
+  return sum / (buf.length - 1);
+}
+
+function spectralEnergyRatio(buf: Float32Array, cutoffHz: number, sr = SR): number {
+  const n = Math.min(2048, buf.length);
+  if (n < 8) return 0;
+  let total = 0;
+  let high = 0;
+  for (let k = 1; k < n / 2; k++) {
+    let re = 0;
+    let im = 0;
+    const omega = (-2 * Math.PI * k) / n;
+    for (let i = 0; i < n; i++) {
+      const sample = buf[i] ?? 0;
+      re += sample * Math.cos(omega * i);
+      im += sample * Math.sin(omega * i);
+    }
+    const power = re * re + im * im;
+    total += power;
+    const freq = (k * sr) / n;
+    if (freq >= cutoffHz) high += power;
+  }
+  return total > 0 ? high / total : 0;
 }
 
 describe('granulator-v1 worklet (sinc + envelopes + modes + full controls)', () => {
@@ -539,6 +591,174 @@ describe('granulator-v1 worklet (sinc + envelopes + modes + full controls)', () 
     expect(workletState(inst).interpMode).toBe(0);
   });
 
+  it('high quality resists Hermite fallback longer than eco', () => {
+    const ecoControls = makeSharedControls({
+      density: 75,
+      duration: 120,
+      voiceCount: 16,
+      pitch: 24,
+      quality: 0,
+    });
+    const highControls = makeSharedControls({
+      density: 75,
+      duration: 120,
+      voiceCount: 16,
+      pitch: 24,
+      quality: 2,
+    });
+    const eco = new ProcessorCtor({
+      processorOptions: {
+        controlHeader: ecoControls.header,
+        controlData: ecoControls.data,
+      },
+    });
+    const high = new ProcessorCtor({
+      processorOptions: {
+        controlHeader: highControls.header,
+        controlData: highControls.data,
+      },
+    });
+    const src = makeSineSource(3.0, 220);
+    postLoadAndEnable(eco, src);
+    postLoadAndEnable(high, src);
+    runBlocks(eco, {}, 24);
+    runBlocks(high, {}, 24);
+    expect(workletState(eco).interpMode).toBe(1);
+    expect(workletState(high).interpMode).toBe(0);
+  });
+
+  it('can auto-step high quality down before Hermite fallback under overload', () => {
+    const runtimeDiag = makeSharedRuntimeDiag(32);
+    const highControls = makeSharedControls({
+      density: 75,
+      duration: 120,
+      voiceCount: 16,
+      pitch: 24,
+      quality: 2,
+    });
+    const inst = new ProcessorCtor({
+      processorOptions: {
+        controlHeader: highControls.header,
+        controlData: highControls.data,
+        runtimeDiagCapacity: runtimeDiag.capacity,
+        runtimeDiagHeader: runtimeDiag.header,
+        runtimeDiagData: runtimeDiag.data,
+      },
+    });
+    inst.port.onmessage?.({ data: { type: 'setDiagnostics', adaptiveQuality: true } });
+    postLoadAndEnable(inst, makeSineSource(3.0, 220));
+    runBlocks(inst, {}, 64);
+    expect(workletState(inst).interpMode).toBe(0);
+    const data = new Float64Array(runtimeDiag.data);
+    const headerSeq = Atomics.load(new Int32Array(runtimeDiag.header), 0);
+    let sawDowngrade = false;
+    for (let seq = 0; seq < Math.min(headerSeq, runtimeDiag.capacity); seq++) {
+      const off = seq * 17;
+      const requestedQuality = data[off + 13] ?? -1;
+      const effectiveQuality = data[off + 14] ?? -1;
+      if (requestedQuality === 2 && effectiveQuality < 2) {
+        sawDowngrade = true;
+        expect(data[off + 15] ?? 0).toBe(1);
+        expect(data[off + 16] ?? 0).toBe(1);
+      }
+    }
+    expect(sawDowngrade).toBe(true);
+  });
+
+  it('keeps high-pitch alias energy bounded in high quality mode', () => {
+    const src = new Float32Array(SR * 2);
+    for (let i = 0; i < src.length; i++) {
+      const t = i / SR;
+      src[i] =
+        0.45 * Math.sin(2 * Math.PI * 1200 * t) +
+        0.3 * Math.sin(2 * Math.PI * 3600 * t) +
+        0.25 * Math.sin(2 * Math.PI * 7200 * t);
+    }
+    const highControls = makeSharedControls({
+      pitch: 24,
+      density: 75,
+      duration: 120,
+      voiceCount: 16,
+      quality: 2,
+    });
+    const high = new ProcessorCtor({
+      processorOptions: {
+        controlHeader: highControls.header,
+        controlData: highControls.data,
+      },
+    });
+    postLoadAndEnable(high, src);
+    const highRun = runBlocks(high, {}, 40);
+    const highAlias = spectralEnergyRatio(highRun.samplesL, 14000);
+    expect(highAlias).toBeLessThan(0.2);
+  });
+
+  it('keeps grain-boundary click energy bounded in high quality renders', () => {
+    const inst = new ProcessorCtor();
+    postLoadAndEnable(inst, makeSineSource(2.0, 330));
+    const render = runBlocks(
+      inst,
+      defaultParams({
+        quality: 2,
+        duration: 12,
+        density: 180,
+        positionJitter: 0.3,
+        pitchJitter: 6,
+        reverseProbability: 0.5,
+      }),
+      32,
+    );
+    expect(render.hasNaN).toBe(false);
+    expect(meanSquareDifference(render.samplesL)).toBeLessThan(0.08);
+  });
+
+  it('keeps peak and RMS stable as voice count increases', () => {
+    const src = makeSineSource(3.0, 220);
+    const lowVoices = new ProcessorCtor();
+    const highVoices = new ProcessorCtor();
+    postLoadAndEnable(lowVoices, src);
+    postLoadAndEnable(highVoices, src);
+    const low = runBlocks(
+      lowVoices,
+      defaultParams({ quality: 1, density: 120, duration: 220, voiceCount: 8 }),
+      40,
+    );
+    const high = runBlocks(
+      highVoices,
+      defaultParams({ quality: 1, density: 120, duration: 220, voiceCount: 32 }),
+      40,
+    );
+    expect(high.peak).toBeLessThan(low.peak * 1.7);
+    expect(high.energyL / low.energyL).toBeLessThan(1.5);
+  });
+
+  it('is deterministic under fixed seed and settings', () => {
+    const src = makeSineSource(2.0, 275);
+    const a = new ProcessorCtor();
+    const b = new ProcessorCtor();
+    a.port.onmessage?.({ data: { type: 'reseed', seed: 123456 } });
+    b.port.onmessage?.({ data: { type: 'reseed', seed: 123456 } });
+    postLoadAndEnable(a, src);
+    postLoadAndEnable(b, src);
+    const params = defaultParams({
+      quality: 2,
+      position: 0.37,
+      positionJitter: 0.25,
+      pitch: 7,
+      pitchJitter: 3,
+      duration: 55,
+      durationJitter: 0.2,
+      density: 65,
+      distribution: 0.6,
+      reverseProbability: 0.4,
+      voiceCount: 24,
+    });
+    const ra = runBlocks(a, params, 24);
+    const rb = runBlocks(b, params, 24);
+    expect(Array.from(ra.samplesL)).toEqual(Array.from(rb.samplesL));
+    expect(Array.from(ra.samplesR)).toEqual(Array.from(rb.samplesR));
+  });
+
   it('records shared runtime snapshots without message traffic', () => {
     const runtimeDiag = makeSharedRuntimeDiag(32);
     const inst = new ProcessorCtor({
@@ -567,6 +787,8 @@ describe('granulator-v1 worklet (sinc + envelopes + modes + full controls)', () 
     expect(data[0]).toBeGreaterThanOrEqual(0);
     expect(data[1]).toBeGreaterThan(0);
     expect(data[3]).toBeGreaterThan(0);
+    expect(data[13]).toBeGreaterThanOrEqual(0);
+    expect(data[14]).toBeGreaterThanOrEqual(0);
   });
 
   it('uses direct shared-control reads without AudioParam lookups in SAB mode', () => {

@@ -6,77 +6,44 @@
 // delay time and reading like unintended vibrato.
 
 import frag from '../video/shaders/scrollX.frag?raw';
-import type { OperatorDef, VideoStage } from '../core/operators';
-import type { CouplingContext } from '../core/coupling';
-import { compileProgram, reqUniform } from '../video/glsl';
+import { createVideoOperatorDef, paramUniform, passthroughParam, PRIMARY_SOURCE_UNIFORM, TIME_UNIFORM } from './shared';
 
-class ScrollXVideoStage implements VideoStage {
-  readonly op = 'scrollX';
-  readonly program: WebGLProgram;
-  #uTex: WebGLUniformLocation;
-  #uAmount: WebGLUniformLocation;
-  #uSpeed: WebGLUniformLocation;
-  #uTime: WebGLUniformLocation;
-
-  constructor(gl: WebGL2RenderingContext) {
-    this.program = compileProgram(gl, frag, 'scrollX');
-    this.#uTex = reqUniform(gl, this.program, 'u_tex', 'scrollX');
-    this.#uAmount = reqUniform(gl, this.program, 'u_amount', 'scrollX');
-    this.#uSpeed = reqUniform(gl, this.program, 'u_speed', 'scrollX');
-    this.#uTime = reqUniform(gl, this.program, 'u_time', 'scrollX');
-  }
-
-  setUniforms(
-    gl: WebGL2RenderingContext,
-    params: Readonly<Record<string, number>>,
-    ctx: CouplingContext,
-  ): void {
-    gl.uniform1i(this.#uTex, 0);
-    gl.uniform1f(this.#uAmount, params['amount'] ?? 0.5);
-    gl.uniform1f(this.#uSpeed, params['speed'] ?? 0);
-    gl.uniform1f(this.#uTime, ctx.time);
-  }
-
-  dispose(gl: WebGL2RenderingContext): void {
-    gl.deleteProgram(this.program);
-  }
-}
-
-export const scrollXDef: OperatorDef = {
+export const scrollXDef = createVideoOperatorDef({
   op: 'scrollX',
+  frag,
+  uniforms: [
+    PRIMARY_SOURCE_UNIFORM,
+    paramUniform('u_amount', 'amount', 0),
+    paramUniform('u_speed', 'speed', 0),
+    TIME_UNIFORM,
+  ],
   paramOrder: ['amount', 'speed'],
   // Identity default = no scroll. Hydra invocation default amount is 0.5.
   defaults: { amount: 0, speed: 0 },
-  coupling: {
-    op: 'scrollX',
-    params: {
-      amount: {
-        spec: {
-          id: 'amount',
-          label: 'amount',
-          range: [0, 1],
-          default: 0,
-          curve: 'lin',
-          unit: 'norm',
-          hint: 'X translation (video) / fixed phase-offset depth (audio)',
-        },
-        toVideo: (c01) => c01,
-      },
-      speed: {
-        spec: {
-          id: 'speed',
-          label: 'speed',
-          range: [-5, 5],
-          default: 0,
-          curve: 'lin',
-          unit: 'hz',
-          hint: 'X scroll rate (video) / stereo motion rate of the offset layer (audio, signed)',
-        },
-        toVideo: (c01) => c01,
-      },
-    },
+  params: {
+    amount: passthroughParam({
+      id: 'amount',
+      label: 'amount',
+      range: [0, 1],
+      default: 0,
+      curve: 'lin',
+      unit: 'norm',
+      hint: 'X translation (video) / fixed phase-offset depth (audio)',
+    }),
+    speed: passthroughParam({
+      id: 'speed',
+      label: 'speed',
+      range: [-5, 5],
+      default: 0,
+      curve: 'lin',
+      unit: 'hz',
+      hint: 'X scroll rate (video) / stereo motion rate of the offset layer (audio, signed)',
+    }),
   },
-  createVideoStage(gl) {
-    return new ScrollXVideoStage(gl);
+  audit: {
+    shaderPath: 'src/video/shaders/scrollX.frag',
+    neutralDefault: true,
+    qaCaseIds: ['audit-scrollX-osc-sweep', 'audit-scrollX-video-cross-source'],
+    qaCoverage: 'dedicated',
   },
-};
+});

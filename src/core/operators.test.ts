@@ -1,11 +1,95 @@
 import { describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-import { getDef, getOperatorUiMeta, listOperatorFamilies, listOps } from './operators';
-import { registerAllOps } from '../ops';
+import { getDef, getOperatorUiMeta, isNeutralInstance, listOperatorFamilies, listOps } from './operators';
+import { DEFAULT_CHAIN, registerAllOps } from '../ops';
 
 registerAllOps();
 
+const EXPECTED_OPERATOR_IDS = [
+  'feedback',
+  'timeDisplace',
+  'slitScan',
+  'structure',
+  'flow',
+  'dataMosh',
+  'pixelSort',
+  'fieldSort',
+  'vortex',
+  'vortexPacket',
+  'curlNoise',
+  'saddleField',
+  'pinchBulge',
+  'polarRipple',
+  'sinkSourceField',
+  'spiralField',
+  'domainFold',
+  'gyreField',
+  'turbulenceWarp',
+  'magneticDipole',
+  'r',
+  'g',
+  'b',
+  'a',
+  'grain',
+  'modulate',
+  'modulateRouted',
+  'modulateDisplace',
+  'modulateRotate',
+  'modulateRotateRouted',
+  'modulateScale',
+  'modulateScaleRouted',
+  'modulatePixelate',
+  'modulatePixelateRouted',
+  'modulateRepeat',
+  'modulateRepeatRouted',
+  'modulateScrollX',
+  'modulateScrollY',
+  'modulateKaleid',
+  'modulateHue',
+  'modulateScrollYRouted',
+  'modulateHueRouted',
+  'selfMod',
+  'scale',
+  'rotate',
+  'scrollX',
+  'scrollY',
+  'repeat',
+  'repeatX',
+  'repeatY',
+  'pixelate',
+  'kaleid',
+  'chromaShift',
+  'brightness',
+  'contrast',
+  'color',
+  'saturate',
+  'posterize',
+  'invert',
+  'luma',
+  'thresh',
+  'hue',
+  'colorama',
+  'sum',
+  'add',
+  'sub',
+  'mult',
+  'diff',
+  'layer',
+  'blend',
+  'mask',
+] as const;
+
 describe('operator UI metadata', () => {
+  it('keeps every existing operator ID registered and every default-chain op available', () => {
+    expect(listOps()).toEqual(EXPECTED_OPERATOR_IDS);
+    for (const op of DEFAULT_CHAIN) {
+      expect(listOps()).toContain(op);
+      expect(() => getDef(op)).not.toThrow();
+    }
+  });
+
   it('groups product-surface operators into stable user-facing families', () => {
     expect(listOperatorFamilies()).toEqual([
       'Motion',
@@ -75,6 +159,28 @@ describe('operator UI metadata', () => {
         expect(defaultValue).toBeGreaterThanOrEqual(min);
         expect(defaultValue).toBeLessThanOrEqual(max);
       }
+    }
+  });
+
+  it('keeps audited alias-family operators wired to real shaders, neutral defaults, and QA cases', () => {
+    const auditedOps = listOps()
+      .map((op) => ({ op, audit: getDef(op).audit }))
+      .filter((entry): entry is { op: string; audit: NonNullable<ReturnType<typeof getDef>['audit']> } => !!entry.audit);
+    expect(auditedOps.length).toBeGreaterThan(0);
+
+    for (const { op, audit } of auditedOps) {
+      expect(existsSync(resolve(process.cwd(), audit.shaderPath))).toBe(true);
+      for (const caseId of audit.qaCaseIds) {
+        expect(existsSync(resolve(process.cwd(), `qa/cases/${caseId}.json`))).toBe(true);
+      }
+
+      const def = getDef(op);
+      const instanceLike = {
+        def,
+        params: { ...def.defaults },
+        lfoAssignments: {},
+      } as Parameters<typeof isNeutralInstance>[0];
+      expect(isNeutralInstance(instanceLike)).toBe(audit.neutralDefault);
     }
   });
 });

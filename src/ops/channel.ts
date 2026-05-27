@@ -1,7 +1,5 @@
 import frag from '../video/shaders/channel.frag?raw';
-import type { OperatorDef, VideoStage } from '../core/operators';
-import type { CouplingContext } from '../core/coupling';
-import { compileProgram, reqUniform } from '../video/glsl';
+import { createVideoOperatorDef, PRIMARY_SOURCE_UNIFORM, vec4Uniform } from './shared';
 
 type ChannelMode = 'r' | 'g' | 'b' | 'a';
 
@@ -12,47 +10,21 @@ const CHANNEL_WEIGHTS: Record<ChannelMode, readonly [number, number, number, num
   a: [0, 0, 0, 1],
 };
 
-class ChannelVideoStage implements VideoStage {
-  readonly op: string;
-  readonly program: WebGLProgram;
-  #uTex: WebGLUniformLocation;
-  #uWeights: WebGLUniformLocation;
-  #weights: readonly [number, number, number, number];
-
-  constructor(gl: WebGL2RenderingContext, op: ChannelMode) {
-    this.op = op;
-    this.program = compileProgram(gl, frag, op);
-    this.#uTex = reqUniform(gl, this.program, 'u_tex', op);
-    this.#uWeights = reqUniform(gl, this.program, 'u_weights', op);
-    this.#weights = CHANNEL_WEIGHTS[op];
-  }
-
-  setUniforms(
-    gl: WebGL2RenderingContext,
-    _params: Readonly<Record<string, number>>,
-    _ctx: CouplingContext,
-  ): void {
-    gl.uniform1i(this.#uTex, 0);
-    gl.uniform4f(this.#uWeights, ...this.#weights);
-  }
-
-  dispose(gl: WebGL2RenderingContext): void {
-    gl.deleteProgram(this.program);
-  }
-}
-
-function makeChannelDef(op: ChannelMode): OperatorDef {
-  return {
+function makeChannelDef(op: ChannelMode) {
+  return createVideoOperatorDef({
     op,
+    frag,
+    uniforms: [PRIMARY_SOURCE_UNIFORM, vec4Uniform('u_weights', CHANNEL_WEIGHTS[op])],
     paramOrder: [],
     defaults: {},
-    coupling: {
-      op,
-      params: {},
+    params: {},
+    audit: {
+      shaderPath: 'src/video/shaders/channel.frag',
+      neutralDefault: false,
+      qaCaseIds: ['audit-modulateDisplace-osc-sweep', 'audit-modulateDisplace-video-cross-source'],
+      qaCoverage: 'shared',
     },
-    createVideoStage(gl) {
-      return new ChannelVideoStage(gl, op);
-    },  };
+  });
 }
 
 export const rDef = makeChannelDef('r');

@@ -12,64 +12,35 @@
 // is no longer k-rate DelayNode automation.
 
 import frag from '../video/shaders/modulate.frag?raw';
-import type { OperatorDef, VideoStage } from '../core/operators';
-import type { CouplingContext } from '../core/coupling';
-import { compileProgram, reqUniform } from '../video/glsl';
+import {
+  createVideoOperatorDef,
+  paramUniform,
+  passthroughParam,
+  PRIMARY_SOURCE_UNIFORM,
+  RATE_UNIFORM,
+  TIME_UNIFORM,
+} from './shared';
 
-class ModulateVideoStage implements VideoStage {
-  readonly op = 'modulate';
-  readonly program: WebGLProgram;
-  #uTex: WebGLUniformLocation;
-  #uAmount: WebGLUniformLocation;
-  #uTime: WebGLUniformLocation;
-  #uRate: WebGLUniformLocation;
-
-  constructor(gl: WebGL2RenderingContext) {
-    this.program = compileProgram(gl, frag, 'modulate');
-    this.#uTex = reqUniform(gl, this.program, 'u_tex', 'modulate');
-    this.#uAmount = reqUniform(gl, this.program, 'u_amount', 'modulate');
-    this.#uTime = reqUniform(gl, this.program, 'u_time', 'modulate');
-    this.#uRate = reqUniform(gl, this.program, 'u_rate', 'modulate');
-  }
-
-  setUniforms(
-    gl: WebGL2RenderingContext,
-    params: Readonly<Record<string, number>>,
-    ctx: CouplingContext,
-  ): void {
-    gl.uniform1i(this.#uTex, 0);
-    gl.uniform1f(this.#uAmount, params['amount'] ?? 0);
-    gl.uniform1f(this.#uTime, ctx.time);
-    gl.uniform1f(this.#uRate, ctx.rate);
-  }
-
-  dispose(gl: WebGL2RenderingContext): void {
-    gl.deleteProgram(this.program);
-  }
-}
-
-export const modulateDef: OperatorDef = {
+export const modulateDef = createVideoOperatorDef({
   op: 'modulate',
+  frag,
+  uniforms: [
+    PRIMARY_SOURCE_UNIFORM,
+    paramUniform('u_amount', 'amount', 0),
+    TIME_UNIFORM,
+    RATE_UNIFORM,
+  ],
   paramOrder: ['amount'],
   defaults: { amount: 0 },
-  coupling: {
-    op: 'modulate',
-    params: {
-      amount: {
-        spec: {
-          id: 'amount',
-          label: 'modulate',
-          range: [0, 1],
-          default: 0,
-          curve: 'lin',
-          unit: 'norm',
-          hint: 'UV displacement (video) / delay-time PM depth (audio); LFO from ctx.rate',
-        },
-        toVideo: (c01) => c01,
-      },
-    },
+  params: {
+    amount: passthroughParam({
+      id: 'amount',
+      label: 'modulate',
+      range: [0, 1],
+      default: 0,
+      curve: 'lin',
+      unit: 'norm',
+      hint: 'UV displacement (video) / delay-time PM depth (audio); LFO from ctx.rate',
+    }),
   },
-  createVideoStage(gl) {
-    return new ModulateVideoStage(gl);
-  },
-};
+});

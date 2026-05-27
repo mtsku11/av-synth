@@ -26,6 +26,7 @@
     type GranulatorControlAudit,
     type GranulatorEnvelope,
     type GranulatorMode,
+    type GranulatorQuality,
     type GranulatorRuntimeSnapshot,
   } from './audio/granulator';
   import { FeedbackDelay } from './audio/feedback-delay';
@@ -128,10 +129,14 @@
   let granulatorEnabled = $state(false);
   let granulatorEnvelope = $state<GranulatorEnvelope>('hann');
   let granulatorMode = $state<GranulatorMode>('classic');
+  let granulatorQuality = $state<GranulatorQuality>('balanced');
+  let granulatorAdaptiveQuality = $state(false);
   let granulatorEmitInterpModeMessages = true;
   let granulatorForceNoSpawn = false;
   let granulatorProvisionRuntimeDiagnostics = true;
   let granulatorEnableRuntimeSnapshotWrites = true;
+  let granulatorRuntimeSnapshot = $state<GranulatorRuntimeSnapshot | null>(null);
+  let granulatorRuntimeDiagTimer = 0;
   let feedbackDelay: FeedbackDelay | null = null;
   let feedbackDelayDisconnect: (() => void) | null = null;
   let feedbackDelayParams = $state<Record<FeedbackDelayParamName, number>>({
@@ -321,6 +326,7 @@
     setGranulatorDiagnostics(options: {
       emitInterpModeMessages?: boolean;
       forceNoSpawn?: boolean;
+      adaptiveQuality?: boolean;
       provisionRuntimeDiagnostics?: boolean;
       enableRuntimeSnapshotWrites?: boolean;
     }): Promise<boolean>;
@@ -386,6 +392,7 @@
       variance: [number, number, number];
       centerOfMass: { x: number; y: number };
     } | null;
+    validateOperatorCompilation(): { op: string; ok: boolean; error?: string }[];
   }
 
   type CaptureStatus = 'idle' | 'recording' | 'ready';
@@ -1068,6 +1075,7 @@
       },
       setGranulatorEnvelope: (value) => setGranulatorEnvelope(value),
       setGranulatorMode: (value) => setGranulatorMode(value),
+      setGranulatorQuality: (value) => setGranulatorQuality(value),
       setFeedbackDelayParam: (name, value) =>
         setFeedbackDelayParam(name, value, {
           clearProgram: false,
@@ -1112,6 +1120,21 @@
   function setGranulatorMode(next: GranulatorMode): void {
     granulatorMode = next;
     granulator?.setMode(next);
+  }
+
+  function setGranulatorQuality(next: GranulatorQuality): void {
+    granulatorQuality = next;
+    granulator?.setQuality(next);
+  }
+
+  function setGranulatorAdaptiveQuality(next: boolean): void {
+    granulatorAdaptiveQuality = next;
+    granulator?.setAdaptiveQuality(next);
+  }
+
+  function sampleGranulatorRuntimeSnapshot(): void {
+    const snapshots = granulator?.readRuntimeDiagnostics() ?? [];
+    granulatorRuntimeSnapshot = snapshots.at(-1) ?? null;
   }
 
   function setGranulatorParamLfo(name: GranulatorSliderParam, lfoIndex: number | null): void {
@@ -1398,6 +1421,10 @@
           granulatorForceNoSpawn = options.forceNoSpawn;
           granulator?.setForceNoSpawn(options.forceNoSpawn);
         }
+        if (typeof options.adaptiveQuality === 'boolean') {
+          granulatorAdaptiveQuality = options.adaptiveQuality;
+          granulator?.setAdaptiveQuality(options.adaptiveQuality);
+        }
         if (typeof options.provisionRuntimeDiagnostics === 'boolean') {
           granulatorProvisionRuntimeDiagnostics = options.provisionRuntimeDiagnostics;
         }
@@ -1580,6 +1607,24 @@
         });
       },
       readFrameStats: (grid = 16) => renderer?.readFrameStats(grid) ?? null,
+      validateOperatorCompilation: () => {
+        if (!renderer) return [];
+        const results: { op: string; ok: boolean; error?: string }[] = [];
+        for (const op of listOps()) {
+          try {
+            const instance = createInstance(op, renderer.gl);
+            disposeInstance(instance, renderer.gl);
+            results.push({ op, ok: true });
+          } catch (error) {
+            results.push({
+              op,
+              ok: false,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+        return results;
+      },
     };
   }
 
@@ -1759,6 +1804,9 @@
     startVideoFeatureSampling();
     installQaBridge();
     startProgramAutomationLoop();
+    if (typeof window !== 'undefined') {
+      granulatorRuntimeDiagTimer = window.setInterval(sampleGranulatorRuntimeSnapshot, 250);
+    }
   });
 
   // Granulator + MIDI initialisation. Idempotent — safe to call from both onStart and
@@ -1784,6 +1832,8 @@
       g.setEnabled(granulatorEnabled);
       g.setEnvelope(granulatorEnvelope);
       g.setMode(granulatorMode);
+      g.setQuality(granulatorQuality);
+      g.setAdaptiveQuality(granulatorAdaptiveQuality);
       g.setForceNoSpawn(granulatorForceNoSpawn);
       g.setEnableRuntimeSnapshotWrites(granulatorEnableRuntimeSnapshotWrites);
       pushGranulatorParams(granulatorRawParams);
@@ -1794,6 +1844,7 @@
         applyFeedbackDelayParam(delay, name, value);
       }
       midiRouter = new MidiRouter(g);
+      sampleGranulatorRuntimeSnapshot();
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
       return;
@@ -2257,6 +2308,10 @@
         window.cancelAnimationFrame(programAutomationRaf);
         programAutomationRaf = 0;
       }
+      if (granulatorRuntimeDiagTimer) {
+        window.clearInterval(granulatorRuntimeDiagTimer);
+        granulatorRuntimeDiagTimer = 0;
+      }
       delete (window as Window & { __AV_SYNTH_QA__?: QaBridge }).__AV_SYNTH_QA__;
     }
     webMidiInput?.dispose();
@@ -2585,12 +2640,17 @@
             enabled={granulatorEnabled}
             envelope={granulatorEnvelope}
             mode={granulatorMode}
+            quality={granulatorQuality}
+            adaptiveQuality={granulatorAdaptiveQuality}
+            runtimeSnapshot={granulatorRuntimeSnapshot}
             values={granulatorRawParams}
             lfoBank={clock.lfoBank}
             lfoAssignments={granulatorLfoAssignments}
             onSetEnabled={setGranulatorEnabled}
             onSetEnvelope={setGranulatorEnvelope}
             onSetMode={setGranulatorMode}
+            onSetQuality={setGranulatorQuality}
+            onSetAdaptiveQuality={setGranulatorAdaptiveQuality}
             onSetParam={setGranulatorParam}
             onSetParamLfo={setGranulatorParamLfo}
           />
