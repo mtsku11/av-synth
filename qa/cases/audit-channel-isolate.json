@@ -1,0 +1,120 @@
+{
+  "id": "audit-channel-isolate",
+  "title": "Channel selectors (r/g/b/a) isolate on decoded media",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-channel-isolate",
+    "tailMs": 700
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "audit": {
+    "family": "channel-select",
+    "operator": "channel",
+    "kind": "isolate",
+    "path": "operator-regression",
+    "expectedVideo": [
+      "routing r/g/b to its own bus and previewing that bus should show a single greyscale channel from the decoded fixture (red bar → bright on r, dim on g/b, etc.)",
+      "routing a to its own bus should show the alpha-or-luma fallback brightness (the channel.frag uses max(c.a, luma(c.rgb)) so a fully-opaque clip reads as luma)",
+      "no NaN or black frames at any selector"
+    ],
+    "expectedAudio": [
+      "channel selectors are visual-only; the audio mix is unchanged across r/g/b/a routings"
+    ],
+    "manualChecks": [
+      "Do r/g/b each produce a distinct greyscale image consistent with the fixture's colour bars?",
+      "Does the alpha branch (no real alpha source) read as a luma proxy rather than collapsing to black?",
+      "Does routing each selector to a non-default bus leave the rest of the chain unaffected?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-node-bus",
+      "op": "r",
+      "bus": 1,
+      "screenshot": "channel-r-bus1"
+    },
+    {
+      "type": "set-monitor-bus",
+      "bus": 1,
+      "screenshot": "channel-r-monitor"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "channel-r-hold"
+    },
+    {
+      "type": "set-node-bus",
+      "op": "r",
+      "bus": 0,
+      "screenshot": "channel-r-bus0"
+    },
+    {
+      "type": "set-node-bus",
+      "op": "g",
+      "bus": 1,
+      "screenshot": "channel-g-bus1"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "channel-g-hold"
+    },
+    {
+      "type": "set-node-bus",
+      "op": "g",
+      "bus": 0,
+      "screenshot": "channel-g-bus0"
+    },
+    {
+      "type": "set-node-bus",
+      "op": "b",
+      "bus": 1,
+      "screenshot": "channel-b-bus1"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "channel-b-hold"
+    },
+    {
+      "type": "set-node-bus",
+      "op": "b",
+      "bus": 0,
+      "screenshot": "channel-b-bus0"
+    },
+    {
+      "type": "set-node-bus",
+      "op": "a",
+      "bus": 1,
+      "screenshot": "channel-a-bus1"
+    },
+    {
+      "type": "wait",
+      "ms": 350,
+      "screenshot": "channel-a-hold"
+    },
+    {
+      "type": "set-node-bus",
+      "op": "a",
+      "bus": 0,
+      "screenshot": "channel-a-bus0"
+    },
+    {
+      "type": "set-monitor-bus",
+      "bus": 0,
+      "screenshot": "channel-monitor-reset"
+    }
+  ]
+}

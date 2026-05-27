@@ -21,7 +21,7 @@ function makeChannelDef(op: ChannelMode) {
     audit: {
       shaderPath: 'src/video/shaders/channel.frag',
       neutralDefault: false,
-      qaCaseIds: ['audit-modulateDisplace-osc-sweep', 'audit-modulateDisplace-video-cross-source'],
+      qaCaseIds: ['audit-channel-isolate'],
       qaCoverage: 'shared',
     },
   });

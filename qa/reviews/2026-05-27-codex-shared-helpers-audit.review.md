@@ -44,7 +44,12 @@ Per `memory.md` entries dated 2026-05-27 and the diff against `HEAD`:
 
 All three follow-ups are effectively complete. The chosen shape is one generic `createVideoOperatorDef` rather than three family-specific helpers — same end result, fewer abstractions, consistent with the "no new abstractions until a third concrete caller appears" rule.
 
-## 4. Defect found — channel-op audit metadata is mis-wired
+## 4. Defect found — channel-op audit metadata is mis-wired *(resolved 2026-05-27)*
+
+> **Update:** fixed in a follow-up commit. `qa/cases/audit-channel-isolate.json` now exists (routes r/g/b/a each in turn to bus 1 with monitor on bus 1, screenshots the isolated channel, returns to defaults) and `src/ops/channel.ts:24` references it as the single shared QA case for all four selectors. `qaCoverage: 'shared'` is now honest — one case covers four ops that differ only in `u_weights`. The original mis-wired state is preserved below for the record.
+
+---
+
 
 `src/ops/channel.ts:21-27` carries:
 
