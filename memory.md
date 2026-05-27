@@ -371,6 +371,7 @@ Cross-ref: [[2026-05-16-source-architecture]].
 - **Motion estimator as a product ceiling.** (2026-05-25) `src/video/shaders/motion-analysis.frag` runs 8-direction block matching with a 1.75-pixel search radius. That is enough to populate a motion texture but cannot represent real motion in most footage; the result is quantised and noisy, and `flow` plus any future routed `modulate*` consumer inherit that ceiling. The same kind of small-search artefact will appear wherever the motion field is used. Real upgrade is multi-scale / wider-radius search; scope it inside the stateful-systems quality work, not inside individual operator passes.
 - **Audio-only params on coupled operators.** (2026-05-25) `feedback.delayTime` is video-uncoupled by spec — the param hint already declares it audio-only, the audio worklet uses it, the video shader does not. The UI does not currently surface that distinction, so video-tab users see a "dead" knob. Open follow-up is a UI marker on `OPERATOR_UI_META.coreParams` rather than deleting working audio params; until then, leaving the knob in place is honest to the audio side but confusing to the video side. Superseded direction: Marc asked to strip the feedback audio path entirely (granulator + feedback delay is the public audio surface now); see todo.md "Strip the legacy feedback-freeze audio path" for the queued cleanup.
 - **Authored vs measured vector fields.** (2026-05-25) The first authored-field op (`vortex`, Biot-Savart point-vortex sum) shipped and is visibly the strongest displacement op in the chain. Lesson worth keeping: visual quality in this product comes more from *the math of the field* than from cleverer post-processing. Authored fields (vortex, future curl-noise, swept saddles) are cheap and independent of the weak motion estimator; measured-field ops (`flow`, routed `modulate*`) inherit `motion-analysis.frag`'s 1.75-px search-radius ceiling. Prefer authored-field additions over more post passes when the goal is "make the public chain feel less amateur".
+- **Authored-field set now covers four distinct field classes.** (2026-05-25) Same-day follow-up to the vortex op: shipped `curlNoise` (divergence-free 2-octave noise curl, GPU-only), `vortexPacket` (macro + micro Biot-Savart bands, two CPU advections), and `saddleField` (oriented saddles with anisotropic stretch/compress). The deliberate design tension that emerged while authoring them is that *each new field op must contribute a different mathematical class* — swirl (vortex), turbulence (curl), banded packet (vortexPacket), directional sweep (saddleField). Adding a fifth op that's a re-skin of an existing class would expand the Feedback family's surface without expanding what it can do, and that's the bar to clear before any more authored fields ship. Public allowlist accordingly grew from 13 to 16 programs, one preset per new op.
 - **Per-op audio twins are gone for good.** (2026-05-25) `OperatorDef.createAudioStage` and `AudioStage` no longer exist; the public audio surface is permanently granulator + feedback delay + master limiter. Re-introducing per-operator audio worklets requires an explicit scope expansion in `plan.md` first, not "just one more op". The legacy `audio-rack.ts` / `AudioRack.svelte` / `feedback-freeze.js` / `modulate-*.js` / `phase-*.js` / `pitch-shifter.js` / `pixelate-*.js` files are deleted, not commented out — do not resurrect them by reading git history without re-justifying scope.
 - **Renderer uniform discipline after stripping a shader.** (2026-05-25) When simplifying a renderer-owned shader (e.g. `history.frag` reduced to an identity copy), uniforms that the shader no longer references get optimized out by the GLSL compiler; `getUniformLocation` then returns null, the strict init guard in `renderer.ts` (`!uHistoryResolution || !uHistoryFeedbackAmount || ...`) throws, and the app boots with `init failed: post-processing program missing required uniforms` in the canvas. Fix is always: remove the now-dead uniform lookups, dead `WebGLUniformLocation` fields, and dead `gl.uniform*` calls in the same pass. Do not "keep the uniform alive" with `u * 0.0` tricks — drivers fold them anyway and it leaves dead code in the renderer.
 
@@ -2683,3 +2684,127 @@ This is V8 periodically flushing unused JIT-compiled bytecode from the isolate h
 **Still uncommitted (requires explicit user approval):**
 1. `public/worklets/granulator.js` — `readSyncedControls()` removal
 2. `qa/e2e/b2.3-granulator-soak.spec.ts` — V8 code-flush classification + double-count fix
+
+## 2026-05-26 — Second field-op pack: eight bounded authored warps, no public bank expansion
+
+Added a second authored-field slice on the video side, but kept it tightly scoped and architecture-conforming. The pack is:
+
+- `pinchBulge`
+- `polarRipple`
+- `sinkSourceField`
+- `spiralField`
+- `domainFold`
+- `gyreField`
+- `turbulenceWarp`
+- `magneticDipole`
+
+All eight follow the same pattern as `vortexPacket`, `curlNoise`, and `saddleField`:
+
+- one `src/ops/*.ts` wrapper per op
+- one GLSL fragment shader per op under `src/video/shaders/`
+- registration in `src/ops/index.ts`
+- Feedback-family `OperatorUiMeta` in `src/core/operators.ts`
+- neutral cold-boot behavior via a first `mix` param with default `0`
+
+Deliberate design choice: these are **bounded coordinate warps**, not heavy simulation passes. Every shader uses explicit softening/clamping and avoids singular inverse-distance or unbounded UV excursions. The intent was to expand the field vocabulary for LFO/audio coupling and feedback chaining without creating a second “big simulation roadmap” in the same pass.
+
+Same-day follow-up after user review: the first pass felt too static compared with the older authored-field operators because most of the new pack only had `phase` or centre controls, not an explicit performance-time animation macro. Decision: add a shared `drift` param to all eight new field ops with default `0` so they stay neutral on boot but gain the same “animate the field itself” affordance as `vortex`, `vortexPacket`, and `saddleField`. Implementation stays shader-local and bounded: `drift` only advances angle/phase or induces small centre orbits, never unbounded gain or UV travel. This keeps the public story coherent: field ops should be directly playable with LFOs and feedback, not just static utilities.
+
+Also added one **internal-only** preset, `fieldOrbitLab`, to `public/presets.json` as an authored reference patch for the new operators. It is intentionally **not** in `PUBLIC_PROGRAM_KEYS` because the visible flagship bank is already curated and stable; the preset exists as a durable in-repo audition patch, not as public surface expansion.
+
+Verification for this pass:
+
+- `npm run check`
+- `npm run test:run -- src/core/operators.test.ts src/core/coupling.test.ts`
+- `npm run build`
+- `npm run test:run -- src/core/operators.test.ts src/core/coupling.test.ts src/core/presets.test.ts`
+- `npm run build`
+- `npx playwright test qa/e2e/op-characterisation.spec.ts --list -c qa/playwright.config.ts`
+
+Also strengthened `src/core/operators.test.ts` so future operator packs fail fast if an op is missing UI metadata, has duplicate registration, or declares params without defaults/coupling specs.
+
+### 2026-05-26 — Default panSpread / ySpread bumped 0 → 0.7 for visible grain composite
+
+Background: Marc reported the grain-composite source "doesn't seem to be functioning even with audio enabled and audio evident in meter". Probe rebuilt to read the visible canvas (Playwright `element.screenshot()` + in-page PNG decode), not the internal `#prevFrame.fbo` via `readPixelAt` — the latter was lighting up because copies into prevFrame happen *after* the canvas present pass, so a lit prevFrame told us nothing about the visible output. Granulator runtime diagnostics confirmed audio side was healthy: ~20 spawns/sec, 2 active voices throughout the 4 s observation.
+
+Diagnosis: with `panSpread=0` and `ySpread=0`, the worklet computes `panNorm = rPan × panSpread = 0` and `panY = rY × ySpread = 0` for every grain. The composite vertex shader (`src/video/grain-composite.vert`) places each grain quad at `u_center = (0, 0)` in clip space with `halfSize = 0.35`. Every grain stacks at the same centred rectangle covering ~350f half the canvas. Looks like a single static frozen frame — indistinguishable from "broken" if the underlying source frame is dark, or if the user is between envelope fades.
+
+Decision: bump `panSpread` and `ySpread` defaults from `0` to `0.7` in **both** authoritative tables:
+
+- `src/audio/granulator-params.ts` — `SPECS.panSpread.default` / `SPECS.ySpread.default` (drives `GRANULATOR_DEFAULTS`, which initialises App.svelte's `granulatorRawParams`)
+- `src/audio/granulator.ts` — `CONTROL_DEFAULTS.panSpread` / `CONTROL_DEFAULTS.ySpread` (worklet-side fallback if no control message has arrived)
+
+Rationale for 0.7 (not 0.5, not 1.0): with `halfSize = 0.35`, a grain centred at `panNorm = 0.7` covers x ∈ [0.35, 1.05] — just touches the right clip-space edge, never leaves a wasted off-screen area. 0.7 gives a strong scatter while keeping every grain fully on-screen. ySpread mirrors this for vertical.
+
+Audio implication: `panSpread` also drives stereo positioning (worklet `theta = π (panNorm + 1) / 4`, equal-power pan) and `ySpread` drives mid/side balance (`midGain = cos(ySpread π/2)`, `sideGain = sin(ySpread π/2)`). 0.7 defaults give a noticeably stereo-spread granular cloud rather than a mono pile — also closer to typical user expectation for a granular synth. Audio behaviour change is intentional and not a regression.
+
+No preset breakage: every in-repo preset sets panSpread/ySpread explicitly (range 0.18–0.66), so the default bump only affects fresh App-state on first load. Verified `378 files / 0 errors`, `183 / 183 tests`. Probe shows 7 of 8 saved frames lit (only initial t0 dark during settle, vs all-black except a brief mid-window flash before the change).
+
+Related discipline note: this is the second time recently a verification has reported PASS by reading the wrong surface. The honest test always reads what the user sees — the canvas, not an internal FBO that mirrors it on a delay. Going forward, any visual probe should default to canvas-PNG-decode over `readPixelAt`.
+
+### 2026-05-26 — Two grain-composite bugs + density triage
+
+After the spread defaults landed Marc reported (a) the video image is upside down and (b) the audio crashes out when density is turned up. Both investigated; (a) and a related GPU bug fixed, (b) does not reproduce inside the UI-reachable range.
+
+**Bug 1 — upside-down sample:** `src/video/grain-composite.frag` was sampling the GrainBuffer texture array with raw `v_uv`. `GrainBuffer.decodeFromVideo` uploads with `UNPACK_FLIP_Y_WEBGL = false`, so image row y=0 (top) lands at texture y=0 (= GL bottom under standard sampling). Net effect: top of the grain quad sampled the image bottom. Fix kept local to the shader (`vec3(v_uv.x, 1.0 - v_uv.y, u_layer)`) rather than flipping at upload, because the existing `readFrameCenter` already has a compensating `height - 1 - py` flip; changing the upload would have required updating both.
+
+**Bug 2 — decode race losing texture binding:** `src/video/grain-buffer.ts` bound `TEXTURE_2D_ARRAY` once before the per-frame loop, then `await waitForSeek(video, t)`. During the await the main renderer's raf loop rebinds the slot; the subsequent `texSubImage3D` then runs with no target bound and the upload silently drops. Playwright captured 16 "no texture bound to target" warnings per decode. Latent in production because the user couldn't see the WebGL console and the grain-composite probe pass signal didn't depend on every frame being uploaded — but it left random black frames in the texture array, almost certainly contributing to Marc's original "doesn't seem to be functioning" report (alongside the spread=0 default already shipped). Fix: rebind + re-`pixelStorei` inside the loop after each await. After fix: zero WebGL warnings, lit-frame count in the visible-canvas probe went 7/8 → 8/8, mean 12.84 → 14.95.
+
+**Audio "crash" — not reproducible inside UI range:** Built `qa/e2e/granulator-density-ramp.spec.ts` driving density 5→1000 Hz with master-peak measurement (added `getMasterPeak` to the QA bridge — `audio.getMasterPeak()` was already used by the UI master meter, just not exposed for tests). Across the full UI range [0.1, 200] (defined at `src/audio/granulator-params.ts:103`), peak stays steady at 0.02–0.03 with ctxState=running, zero console errors, and no NaN propagation. Output even peaks slightly at density=500 (above the slider cap). Only above ~2000 spawns/sec — unreachable from the UI — does peak collapse toward zero, because at that rate every voice gets stolen before its Hann envelope rises off zero, so each voice contributes near-silence before being faded out. Engine-level mitigation deferred until either the slider range widens or MIDI-modulated density bursts surface the same path in practice.
+
+**Most likely actual user experience:** Marc was hearing unstable grain-composite playback caused by the decode race (Bug 2) — patchy black frames during the decode window — and attributed it to density. The texSubImage3D rebind fix should resolve the perceived instability.
+
+**Probe-discipline note:** The density probe was nearly useless on first pass because the bridge didn't expose master peak. Now exposed via `__AV_SYNTH_QA__.getMasterPeak()`. Future audio probes default to this signal rather than trying to inject an AnalyserNode from the test side — the engine already taps the master bus pre-limiter for the UI meter, so reuse it.
+
+## 2026-05-26 — slitScan op + hiddenParams hook
+
+Added a dedicated `slitScan` operator (separate from `timeDisplace`, which keeps its existing scan/smear/decay blend). Slit-scan params: mix, orientation (vertical/horizontal), slitX, slitY, scanSpeed (signed -1..1), depth. Sign of scanSpeed flips which side of the slit is past.
+
+Extended `OperatorDef` with an optional `hiddenParams(params) => Set<string>` hook so ops can mark currently-irrelevant params (slitY when vertical, slitX when horizontal). UI-only — engine math ignores it. First use of the hook; if a third op needs it the pattern will be promoted into a smaller abstraction.
+
+Design tension worth flagging: `ParamSpec` has no `step` or discrete-enum support, so orientation is a continuous 0..1 slider snapped to {0,1} in the shader. A proper toggle UI is a follow-up. Same shape will be needed for any future "mode" param.
+
+Probe (`qa/e2e/slit-scan-probe.spec.ts`) only has one strict gate (scanSpeed=0 vs scanSpeed=1 must differ). Orientation flip and slit-position change are soft gates because whole-image luma-diff on the mostly-static ci-smoke fixture sits near the noise floor — the saved screenshots in /tmp/slit-*.png are the human-verifiable evidence. Stronger gates would need either a longer history ring (TEMPORAL_HISTORY_CAPACITY=8 today) or a fixture with more motion.
+
+## 2026-05-26 — dataMosh op + per-op ownedState FBO
+
+Context: Marc reported the existing datamosh-style smear in `flow` was below par, and asked about porting either Akascape's realtime-datamosh Shadertoy or the Datamosher-Pro desktop app. Investigation findings worth keeping:
+
+- **Datamosher-Pro is bitstream-level**, not pixel-level. `classic.py`/`repeat.py`/FFG_effects all split encoded AVI on `00dc` markers and toggle I-/P-frame bytes. Not portable to a browser shader pipeline at all — the `<video>` element only gives us decoded RGB. Do not waste time re-evaluating this; the answer is unchanged unless we ship WebCodecs-based bitstream surgery, which is a separate product.
+- **Akascape's Shadertoy is the only pixel-domain reference** in the family, but the technique (sparse-refresh accumulator, ~10% per noise-chunk per frame) produces a VHS-bleed look rather than the held-keyframe-with-drift signature that "datamosh" usually refers to. Useful as a third-tier option but not what most users mean.
+- **The real datamosh signature is "held I-frame content sliding along motion vectors as P-frame predictions get mis-applied to it."** That needs a self-feedback buffer holding indefinitely. The renderer's shared `temporalHistory` (8-frame ring, written from chain output) is the wrong primitive — it holds whole frames per layer, can't accumulate selective drift, and tops out at ~267ms at 30fps.
+
+### Architecture choice: per-op ownedState FBO
+
+Added an opt-in self-feedback facility rather than reshaping the shared temporal ring. Decision shape:
+
+- `OperatorDef.ownedState?: { uniform: string }` declares a sampler name the shader reads for previous-frame state.
+- `VideoStageRendererResources.ownedState` is `{ textureUnit: 6, width, height, initialized } | null`. `initialized` is false on the very first frame after allocation; shaders gate on it to passthrough current input instead of reading uninitialised memory.
+- Renderer allocates per-instance ping-pong (2 textures + 1 FBO rebound each frame) in `#syncNodeTargets`, walking `plan.steps` for ops whose def carries `ownedState`. Lifecycle: allocate on step add, dispose on step remove, dispose-and-reallocate on canvas resize (state reset is acceptable on resize).
+- Per-frame render path: ownedState op renders into ownedState[next] (FBO attachment rebound), reads ownedState[current] on TEXTURE6, then renderer blits ownedState[next] → chain target so downstream ops see the dataMosh output. After blit, swap current ↔ next, increment framesWritten (drives the `initialized` flag).
+- Single-attachment model (op's output IS its state) chosen over MRT (Multiple Render Targets) for simplicity. Works because the only consumer today (`dataMosh`) genuinely *wants* its visible output to equal its persistent state. If a future op needs state-distinct-from-output, promote to MRT — but don't pre-build that.
+
+Why this shape rather than promoting `temporalHistory` to be writable by ops: the temporal ring is shared (all ops see the same layers, written from chain output once per frame). Per-op feedback is fundamentally per-instance — two `dataMosh` nodes on different branches must hold different keyframes. Conflating those would require ownership semantics on the shared ring that don't fit its current role.
+
+### Op shape
+
+`src/ops/dataMosh.ts` + `src/video/shaders/dataMosh.frag`. Six params: `mix` (dry/wet), `hold` (persistence), `drift` (motion-vector slide strength), `release` (motion threshold above which held gives way to live), `decay` (slow bleed of held toward grey), `chunk` (macroblock chunkiness for codec-warp feel). Output formula:
+
+```
+held = sample ownedState[current] at v_uv shifted by motion_vector * drift
+held = mix(held, grey, decay * 0.012)         // slow degrade
+wet  = mix(live, held, hold * (1 - releaseGate(motionMag, release)))
+out  = mix(live, wet, mix)                    // dry/wet final
+```
+
+The op's `out` is also written as the next ownedState. The mix=0 case therefore stays a true identity even though the wet path is still computed — at mix=0 the state slowly converges to live (no moshing).
+
+`flow` is left untouched. Its `smear`/`memory`/`glitch` mode is a different (motion-blur-flavoured) look and still drives the existing `Datamosh Smear` flagship preset; users now pick between `flow` (smear) and `dataMosh` (held keyframe).
+
+### Verification + caveats
+
+- `npm run check` 380/0, `npm run test:run` 183/183.
+- `npm run qa:dataMosh` green: `identity↔live=4.44, identity↔hold=1.91, identity-Δt=4.24, hold-Δt=3.68`. The hold-Δt < identity-Δt assertion is the actual datamosh signature gate — proves held content persists across frames.
+- `npm run qa:slitScan` re-run as a regression check; renderer changes did not affect non-ownedState ops.
+- Probe Gate 2 threshold is intentionally low (0.25) because `ci-smoke` is mostly flat colour bars. The drift artifacts (yellow/orange bleed at red-bar edges, diagonal chroma drift around rainbow corner, held checker pattern) are visually obvious in `/tmp/datamosh-hold-a.png` but don't move whole-frame luma much. A high-motion fixture would let us tighten this — open follow-up in todo.md.
+- Held content rolls over naturally as the wet output (which mixes some live in via the release gate) becomes the next state. A user-triggered "snapshot now" trigger would make it feel like Datamosher-Pro's `Void` cut — but that needs a non-numeric input type in `ParamSpec`/coupling which we don't have today. Same follow-up family as the slit-scan orientation enum.

@@ -75,6 +75,15 @@ interface OffscreenTarget {
   height: number;
 }
 
+interface OwnedStateBuffer {
+  fbo: WebGLFramebuffer;
+  current: WebGLTexture;
+  next: WebGLTexture;
+  width: number;
+  height: number;
+  framesWritten: number;
+}
+
 interface TemporalHistoryBuffer {
   fbo: WebGLFramebuffer;
   tex: WebGLTexture;
@@ -810,6 +819,7 @@ export class VideoRenderer {
   #sourceTarget: OffscreenTarget;
   #displacementTarget: OffscreenTarget;
   #nodeTargets = new Map<string, OffscreenTarget>();
+  #ownedStateBuffers = new Map<string, OwnedStateBuffer>();
   #busHistory = new Map<BusIndex, OffscreenTarget>();
   #emptyTarget: OffscreenTarget;
   #prevFrame: OffscreenTarget;
@@ -1296,6 +1306,61 @@ export class VideoRenderer {
     };
   }
 
+  // Characterise the last completed frame on a fixed N×N grid. Used by the
+  // op-characterisation sweep — small, deterministic, dimension-independent.
+  // Each channel returns mean (0..1), variance (0..1), and brightness-weighted
+  // centre-of-mass in normalised image coords. Reads from #prevFrame for the
+  // same reason as readPixelAt.
+  readFrameStats(gridSize = 16): {
+    grid: number;
+    mean: [number, number, number];
+    variance: [number, number, number];
+    centerOfMass: { x: number; y: number };
+  } | null {
+    const gl = this.gl;
+    const { fbo, width, height } = this.#prevFrame;
+    const prevFbo = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    const px = new Float32Array(4);
+    const n = gridSize * gridSize;
+    const sum: [number, number, number] = [0, 0, 0];
+    const sumSq: [number, number, number] = [0, 0, 0];
+    let lumaSum = 0;
+    let lumaX = 0;
+    let lumaY = 0;
+    for (let iy = 0; iy < gridSize; iy++) {
+      const ny = (iy + 0.5) / gridSize;
+      const py = Math.floor(ny * height);
+      for (let ix = 0; ix < gridSize; ix++) {
+        const nx = (ix + 0.5) / gridSize;
+        const px2 = Math.floor(nx * width);
+        gl.readPixels(px2, height - 1 - py, 1, 1, gl.RGBA, gl.FLOAT, px);
+        const r = Math.max(0, Math.min(1, px[0]!));
+        const g = Math.max(0, Math.min(1, px[1]!));
+        const b = Math.max(0, Math.min(1, px[2]!));
+        sum[0] += r; sum[1] += g; sum[2] += b;
+        sumSq[0] += r * r; sumSq[1] += g * g; sumSq[2] += b * b;
+        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        lumaSum += luma;
+        lumaX += luma * nx;
+        lumaY += luma * ny;
+      }
+    }
+    const err = gl.getError();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, prevFbo);
+    if (err !== gl.NO_ERROR) return null;
+    const mean: [number, number, number] = [sum[0] / n, sum[1] / n, sum[2] / n];
+    const variance: [number, number, number] = [
+      Math.max(0, sumSq[0] / n - mean[0] * mean[0]),
+      Math.max(0, sumSq[1] / n - mean[1] * mean[1]),
+      Math.max(0, sumSq[2] / n - mean[2] * mean[2]),
+    ];
+    const center = lumaSum > 1e-6
+      ? { x: lumaX / lumaSum, y: lumaY / lumaSum }
+      : { x: 0.5, y: 0.5 };
+    return { grid: gridSize, mean, variance, centerOfMass: center };
+  }
+
   readMotionEnergy(): number | null {
     const gl = this.gl;
     const prevFbo = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
@@ -1338,6 +1403,8 @@ export class VideoRenderer {
     this.#deleteTarget(this.#displacementTarget);
     for (const target of this.#nodeTargets.values()) this.#deleteTarget(target);
     this.#nodeTargets.clear();
+    for (const buf of this.#ownedStateBuffers.values()) this.#deleteOwnedStateBuffer(buf);
+    this.#ownedStateBuffers.clear();
     for (const target of this.#busHistory.values()) this.#deleteTarget(target);
     this.#busHistory.clear();
     this.#deleteTarget(this.#emptyTarget);
@@ -1408,8 +1475,26 @@ export class VideoRenderer {
         continue;
       }
 
-      gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
-      gl.viewport(0, 0, target.width, target.height);
+      const ownedState = instance.def.ownedState
+        ? this.#ownedStateBuffers.get(step.id) ?? null
+        : null;
+
+      if (ownedState) {
+        // Render into ownedState[next]; ownedState[current] is exposed to the
+        // shader on TEXTURE6 as the previous-frame state.
+        gl.bindFramebuffer(gl.FRAMEBUFFER, ownedState.fbo);
+        gl.framebufferTexture2D(
+          gl.FRAMEBUFFER,
+          gl.COLOR_ATTACHMENT0,
+          gl.TEXTURE_2D,
+          ownedState.next,
+          0,
+        );
+        gl.viewport(0, 0, ownedState.width, ownedState.height);
+      } else {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+        gl.viewport(0, 0, target.width, target.height);
+      }
       gl.useProgram(instance.videoStage.program);
 
       // Bind primary input → TEXTURE0 (u_tex).
@@ -1433,6 +1518,11 @@ export class VideoRenderer {
 
       gl.activeTexture(gl.TEXTURE5);
       gl.bindTexture(gl.TEXTURE_2D, this.#motionFieldTarget.tex);
+
+      if (ownedState) {
+        gl.activeTexture(gl.TEXTURE6);
+        gl.bindTexture(gl.TEXTURE_2D, ownedState.current);
+      }
 
       const rawParams = applyGlobalLfoAssignments(
         instance.params,
@@ -1461,9 +1551,40 @@ export class VideoRenderer {
           height: this.#motionFieldTarget.height,
           scale: MOTION_FIELD_SCALE,
         },
+        ownedState: ownedState
+          ? {
+              textureUnit: 6,
+              width: ownedState.width,
+              height: ownedState.height,
+              initialized: ownedState.framesWritten > 0,
+            }
+          : null,
       });
       instance.videoStage.setUniforms(gl, params, ctx);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+      if (ownedState) {
+        // Blit ownedState[next] → chain target so downstream ops see it.
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, ownedState.fbo);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, target.fbo);
+        gl.blitFramebuffer(
+          0,
+          0,
+          ownedState.width,
+          ownedState.height,
+          0,
+          0,
+          target.width,
+          target.height,
+          gl.COLOR_BUFFER_BIT,
+          gl.LINEAR,
+        );
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        const tmp = ownedState.current;
+        ownedState.current = ownedState.next;
+        ownedState.next = tmp;
+        ownedState.framesWritten += 1;
+      }
     }
 
     // 3. Present either the selected monitor bus or a compact quad preview.
@@ -1862,14 +1983,28 @@ export class VideoRenderer {
     const width = this.canvas.width;
     const height = this.canvas.height;
     const nextIds = new Set(this.#plan.steps.map((step) => step.id));
+    const ownedIds = new Set(
+      this.#plan.steps
+        .filter((step) => step.instance.def.ownedState != null)
+        .map((step) => step.id),
+    );
     for (const [id, target] of this.#nodeTargets) {
       if (nextIds.has(id)) continue;
       this.#deleteTarget(target);
       this.#nodeTargets.delete(id);
     }
+    for (const [id, buf] of this.#ownedStateBuffers) {
+      if (ownedIds.has(id)) continue;
+      this.#deleteOwnedStateBuffer(buf);
+      this.#ownedStateBuffers.delete(id);
+    }
     for (const id of nextIds) {
       if (this.#nodeTargets.has(id)) continue;
       this.#nodeTargets.set(id, createTarget(this.gl, width, height, this.#internalFormat));
+    }
+    for (const id of ownedIds) {
+      if (this.#ownedStateBuffers.has(id)) continue;
+      this.#ownedStateBuffers.set(id, this.#createOwnedStateBuffer(width, height));
     }
   }
 
@@ -1877,6 +2012,43 @@ export class VideoRenderer {
     const gl = this.gl;
     gl.deleteFramebuffer(target.fbo);
     gl.deleteTexture(target.tex);
+  }
+
+  #createOwnedStateBuffer(width: number, height: number): OwnedStateBuffer {
+    const gl = this.gl;
+    const allocTex = (): WebGLTexture => {
+      const tex = gl.createTexture();
+      if (!tex) throw new Error('Failed to allocate ownedState texture');
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        this.#internalFormat,
+        width,
+        height,
+        0,
+        gl.RGBA,
+        this.#internalFormat === gl.RGBA16F ? gl.FLOAT : gl.UNSIGNED_BYTE,
+        null,
+      );
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      return tex;
+    };
+    const current = allocTex();
+    const next = allocTex();
+    const fbo = gl.createFramebuffer();
+    if (!fbo) throw new Error('Failed to allocate ownedState FBO');
+    return { fbo, current, next, width, height, framesWritten: 0 };
+  }
+
+  #deleteOwnedStateBuffer(buf: OwnedStateBuffer): void {
+    const gl = this.gl;
+    gl.deleteFramebuffer(buf.fbo);
+    gl.deleteTexture(buf.current);
+    gl.deleteTexture(buf.next);
   }
 
   #deleteTemporalHistory(): void {
@@ -1963,6 +2135,8 @@ export class VideoRenderer {
     this.#deleteTarget(this.#displacementTarget);
     for (const target of this.#nodeTargets.values()) this.#deleteTarget(target);
     this.#nodeTargets.clear();
+    for (const buf of this.#ownedStateBuffers.values()) this.#deleteOwnedStateBuffer(buf);
+    this.#ownedStateBuffers.clear();
     for (const target of this.#busHistory.values()) this.#deleteTarget(target);
     this.#busHistory.clear();
     this.#deleteTarget(this.#emptyTarget);

@@ -48,6 +48,8 @@
     createInstance,
     disposeInstance,
     listOps,
+    getDef,
+    getOperatorUiMeta,
     type OperatorInstance,
   } from './core/operators';
   import {
@@ -139,6 +141,12 @@
   let webMidiInput: WebMidiInput | null = null;
   let midiDevices = $state<readonly WebMidiDevice[]>([]);
   let midiUnavailableReason = $state<string | null>(null);
+  let selectedMidiSource = $state<string>('all');
+  const KEY_TO_NOTE: Readonly<Record<string, number>> = {
+    a: 60, w: 61, s: 62, e: 63, d: 64, f: 65, t: 66,
+    g: 67, y: 68, h: 69, u: 70, j: 71, k: 72, o: 73, l: 74,
+  };
+  const heldKeys = new Set<string>();
   let grainBuffer: GrainBuffer | null = null;
   let grainScheduler: GrainScheduler | null = null;
   let grainCompositeSource: GrainCompositeSource | null = null;
@@ -320,6 +328,7 @@
     getGranulatorControlAudit(): Promise<GranulatorControlAudit | null>;
     setFeedbackDelayParam(name: string, value: number): Promise<boolean>;
     getAudioContext(): AudioContext | null;
+    getMasterPeak(): number | null;
     isGrainDecoded(): boolean;
     ensureGrainAudioLoaded(): Promise<boolean>;
     readCenterPixel(): { r: number; g: number; b: number } | null;
@@ -362,6 +371,21 @@
     setPatchNodeSecondaryInput(op: string, input: string, opIndex?: number): Promise<boolean>;
     setMonitorBus(bus: BusIndex): Promise<boolean>;
     setPreviewMode(mode: PreviewMode): Promise<boolean>;
+    setChain(opIds: readonly string[]): Promise<boolean>;
+    listRegisteredOps(): {
+      op: string;
+      family: string;
+      inputArity: number;
+      paramOrder: readonly string[];
+      defaults: Readonly<Record<string, number>>;
+      ranges: Readonly<Record<string, readonly [number, number]>>;
+    }[];
+    readFrameStats(grid?: number): {
+      grid: number;
+      mean: [number, number, number];
+      variance: [number, number, number];
+      centerOfMass: { x: number; y: number };
+    } | null;
   }
 
   type CaptureStatus = 'idle' | 'recording' | 'ready';
@@ -1004,6 +1028,15 @@
 
   function setGranulatorParam(name: GranulatorSliderParam, value: number): void {
     granulatorRawParams = { ...granulatorRawParams, [name]: value };
+    if (
+      name === 'position' &&
+      videoEl &&
+      !grainDecodeStatus &&
+      Number.isFinite(videoEl.duration) &&
+      videoEl.duration > 0
+    ) {
+      videoEl.currentTime = value * videoEl.duration;
+    }
   }
 
   function pushGranulatorParams(values: Partial<Record<GranulatorSliderParam, number>>): void {
@@ -1384,6 +1417,7 @@
         return true;
       },
       getAudioContext: () => (audio.isInitialised ? audio.ctx : null),
+      getMasterPeak: () => (audio.isInitialised ? audio.getMasterPeak() : null),
       isGrainDecoded: () => !!(videoEl && grainDecodedSrc === videoEl.src),
       readCenterPixel: () => {
         if (!renderer) return null;
@@ -1511,6 +1545,41 @@
         await tick();
         return true;
       },
+      setChain: async (opIds) => {
+        if (!renderer) return false;
+        for (const inst of instances) disposeInstance(inst, renderer.gl);
+        const next: OperatorInstance[] = [];
+        for (const op of opIds) {
+          const inst = createInstance(op, renderer.gl);
+          next.push(inst);
+        }
+        instances = next;
+        syncSerialGraph(instances);
+        resetRendererTemporalState();
+        activeProgram = null;
+        await tick();
+        return true;
+      },
+      listRegisteredOps: () => {
+        return listOps().map((op) => {
+          const def = getDef(op);
+          const meta = getOperatorUiMeta(op);
+          const ranges: Record<string, readonly [number, number]> = {};
+          for (const id of def.paramOrder) {
+            const spec = def.coupling.params[id]?.spec;
+            if (spec) ranges[id] = spec.range;
+          }
+          return {
+            op,
+            family: meta.family,
+            inputArity: def.inputArity ?? 1,
+            paramOrder: def.paramOrder,
+            defaults: def.defaults,
+            ranges,
+          };
+        });
+      },
+      readFrameStats: (grid = 16) => renderer?.readFrameStats(grid) ?? null,
     };
   }
 
@@ -1734,7 +1803,8 @@
         const input = await WebMidiInput.open();
         webMidiInput = input;
         midiDevices = input.devices;
-        input.onRawMessage = (bytes) => {
+        input.onRawMessage = (bytes, deviceName) => {
+          if (selectedMidiSource !== 'all' && selectedMidiSource !== deviceName) return;
           const msg = parseMidiMessage(bytes);
           if (msg) midiRouter?.ingest(msg);
         };
@@ -2276,8 +2346,29 @@
     await clock.start();
     await playActiveVideoSource();
   }
+
+  function onKeyDown(e: KeyboardEvent): void {
+    if (e.repeat) return;
+    const t = e.target;
+    if (t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement) return;
+    if (selectedMidiSource !== 'all' && selectedMidiSource !== 'keyboard') return;
+    const note = KEY_TO_NOTE[e.key.toLowerCase()];
+    if (note === undefined) return;
+    if (heldKeys.has(e.key)) return;
+    heldKeys.add(e.key);
+    midiRouter?.ingest({ type: 'noteOn', channel: 1, note, velocity: 100 });
+  }
+
+  function onKeyUp(e: KeyboardEvent): void {
+    const note = KEY_TO_NOTE[e.key.toLowerCase()];
+    if (note === undefined) return;
+    const wasHeld = heldKeys.delete(e.key);
+    if (!wasHeld) return;
+    midiRouter?.ingest({ type: 'noteOff', channel: 1, note, velocity: 0 });
+  }
 </script>
 
+<svelte:window onkeydown={onKeyDown} onkeyup={onKeyUp} />
 <video bind:this={videoEl} style="display:none" playsinline></video>
 
 <main class="shell">
@@ -2367,15 +2458,34 @@
             1}/{grainDecodeStatus.frameCount}
         </p>
       {/if}
-      <p class="midi-status" data-qa="midi-status">
-        {#if midiUnavailableReason}
-          MIDI: {midiUnavailableReason}
-        {:else if midiDevices.length === 0}
-          MIDI: no devices connected
-        {:else}
-          MIDI: {midiDevices.map((d) => d.name).join(', ')}
-        {/if}
-      </p>
+      <div class="midi-row">
+        <span class="midi-status" data-qa="midi-status">
+          {#if midiUnavailableReason}
+            MIDI: {midiUnavailableReason}
+          {:else if selectedMidiSource === 'keyboard'}
+            MIDI: computer keyboard
+          {:else if midiDevices.length === 0}
+            MIDI: no devices
+          {:else if selectedMidiSource === 'all'}
+            MIDI: {midiDevices.map((d) => d.name).join(', ')}
+          {:else}
+            MIDI: {selectedMidiSource}
+          {/if}
+        </span>
+        <select
+          class="midi-source-select"
+          data-qa="midi-source-select"
+          value={selectedMidiSource}
+          onchange={(e) => { selectedMidiSource = (e.currentTarget as HTMLSelectElement).value; }}
+          disabled={!!midiUnavailableReason}
+        >
+          <option value="all">all devices</option>
+          <option value="keyboard">computer keyboard</option>
+          {#each midiDevices as device (device.id)}
+            <option value={device.name}>{device.name}</option>
+          {/each}
+        </select>
+      </div>
     </div>
   </section>
 
@@ -2663,6 +2773,38 @@
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
     margin: 0;
+  }
+
+  .midi-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .midi-status {
+    color: var(--muted);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+  }
+
+  .midi-source-select {
+    background: #1d1f25;
+    border: 1px solid #2a2d36;
+    color: #c8ccd4;
+    padding: 2px 4px;
+    font-size: 0.7rem;
+    font-family: inherit;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  .midi-source-select:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .source-actions {

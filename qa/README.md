@@ -70,6 +70,16 @@ Granulator-specific helpers:
 - `npm run qa:granulator:latency` runs the internal lower-bound MIDI-latency proxy and writes `qa/results/granulator-latency-proxy.json`.
 - The review/protocol note for both harnesses lives at `qa/reviews/granulator/2026-05-24-d3-d4-harnesses.md`.
 
+Operator characterisation:
+
+- `npm run qa:opSweep` — sweep every registered unary video op, walk each param min→max in 5 steps against a paused source frame, capture mean/variance/centre-of-mass, compare against `qa/baselines/op-sweeps/`. Fails on dead params (curve flat across the full range) and on baseline drift beyond per-op tolerance. ~2.5 min steady state.
+- `npm run qa:opSweep:bless` — same sweep, but writes `qa/baselines/op-sweeps/*.json` instead of comparing. Run this after intentional shader changes that move a param's measurable output.
+- Spec lives at `qa/e2e/op-characterisation.spec.ts`. Drives sweeps off `window.__AV_SYNTH_QA__.listRegisteredOps()`, so any new operator is automatically covered the next bless run.
+- `npm run qa:opSweep:thorough` — half-day (~6 h) sweep at 30 steps × 1500 ms × 3 source frames (t=0.4s, 1.0s, 1.6s), plus a 20 s temporal hold for every noisy op (curl/vortex/feedback/modulate*/scroll/rotate/grain/selfMod). Asserts dead params, bounded variance during the temporal hold, and per-frame baseline drift against `qa/baselines/op-sweeps-thorough/`. Intended to run overnight.
+- `npm run qa:opSweep:thorough:bless` — same, but writes the thorough baselines instead of comparing.
+- `npm run qa:opSweep:thorough:smoke` — ~90 s end-to-end wiring check (2 ops, 5 steps, 2 frames, 2 s temporal). Use after touching the spec to confirm it still runs before kicking off a half-day bless.
+- Thorough spec lives at `qa/e2e/op-characterisation-thorough.spec.ts`. Overridable via env: `OP_FILTER`, `SWEEP_STEPS`, `SOURCE_FRAMES`, `TEMPORAL_MS`, `SKIP_TEMPORAL=1`.
+
 ## Directory layout
 
 - `qa/cases/` — JSON manifests for smoke/regression scenarios

@@ -14,6 +14,8 @@ uniform int u_count;
 // Each saddle packed as ( px, py, axis_x, axis_y ). `axis` has length 1
 // — strength is uniform, orientation is per-saddle. Drift-rotated on CPU.
 uniform vec4 u_saddles[24];
+uniform sampler2D u_prev_frame;
+uniform float u_advect;
 
 // 2D saddle around a point: in the saddle's local frame the velocity is
 // ( x, -anisotropy * y ), which stretches matter along the axis and
@@ -39,7 +41,11 @@ void main() {
     vel += saddleVel(v_uv, u_saddles[i]);
   }
   vec2 src_uv = fract(v_uv - vel * u_strength);
-  vec3 displaced = texture(u_tex, src_uv).rgb;
+  vec3 displaced = mix(
+    texture(u_tex, src_uv).rgb,
+    texture(u_prev_frame, fract(2.0 * v_uv - src_uv)).rgb,
+    clamp(u_advect, 0.0, 0.95)
+  );
   vec3 current = texture(u_tex, v_uv).rgb;
   o_color = vec4(mix(current, displaced, clamp(u_mix, 0.0, 1.0)), 1.0);
 }

@@ -24,7 +24,14 @@ export type GranulatorParamName =
   | 'reverseProbability'
   | 'voiceCount'
   | 'mode'
-  | 'gain';
+  | 'gain'
+  | 'mix'
+  | 'fmAmount'
+  | 'fmFreq'
+  | 'envAttack'
+  | 'envDecay'
+  | 'envSustain'
+  | 'envRelease';
 
 export const GRANULATOR_ENVELOPES = ['hann', 'tukey-25', 'gaussian', 'expdec', 'rexpdec'] as const;
 export type GranulatorEnvelope = (typeof GRANULATOR_ENVELOPES)[number];
@@ -60,6 +67,13 @@ const CONTROL_ORDER: readonly GranulatorParamName[] = [
   'voiceCount',
   'mode',
   'gain',
+  'mix',
+  'fmAmount',
+  'fmFreq',
+  'envAttack',
+  'envDecay',
+  'envSustain',
+  'envRelease',
 ];
 const CONTROL_INDEX: Readonly<Record<GranulatorParamName, number>> = Object.freeze(
   Object.fromEntries(CONTROL_ORDER.map((name, index) => [name, index])) as Record<
@@ -77,12 +91,19 @@ const CONTROL_DEFAULTS: Readonly<Record<GranulatorParamName, number>> = Object.f
   density: 20,
   distribution: 0,
   envelope: ENVELOPE_INDEX.hann,
-  panSpread: 0,
-  ySpread: 0,
+  panSpread: 0.7,
+  ySpread: 0.7,
   reverseProbability: 0,
   voiceCount: 32,
   mode: MODE_INDEX.classic,
   gain: 0.7,
+  mix: 1,
+  fmAmount: 0,
+  fmFreq: 10,
+  envAttack: 10,
+  envDecay: 100,
+  envSustain: 1.0,
+  envRelease: 300,
 });
 const CONTROL_WRITE_SEQ_IDX = 0;
 const GRAIN_EVENT_RING_CAPACITY = 2048;

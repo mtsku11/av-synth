@@ -12,20 +12,24 @@ class CurlNoiseVideoStage implements VideoStage {
   readonly op = 'curlNoise';
   readonly program: WebGLProgram;
   #uTex: WebGLUniformLocation;
+  #uPrev: WebGLUniformLocation;
   #uMix: WebGLUniformLocation;
   #uStrength: WebGLUniformLocation;
   #uScale: WebGLUniformLocation;
   #uTime: WebGLUniformLocation;
   #uWarp: WebGLUniformLocation;
+  #uAdvect: WebGLUniformLocation;
 
   constructor(gl: WebGL2RenderingContext) {
     this.program = compileProgram(gl, frag, 'curlNoise');
     this.#uTex = reqUniform(gl, this.program, 'u_tex', 'curlNoise');
+    this.#uPrev = reqUniform(gl, this.program, 'u_prev_frame', 'curlNoise');
     this.#uMix = reqUniform(gl, this.program, 'u_mix', 'curlNoise');
     this.#uStrength = reqUniform(gl, this.program, 'u_strength', 'curlNoise');
     this.#uScale = reqUniform(gl, this.program, 'u_scale', 'curlNoise');
     this.#uTime = reqUniform(gl, this.program, 'u_time', 'curlNoise');
     this.#uWarp = reqUniform(gl, this.program, 'u_warp', 'curlNoise');
+    this.#uAdvect = reqUniform(gl, this.program, 'u_advect', 'curlNoise');
   }
 
   setUniforms(
@@ -34,11 +38,13 @@ class CurlNoiseVideoStage implements VideoStage {
     ctx: CouplingContext,
   ): void {
     gl.uniform1i(this.#uTex, 0);
+    gl.uniform1i(this.#uPrev, 1);
     gl.uniform1f(this.#uMix, params['mix'] ?? 0);
     gl.uniform1f(this.#uStrength, params['strength'] ?? 0.12);
     gl.uniform1f(this.#uScale, Math.max(0.5, params['scale'] ?? 3.0));
     gl.uniform1f(this.#uTime, ctx.time * (params['speed'] ?? 0.4));
     gl.uniform1f(this.#uWarp, params['warp'] ?? 0.4);
+    gl.uniform1f(this.#uAdvect, params['advect'] ?? 0);
   }
 
   dispose(gl: WebGL2RenderingContext): void {
@@ -48,8 +54,8 @@ class CurlNoiseVideoStage implements VideoStage {
 
 export const curlNoiseDef: OperatorDef = {
   op: 'curlNoise',
-  paramOrder: ['mix', 'strength', 'scale', 'speed', 'warp'],
-  defaults: { mix: 0, strength: 0.12, scale: 3.0, speed: 0.4, warp: 0.4 },
+  paramOrder: ['mix', 'strength', 'scale', 'speed', 'warp', 'advect'],
+  defaults: { mix: 0, strength: 0.12, scale: 3.0, speed: 0.4, warp: 0.4, advect: 0 },
   coupling: {
     op: 'curlNoise',
     params: {
@@ -110,6 +116,18 @@ export const curlNoiseDef: OperatorDef = {
           curve: 'lin',
           unit: 'norm',
           hint: 'second-pass advection — pulls the field through itself for a fluid feel',
+        },
+        toVideo: (raw) => raw,
+      },
+      advect: {
+        spec: {
+          id: 'advect',
+          label: 'advect',
+          range: [0, 0.95],
+          default: 0,
+          curve: 'lin',
+          unit: 'norm',
+          hint: 'temporal accumulation — pixels flow along the field over successive frames',
         },
         toVideo: (raw) => raw,
       },

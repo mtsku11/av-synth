@@ -62,7 +62,7 @@ const ENV_GAUSSIAN = 2;
 const ENV_EXPDEC = 3;
 const ENV_REXPDEC = 4;
 const ENV_COUNT = 5;
-const CONTROL_PARAM_COUNT = 15;
+const CONTROL_PARAM_COUNT = 22;
 const CONTROL_WRITE_SEQ_IDX = 0;
 const CONTROL_POSITION = 0;
 const CONTROL_POSITION_JITTER = 1;
@@ -79,8 +79,21 @@ const CONTROL_REVERSE_PROBABILITY = 11;
 const CONTROL_VOICE_COUNT = 12;
 const CONTROL_MODE = 13;
 const CONTROL_GAIN = 14;
+const CONTROL_MIX = 15;
+const CONTROL_FM_AMOUNT = 16;
+const CONTROL_FM_FREQ = 17;
+const CONTROL_ENV_ATTACK = 18;
+const CONTROL_ENV_DECAY = 19;
+const CONTROL_ENV_SUSTAIN = 20;
+const CONTROL_ENV_RELEASE = 21;
+// ln(2)/12 — converts semitones to the exponent for 2^(st/12) via Math.exp.
+const LN2_12 = 0.05776226504666211;
+const TWO_PI = 6.283185307179586;
 const DEFAULT_CONTROL_VALUES = new Float32Array([
-  0.5, 0, 0, 0, 80, 0, 20, 0, 0, 0, 0, 0, 32, 0, 0.7,
+  // pos  posJ  pit  pitJ  dur  durJ  den  dist  env  panS  yS  revP  vc  mode  gain  mix
+  0.5,     0,    0,   0,   80,   0,   20,   0,    0,   0,   0,   0,  32,   0,  0.7,  1.0,
+  // fmAmt  fmFreq  envAtk  envDcy  envSus  envRel
+  0,        10,     10,     100,    1.0,    300,
 ]);
 
 const MODE_CLASSIC = 0;
@@ -249,6 +262,9 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     this.vGain = new Float32Array(POOL_SIZE); // per-grain velocity attenuation (1.0 = unattenuated)
     this.vReverse = new Uint8Array(POOL_SIZE);
     this.vMidiCh = new Uint8Array(POOL_SIZE);
+    // FM oscillator state per grain slot (audio-rate pitch modulation).
+    this.vFmPhase = new Float32Array(POOL_SIZE);
+    this.vFmAccPos = new Float32Array(POOL_SIZE);
 
     // Pending note-on triggers from the main thread (spec §11). Kept in fixed-size typed
     // storage so note bursts do not allocate on the worklet thread.
@@ -262,6 +278,15 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
 
     this.masterSeed = new Uint32Array(1);
     this.masterSeed[0] = 0xc0ffee13;
+
+    // ADSR amplitude envelope — applied to the granulator's mixed output.
+    // Phase: 0=idle (transparent), 1=attack, 2=decay, 3=sustain, 4=release.
+    // In idle, adsrGain = 1.0 so non-MIDI usage is unaffected.
+    this.adsrPhase = 0;
+    this.adsrGain = 1.0;
+    // Per-channel note-held flags so release only fires when all channels lift.
+    this.channelHeld = new Uint8Array(MIDI_CHANNELS + 1); // 1-indexed
+    this.heldNoteCount = 0;
 
     this.srcL = null;
     this.srcR = null;
@@ -454,13 +479,31 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         const velocity = Number(msg.velocity);
         const channel = msg.channel | 0;
         if (!Number.isFinite(pitchSt) || !Number.isFinite(velocity)) break;
-        if (channel >= 1 && channel <= MIDI_CHANNELS) this.notePitch[channel - 1] = pitchSt;
+        if (channel >= 1 && channel <= MIDI_CHANNELS) {
+          this.notePitch[channel - 1] = pitchSt;
+          if (!this.channelHeld[channel]) {
+            this.channelHeld[channel] = 1;
+            this.heldNoteCount++;
+          }
+        }
+        // Trigger ADSR attack on first note; retrigger from current gain on subsequent notes.
+        if (this.heldNoteCount > 0) {
+          if (this.adsrPhase === 0) this.adsrGain = 0;
+          this.adsrPhase = 1;
+        }
         this.enqueuePendingNote(pitchSt, velocity, channel);
         break;
       }
       case 'noteOff': {
         const channel = msg.channel | 0;
-        if (channel >= 1 && channel <= MIDI_CHANNELS) this.releaseChannel(channel);
+        if (channel >= 1 && channel <= MIDI_CHANNELS) {
+          this.releaseChannel(channel);
+          if (this.channelHeld[channel]) {
+            this.channelHeld[channel] = 0;
+            this.heldNoteCount = Math.max(0, this.heldNoteCount - 1);
+          }
+          if (this.heldNoteCount === 0 && this.adsrPhase > 0) this.adsrPhase = 4;
+        }
         break;
       }
       case 'notePitch': {
@@ -681,6 +724,10 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     this.vFading[slot] = 0;
     this.vFadeRem[slot] = 0;
     this.vActive[slot] = 1;
+    // FM state: stagger initial phase by voice ID (golden-ratio sequence) so a grain
+    // cloud sounds like a chorus rather than all voices starting in-phase.
+    this.vFmPhase[slot] = (this.vVoiceId[slot] * 2.618033988) % TWO_PI;
+    this.vFmAccPos[slot] = startSample;
     this.totalSpawnCount++;
 
     this.emitGrainEvent(
@@ -838,6 +885,13 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     let voiceCount;
     let mode;
     let gain;
+    let mix;
+    let fmAmount;
+    let fmFreq;
+    let envAttack;
+    let envDecay;
+    let envSustain;
+    let envRelease;
     const hasSharedControls = !!this.controlHeader && !!this.controlData;
     if (hasSharedControls) {
       const cache = this.controlCache;
@@ -856,6 +910,13 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       voiceCount = Math.max(1, Math.min(POOL_SIZE, cache[CONTROL_VOICE_COUNT] | 0));
       mode = Math.max(0, Math.min(2, cache[CONTROL_MODE] | 0));
       gain = cache[CONTROL_GAIN];
+      mix = Math.max(0, Math.min(1, cache[CONTROL_MIX]));
+      fmAmount = Math.max(0, cache[CONTROL_FM_AMOUNT]);
+      fmFreq = Math.max(0.01, cache[CONTROL_FM_FREQ]);
+      envAttack = Math.max(1, cache[CONTROL_ENV_ATTACK]);
+      envDecay = Math.max(1, cache[CONTROL_ENV_DECAY]);
+      envSustain = Math.max(0, Math.min(1, cache[CONTROL_ENV_SUSTAIN]));
+      envRelease = Math.max(1, cache[CONTROL_ENV_RELEASE]);
     } else {
       position = this.readControl(parameters, 'position', CONTROL_POSITION);
       positionJitter = this.readControl(parameters, 'positionJitter', CONTROL_POSITION_JITTER);
@@ -882,6 +943,13 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       );
       mode = Math.max(0, Math.min(2, this.readControl(parameters, 'mode', CONTROL_MODE) | 0));
       gain = this.readControl(parameters, 'gain', CONTROL_GAIN);
+      mix = this.readControl(parameters, 'mix', CONTROL_MIX);
+      fmAmount = Math.max(0, this.readCachedControl(CONTROL_FM_AMOUNT));
+      fmFreq = Math.max(0.01, this.readCachedControl(CONTROL_FM_FREQ));
+      envAttack = Math.max(1, this.readCachedControl(CONTROL_ENV_ATTACK));
+      envDecay = Math.max(1, this.readCachedControl(CONTROL_ENV_DECAY));
+      envSustain = Math.max(0, Math.min(1, this.readCachedControl(CONTROL_ENV_SUSTAIN)));
+      envRelease = Math.max(1, this.readCachedControl(CONTROL_ENV_RELEASE));
     }
 
     const basePitchRatio = Math.pow(2, pitchSt / 12);
@@ -1011,7 +1079,23 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       this.runtimeDiagNextSampleSec += RUNTIME_DIAG_SAMPLE_INTERVAL_SEC;
     }
 
-    this.renderActiveVoices(outL, outR, N, gain * this.vNormGain, this.interpMode);
+    if (this.adsrPhase > 0) {
+      const blockSec = N / sampleRate;
+      if (this.adsrPhase === 1) {
+        this.adsrGain += blockSec / (envAttack * 0.001);
+        if (this.adsrGain >= 1.0) { this.adsrGain = 1.0; this.adsrPhase = 2; }
+      } else if (this.adsrPhase === 2) {
+        this.adsrGain -= (1.0 - envSustain) * blockSec / (envDecay * 0.001);
+        if (this.adsrGain <= envSustain) { this.adsrGain = envSustain; this.adsrPhase = 3; }
+      } else if (this.adsrPhase === 3) {
+        this.adsrGain = envSustain;
+      } else if (this.adsrPhase === 4) {
+        this.adsrGain -= blockSec / (envRelease * 0.001);
+        if (this.adsrGain <= 0) { this.adsrGain = 1.0; this.adsrPhase = 0; }
+      }
+    }
+
+    this.renderActiveVoices(outL, outR, N, gain * mix * this.vNormGain * this.adsrGain, this.interpMode, fmAmount, fmFreq);
 
     if (outR !== outL) {
       const midGain = Math.cos((ySpread * Math.PI) / 2);
@@ -1031,7 +1115,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     return true;
   }
 
-  renderActiveVoices(outL, outR, N, gain, interpMode) {
+  renderActiveVoices(outL, outR, N, gain, interpMode, fmAmount, fmFreq) {
     const sincLut = SINC_LUT;
     const srcL = this.srcL;
     const srcR = this.srcR;
@@ -1060,6 +1144,10 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       let aaL = this.vAaL[v];
       let aaR = this.vAaR[v];
       let fadeRem = this.vFadeRem[v];
+      const fmActive = fmAmount > 0.001;
+      const fmPhaseInc = fmActive ? TWO_PI * fmFreq / sampleRate : 0;
+      let fmPhase = this.vFmPhase[v];
+      let fmAccPos = this.vFmAccPos[v];
 
       for (let n = subStart; n < N; n++) {
         if (elapsed >= dur) break;
@@ -1077,7 +1165,16 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
           fadeRem--;
         }
 
-        const rp = start + elapsed * ratio;
+        let rp;
+        if (fmActive) {
+          rp = fmAccPos;
+          fmAccPos += ratio * Math.exp(LN2_12 * fmAmount * Math.sin(fmPhase));
+          fmPhase += fmPhaseInc;
+          if (fmPhase > TWO_PI) fmPhase -= TWO_PI;
+        } else {
+          rp = start + elapsed * ratio;
+          fmAccPos = rp;
+        }
         if (rp < srcMinIdx || rp > srcMaxIdx) {
           elapsed++;
           continue;
@@ -1150,6 +1247,8 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       this.vAaL[v] = aaL;
       this.vAaR[v] = aaR;
       this.vFadeRem[v] = fadeRem;
+      this.vFmPhase[v] = fmPhase;
+      this.vFmAccPos[v] = fmAccPos;
 
       if (elapsed >= dur || (fading && fadeRem <= 0)) {
         this.vActive[v] = 0;

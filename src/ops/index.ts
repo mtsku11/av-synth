@@ -3,12 +3,24 @@
 import { registerOp } from '../core/operators';
 import { feedbackDef } from './feedback';
 import { timeDisplaceDef } from './timeDisplace';
+import { slitScanDef } from './slitScan';
+import { dataMoshDef } from './dataMosh';
+import { pixelSortDef } from './pixelSort';
+import { fieldSortDef } from './fieldSort';
 import { structureDef } from './structure';
 import { flowDef } from './flow';
 import { vortexDef } from './vortex';
 import { vortexPacketDef } from './vortexPacket';
 import { curlNoiseDef } from './curlNoise';
 import { saddleFieldDef } from './saddleField';
+import { pinchBulgeDef } from './pinchBulge';
+import { polarRippleDef } from './polarRipple';
+import { sinkSourceFieldDef } from './sinkSourceField';
+import { spiralFieldDef } from './spiralField';
+import { domainFoldDef } from './domainFold';
+import { gyreFieldDef } from './gyreField';
+import { turbulenceWarpDef } from './turbulenceWarp';
+import { magneticDipoleDef } from './magneticDipole';
 import { aDef, bDef, gDef, rDef } from './channel';
 import { grainDef } from './grain';
 import { modulateDef } from './modulate';
@@ -59,12 +71,24 @@ export function registerAllOps(): void {
   registered = true;
   registerOp(feedbackDef);
   registerOp(timeDisplaceDef);
+  registerOp(slitScanDef);
   registerOp(structureDef);
   registerOp(flowDef);
+  registerOp(dataMoshDef);
+  registerOp(pixelSortDef);
+  registerOp(fieldSortDef);
   registerOp(vortexDef);
   registerOp(vortexPacketDef);
   registerOp(curlNoiseDef);
   registerOp(saddleFieldDef);
+  registerOp(pinchBulgeDef);
+  registerOp(polarRippleDef);
+  registerOp(sinkSourceFieldDef);
+  registerOp(spiralFieldDef);
+  registerOp(domainFoldDef);
+  registerOp(gyreFieldDef);
+  registerOp(turbulenceWarpDef);
+  registerOp(magneticDipoleDef);
   registerOp(rDef);
   registerOp(gDef);
   registerOp(bDef);
@@ -126,12 +150,24 @@ export function registerAllOps(): void {
 export const DEFAULT_CHAIN: readonly string[] = [
   'feedback',
   'timeDisplace',
+  'slitScan',
   'structure',
   'flow',
+  'dataMosh',
+  'pixelSort',
+  'fieldSort',
   'vortex',
   'vortexPacket',
   'curlNoise',
   'saddleField',
+  'pinchBulge',
+  'polarRipple',
+  'sinkSourceField',
+  'spiralField',
+  'domainFold',
+  'gyreField',
+  'turbulenceWarp',
+  'magneticDipole',
   'r',
   'g',
   'b',

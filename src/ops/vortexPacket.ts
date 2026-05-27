@@ -108,6 +108,8 @@ class VortexPacketVideoStage implements VideoStage {
   #microState: Float32Array;
   #macroBuf: Float32Array;
   #microBuf: Float32Array;
+  #uPrev: WebGLUniformLocation;
+  #uAdvect: WebGLUniformLocation;
   #lastTime: number | null = null;
 
   constructor(gl: WebGL2RenderingContext) {
@@ -122,6 +124,8 @@ class VortexPacketVideoStage implements VideoStage {
     this.#uMicroCount = reqUniform(gl, this.program, 'u_micro_count', 'vortexPacket');
     this.#uMacro = reqUniform(gl, this.program, 'u_macro[0]', 'vortexPacket');
     this.#uMicro = reqUniform(gl, this.program, 'u_micro[0]', 'vortexPacket');
+    this.#uPrev = reqUniform(gl, this.program, 'u_prev_frame', 'vortexPacket');
+    this.#uAdvect = reqUniform(gl, this.program, 'u_advect', 'vortexPacket');
     this.#macroState = seedBand(MACRO_COUNT, MACRO_SEED, 0.9, 1.4);
     this.#microState = seedBand(MICRO_COUNT, MICRO_SEED, 0.3, 0.55);
     this.#macroBuf = new Float32Array(MACRO_CAPACITY * 4);
@@ -154,6 +158,8 @@ class VortexPacketVideoStage implements VideoStage {
     gl.uniform1i(this.#uMicroCount, MICRO_COUNT);
     gl.uniform4fv(this.#uMacro, this.#macroBuf);
     gl.uniform4fv(this.#uMicro, this.#microBuf);
+    gl.uniform1i(this.#uPrev, 1);
+    gl.uniform1f(this.#uAdvect, params['advect'] ?? 0);
   }
 
   dispose(gl: WebGL2RenderingContext): void {
@@ -163,7 +169,7 @@ class VortexPacketVideoStage implements VideoStage {
 
 export const vortexPacketDef: OperatorDef = {
   op: 'vortexPacket',
-  paramOrder: ['mix', 'strength', 'drift', 'macroBalance', 'macroSoftness', 'microSoftness'],
+  paramOrder: ['mix', 'strength', 'drift', 'macroBalance', 'macroSoftness', 'microSoftness', 'advect'],
   defaults: {
     mix: 0,
     strength: 0.22,
@@ -171,6 +177,7 @@ export const vortexPacketDef: OperatorDef = {
     macroBalance: 0.6,
     macroSoftness: 0.18,
     microSoftness: 0.04,
+    advect: 0,
   },
   coupling: {
     op: 'vortexPacket',
@@ -244,6 +251,18 @@ export const vortexPacketDef: OperatorDef = {
           curve: 'lin',
           unit: 'norm',
           hint: 'kernel radius of the micro eddies',
+        },
+        toVideo: (raw) => raw,
+      },
+      advect: {
+        spec: {
+          id: 'advect',
+          label: 'advect',
+          range: [0, 0.95],
+          default: 0,
+          curve: 'lin',
+          unit: 'norm',
+          hint: 'temporal accumulation — pixels flow along the field over successive frames',
         },
         toVideo: (raw) => raw,
       },

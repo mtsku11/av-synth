@@ -5,6 +5,8 @@ in vec2 v_uv;
 out vec4 o_color;
 
 uniform sampler2D u_tex;
+uniform sampler2D u_prev_frame;
+uniform float u_advect;
 uniform float u_mix;
 uniform float u_strength;
 uniform float u_scale;
@@ -54,7 +56,11 @@ void main() {
   vec2 warped = v_uv + vel * u_warp * 0.05;
   vec2 vel2 = curl(warped);
   vec2 src_uv = fract(v_uv - vel2 * u_strength);
-  vec3 displaced = texture(u_tex, src_uv).rgb;
+  vec3 displaced = mix(
+    texture(u_tex, src_uv).rgb,
+    texture(u_prev_frame, fract(2.0 * v_uv - src_uv)).rgb,
+    clamp(u_advect, 0.0, 0.95)
+  );
   vec3 current = texture(u_tex, v_uv).rgb;
   o_color = vec4(mix(current, displaced, clamp(u_mix, 0.0, 1.0)), 1.0);
 }

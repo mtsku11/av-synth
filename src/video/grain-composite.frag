@@ -16,6 +16,9 @@ uniform float u_layer;
 uniform float u_alpha;
 
 void main() {
-  vec3 rgb = texture(u_grain, vec3(v_uv, u_layer)).rgb;
+  // GrainBuffer uploads with UNPACK_FLIP_Y_WEBGL=false, so the image's top row
+  // is stored at texture y=0 (GL sampler t=0 = texture bottom). Flip v_uv.y on
+  // sample so the quad renders right-side up.
+  vec3 rgb = texture(u_grain, vec3(v_uv.x, 1.0 - v_uv.y, u_layer)).rgb;
   fragColor = vec4(rgb * u_alpha, u_alpha);
 }

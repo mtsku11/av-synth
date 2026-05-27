@@ -73,6 +73,13 @@
     reverseProbability: { label: 'reverse p',    min: 0,    max: 1,    step: 0.001, unit: '0–1' },
     voiceCount:         { label: 'voices',       min: 1,    max: 64,   step: 1,     unit: '' },
     gain:               { label: 'gain',         min: 0,    max: 1,    step: 0.001, unit: '0–1' },
+    mix:                { label: 'mix',          min: 0,    max: 1,    step: 0.001, unit: '0–1' },
+    fmAmount:           { label: 'fm amount',    min: 0,    max: 48,   step: 0.01,  unit: 'st' },
+    fmFreq:             { label: 'fm freq',      min: 0.1,  max: 500,  step: 0.1,   unit: 'Hz' },
+    envAttack:          { label: 'attack',       min: 1,    max: 10000, step: 1,    unit: 'ms' },
+    envDecay:           { label: 'decay',        min: 1,    max: 10000, step: 1,    unit: 'ms' },
+    envSustain:         { label: 'sustain',      min: 0,    max: 1,    step: 0.001, unit: '0–1' },
+    envRelease:         { label: 'release',      min: 1,    max: 20000, step: 1,    unit: 'ms' },
   };
 
   const SLIDERS: readonly ControlSpec[] = GRANULATOR_SLIDER_ORDER.map((name) => ({

@@ -29,8 +29,9 @@ export interface VideoStage {
    * TEXTURE2 = secondary input for binary Blend operators, TEXTURE3 = shared
    * temporal-history texture array when available, TEXTURE4 = shared
    * structure-analysis texture when available, TEXTURE5 = shared low-res
-   * motion-field texture when available). Stage writes its own scalar/vector
-   * uniforms.
+   * motion-field texture when available, TEXTURE6 = per-instance ownedState
+   * previous-frame texture when the op's def declares ownedState). Stage
+   * writes its own scalar/vector uniforms.
    */
   setUniforms(
     gl: WebGL2RenderingContext,
@@ -60,6 +61,32 @@ export interface VideoStageRendererResources {
     height: number;
     scale: number;
   } | null;
+  /**
+   * Present only for ops whose def declares `ownedState`. The texture unit
+   * named here holds the previous frame's ownedState contents; the op's
+   * fragment shader writes the new state via `o_color` and the renderer
+   * copies it into the chain target so downstream ops see it as their input.
+   * `initialized` is false on the first frame after allocation (state is
+   * undefined; shader should pass through current input).
+   */
+  ownedState: {
+    textureUnit: number;
+    width: number;
+    height: number;
+    initialized: boolean;
+  } | null;
+}
+
+/**
+ * Declares that an op carries its own per-instance accumulation FBO that
+ * survives across frames. The renderer allocates ping-pong textures, binds
+ * the previous frame's texture under the named sampler, and ping-pongs after
+ * each pass. The op renders normally (one `out vec4 o_color`); the renderer
+ * blits the result into the chain target.
+ */
+export interface OwnedStateSpec {
+  /** Sampler uniform name the shader reads for the previous-frame state. */
+  readonly uniform: string;
 }
 
 export interface OperatorDef {
@@ -71,6 +98,19 @@ export interface OperatorDef {
   readonly paramOrder: readonly string[];
   /** Defaults for every coupled param (raw effective values, not normalised). */
   readonly defaults: Readonly<Record<string, number>>;
+  /**
+   * Optional. Given the instance's current effective params, return the set of
+   * param ids that should be hidden from the controls UI. Engine math always
+   * ignores this — it only suppresses sliders for params that have no effect
+   * in the current mode (e.g. slitY when a slit-scan is in vertical mode).
+   */
+  hiddenParams?(params: Readonly<Record<string, number>>): ReadonlySet<string>;
+  /**
+   * Optional. If present, the renderer allocates a per-instance ownedState
+   * accumulation FBO (ping-pong) and exposes the previous frame's state to
+   * this op's shader via the named sampler on TEXTURE6.
+   */
+  readonly ownedState?: OwnedStateSpec;
   createVideoStage(gl: WebGL2RenderingContext): VideoStage;
 }
 
@@ -124,6 +164,12 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['feedback', 'motion trails', 'video texture'],
     coreParams: ['mix', 'depth', 'scan', 'smear'],
   },
+  slitScan: {
+    family: 'Feedback',
+    blurb: 'vertical or horizontal slit-scan with adjustable slit position and scan speed',
+    intents: ['feedback', 'motion trails', 'video texture'],
+    coreParams: ['mix', 'orientation', 'slitX', 'slitY', 'scanSpeed'],
+  },
   structure: {
     family: 'Feedback',
     blurb: 'edge / luma / flux masks drive contour memory and displacement',
@@ -135,6 +181,24 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'motion-field smear and datamosh drag from consecutive frames',
     intents: ['feedback', 'motion', 'video texture'],
     coreParams: ['mix', 'strength', 'smear', 'memory', 'glitch'],
+  },
+  dataMosh: {
+    family: 'Feedback',
+    blurb: 'held keyframe drifted along motion vectors — true codec-style datamosh look',
+    intents: ['feedback', 'motion', 'video texture', 'glitch'],
+    coreParams: ['mix', 'drift', 'decay', 'chunk'],
+  },
+  pixelSort: {
+    family: 'Feedback',
+    blurb: 'luma-threshold pixel sort — bright pixels stream along the sort direction each frame',
+    intents: ['feedback', 'glitch', 'video texture'],
+    coreParams: ['mix', 'threshold', 'direction', 'speed'],
+  },
+  fieldSort: {
+    family: 'Feedback',
+    blurb: 'vector-field pixel sort — diagonal odd-even transposition sort with parametric angle and banding',
+    intents: ['feedback', 'glitch', 'video texture'],
+    coreParams: ['mix', 'threshold', 'angle', 'bands', 'speed'],
   },
   vortex: {
     family: 'Feedback',
@@ -159,6 +223,54 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'oriented saddle packet — anisotropic directional flow rather than rotation',
     intents: ['feedback', 'video texture', 'motion'],
     coreParams: ['mix', 'strength', 'softness', 'anisotropy', 'drift'],
+  },
+  pinchBulge: {
+    family: 'Feedback',
+    blurb: 'stable lens warp — macro pinch or bulge around a movable centre',
+    intents: ['feedback', 'video texture', 'motion'],
+    coreParams: ['mix', 'amount', 'radius', 'falloff', 'centerX', 'drift'],
+  },
+  polarRipple: {
+    family: 'Feedback',
+    blurb: 'concentric radial ripple field — good for kick or envelope pulses',
+    intents: ['feedback', 'video texture', 'motion'],
+    coreParams: ['mix', 'amplitude', 'frequency', 'phase', 'falloff', 'drift'],
+  },
+  sinkSourceField: {
+    family: 'Feedback',
+    blurb: 'radial sink/source field with optional spin — push or pull around a point',
+    intents: ['feedback', 'video texture', 'motion'],
+    coreParams: ['mix', 'strength', 'radius', 'falloff', 'spin', 'drift'],
+  },
+  spiralField: {
+    family: 'Feedback',
+    blurb: 'simple predictable spiral twist — a macro performance warp distinct from vortex flow',
+    intents: ['feedback', 'video texture', 'motion'],
+    coreParams: ['mix', 'twist', 'radius', 'falloff', 'phase', 'drift'],
+  },
+  domainFold: {
+    family: 'Feedback',
+    blurb: 'mirror-fold utility warp for symmetry and kaleidoscopic feedback structure',
+    intents: ['feedback', 'video texture', 'motion'],
+    coreParams: ['mix', 'folds', 'angle', 'softness', 'zoom', 'drift'],
+  },
+  gyreField: {
+    family: 'Feedback',
+    blurb: 'counter-rotating gyre cells — stable flow-map warping without noise',
+    intents: ['feedback', 'video texture', 'motion'],
+    coreParams: ['mix', 'strength', 'cells', 'scale', 'phase', 'drift'],
+  },
+  turbulenceWarp: {
+    family: 'Feedback',
+    blurb: 'layered turbulence warp — lighter and more direct than curl-noise flow',
+    intents: ['feedback', 'video texture', 'motion'],
+    coreParams: ['mix', 'strength', 'scale', 'octaves', 'phase', 'drift'],
+  },
+  magneticDipole: {
+    family: 'Feedback',
+    blurb: 'two-pole attraction/repulsion field — asymmetric dipole drag around a centre',
+    intents: ['feedback', 'video texture', 'motion'],
+    coreParams: ['mix', 'strength', 'separation', 'angle', 'balance', 'drift'],
   },
   r: {
     family: 'Finish',

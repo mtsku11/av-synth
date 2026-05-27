@@ -232,15 +232,18 @@ export class GrainBuffer {
     const ctx = canvas.getContext('2d', { willReadFrequently: false });
     if (!ctx) throw new Error('grain-buffer: failed to acquire 2D canvas context');
 
-    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texture);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-
     const frameDt = 1 / plan.fps;
     for (let i = 0; i < plan.frameCount; i++) {
       const t = Math.min(plan.durationSec - frameDt * 0.5, i * frameDt);
       await waitForSeek(video, t);
       ctx.drawImage(video, 0, 0, plan.width, plan.height);
+      // Re-bind every iteration: the main renderer's raf loop runs during our
+      // await above and replaces TEXTURE_2D_ARRAY binding. Without this rebind
+      // texSubImage3D emits "no texture bound to target" and the upload silently
+      // drops, leaving black frames in the grain buffer.
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texture);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
       gl.texSubImage3D(
         gl.TEXTURE_2D_ARRAY,
         0,

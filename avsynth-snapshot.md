@@ -1,0 +1,119 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - heading "av-synth" [level=1] [ref=e6]
+      - generic [ref=e7]: "M5.7 · 0 ops · source: video input"
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: ── monitor ──
+        - generic [ref=e12]:
+          - button "── monitor ── o1 o2 o3" [ref=e13] [cursor=pointer]: o0
+          - button "o1" [ref=e14] [cursor=pointer]
+          - button "o2" [ref=e15] [cursor=pointer]
+          - button "o3" [ref=e16] [cursor=pointer]
+      - generic [ref=e17]:
+        - generic [ref=e18]: ── preview ──
+        - generic [ref=e19]:
+          - button "── preview ── quad" [ref=e20] [cursor=pointer]: single
+          - button "quad" [ref=e21] [cursor=pointer]
+  - generic [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]: no clip loaded
+      - generic [ref=e26] [cursor=pointer]: choose video
+      - button "grain composite" [ref=e27]
+      - button "video" [ref=e28]
+    - paragraph [ref=e29]: "MIDI: no devices connected"
+  - complementary [ref=e34]:
+    - generic [ref=e35]:
+      - generic [ref=e36]: ── workspace ──
+      - tablist "Edit surface" [ref=e37]:
+        - tab "video" [selected] [ref=e38] [cursor=pointer]
+        - tab "audio" [ref=e39] [cursor=pointer]
+        - tab "lfo" [ref=e40] [cursor=pointer]
+        - tab "presets" [ref=e41] [cursor=pointer]
+    - complementary [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - heading "chain" [level=2] [ref=e46]
+          - paragraph [ref=e47]: add effects one by one and reorder them in series
+        - generic [ref=e48]: 0 ops · 0 active
+      - generic [ref=e49]:
+        - article [ref=e50]:
+          - generic [ref=e51]: input
+          - strong [ref=e52]: video input
+          - generic [ref=e53]: load a video to feed the chain
+        - generic [ref=e54]:
+          - combobox [ref=e55]:
+            - option "motion" [selected]
+            - option "scale"
+            - option "rotate"
+            - option "scrollX"
+            - option "scrollY"
+            - option "repeat"
+            - option "repeatX"
+            - option "repeatY"
+          - combobox [ref=e56]:
+            - option "color" [selected]
+            - option "brightness"
+            - option "contrast"
+            - option "color"
+            - option "saturate"
+            - option "posterize"
+            - option "invert"
+            - option "hue"
+            - option "colorama"
+          - combobox [ref=e57]:
+            - option "texture" [selected]
+            - option "pixelate"
+            - option "kaleid"
+            - option "chromaShift"
+          - combobox [ref=e58]:
+            - option "feedback" [selected]
+            - option "feedback"
+            - option "timeDisplace"
+            - option "structure"
+            - option "flow"
+            - option "modulate"
+            - option "modulateScale"
+            - option "modulatePixelate"
+            - option "modulateRepeat"
+            - option "modulateRotate"
+            - option "modulateScrollX"
+            - option "modulateScrollY"
+            - option "modulateKaleid"
+            - option "modulateHue"
+            - option "vortex"
+          - combobox [ref=e59]:
+            - option "blend/composite" [selected]
+            - option "modulateRouted"
+            - option "modulateDisplace"
+            - option "modulateScaleRouted"
+            - option "modulatePixelateRouted"
+            - option "modulateRepeatRouted"
+            - option "modulateRotateRouted"
+            - option "modulateScrollYRouted"
+            - option "modulateHueRouted"
+            - option "add"
+            - option "blend"
+            - option "diff"
+            - option "layer"
+            - option "mask"
+            - option "mult"
+            - option "sub"
+          - combobox [ref=e60]:
+            - option "finish" [selected]
+            - option "r"
+            - option "g"
+            - option "b"
+            - option "a"
+            - option "luma"
+            - option "thresh"
+            - option "sum"
+          - combobox [ref=e61]:
+            - option "audio character" [selected]
+            - option "grain"
+            - option "selfMod"
+        - generic [ref=e62]:
+          - strong [ref=e63]: Start with one operator.
+          - paragraph [ref=e64]: Choose an effect from the menu above. The chain runs top to bottom, in order.
+  - generic [ref=e65]: · staging rc · video-first shell live · final local listening pass and first Cloudflare deploy remain

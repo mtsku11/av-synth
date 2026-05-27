@@ -117,25 +117,28 @@ function buildSummary(instance: OperatorInstance): string[] {
 }
 
 function buildParamViews(instance: OperatorInstance): PatchParamView[] {
-  return instance.def.paramOrder.map((paramId) => {
-    const spec = instance.def.coupling.params[paramId]?.spec;
-    const fallback = instance.def.defaults[paramId] ?? 0;
-    return {
-      id: paramId,
-      label: spec?.label ?? paramId,
-      spec: spec ?? {
+  const hidden = instance.def.hiddenParams?.(instance.params) ?? null;
+  return instance.def.paramOrder
+    .filter((paramId) => !hidden?.has(paramId))
+    .map((paramId) => {
+      const spec = instance.def.coupling.params[paramId]?.spec;
+      const fallback = instance.def.defaults[paramId] ?? 0;
+      return {
         id: paramId,
-        label: paramId,
-        range: [0, 1],
-        default: fallback,
-        curve: 'lin',
-        unit: 'norm',
-      },
-      value: instance.params[paramId] ?? fallback,
-      defaultValue: fallback,
-      lfo: buildParamLfoAssignmentView(instance.lfoAssignments, paramId),
-    };
-  });
+        label: spec?.label ?? paramId,
+        spec: spec ?? {
+          id: paramId,
+          label: paramId,
+          range: [0, 1],
+          default: fallback,
+          curve: 'lin',
+          unit: 'norm',
+        },
+        value: instance.params[paramId] ?? fallback,
+        defaultValue: fallback,
+        lfo: buildParamLfoAssignmentView(instance.lfoAssignments, paramId),
+      };
+    });
 }
 
 export function orderInstancesByGraph(

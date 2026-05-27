@@ -14,6 +14,8 @@ uniform int u_vortex_count;
 // w is signed rotation strength (~ -1.2 .. 1.2). Kept as a vec4 array so
 // drivers don't pad std140 quirkily across vec2/float boundaries.
 uniform vec4 u_vortices[64];
+uniform sampler2D u_prev_frame;
+uniform float u_advect;
 
 // 2D point-vortex (Biot-Savart) velocity, summed over all active vortices.
 // Each vortex contributes ( -dy, dx ) * w / ( r^2 + softness ). Toroidal
@@ -35,7 +37,11 @@ vec2 velocityAt(vec2 uv) {
 void main() {
   vec2 vel = velocityAt(v_uv);
   vec2 src_uv = fract(v_uv - vel * u_strength);
-  vec3 displaced = texture(u_tex, src_uv).rgb;
+  vec3 displaced = mix(
+    texture(u_tex, src_uv).rgb,
+    texture(u_prev_frame, fract(2.0 * v_uv - src_uv)).rgb,
+    clamp(u_advect, 0.0, 0.95)
+  );
   vec3 current = texture(u_tex, v_uv).rgb;
   o_color = vec4(mix(current, displaced, clamp(u_mix, 0.0, 1.0)), 1.0);
 }

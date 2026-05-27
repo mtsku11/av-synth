@@ -57,6 +57,8 @@ class SaddleFieldVideoStage implements VideoStage {
   #uSaddles: WebGLUniformLocation;
   #state: SaddleState[];
   #uploadBuffer: Float32Array;
+  #uPrev: WebGLUniformLocation;
+  #uAdvect: WebGLUniformLocation;
   #lastTime: number | null = null;
 
   constructor(gl: WebGL2RenderingContext) {
@@ -68,6 +70,8 @@ class SaddleFieldVideoStage implements VideoStage {
     this.#uAnisotropy = reqUniform(gl, this.program, 'u_anisotropy', 'saddleField');
     this.#uCount = reqUniform(gl, this.program, 'u_count', 'saddleField');
     this.#uSaddles = reqUniform(gl, this.program, 'u_saddles[0]', 'saddleField');
+    this.#uPrev = reqUniform(gl, this.program, 'u_prev_frame', 'saddleField');
+    this.#uAdvect = reqUniform(gl, this.program, 'u_advect', 'saddleField');
     this.#state = seedSaddles();
     this.#uploadBuffer = new Float32Array(SADDLE_CAPACITY * 4);
   }
@@ -110,6 +114,8 @@ class SaddleFieldVideoStage implements VideoStage {
     gl.uniform1f(this.#uAnisotropy, params['anisotropy'] ?? 1.0);
     gl.uniform1i(this.#uCount, SADDLE_COUNT);
     gl.uniform4fv(this.#uSaddles, this.#uploadBuffer);
+    gl.uniform1i(this.#uPrev, 1);
+    gl.uniform1f(this.#uAdvect, params['advect'] ?? 0);
   }
 
   dispose(gl: WebGL2RenderingContext): void {
@@ -119,8 +125,8 @@ class SaddleFieldVideoStage implements VideoStage {
 
 export const saddleFieldDef: OperatorDef = {
   op: 'saddleField',
-  paramOrder: ['mix', 'strength', 'softness', 'anisotropy', 'drift'],
-  defaults: { mix: 0, strength: 0.2, softness: 0.12, anisotropy: 1.0, drift: 0.4 },
+  paramOrder: ['mix', 'strength', 'softness', 'anisotropy', 'drift', 'advect'],
+  defaults: { mix: 0, strength: 0.2, softness: 0.12, anisotropy: 1.0, drift: 0.4, advect: 0 },
   coupling: {
     op: 'saddleField',
     params: {
@@ -181,6 +187,18 @@ export const saddleFieldDef: OperatorDef = {
           curve: 'lin',
           unit: 'norm',
           hint: 'how fast the saddle axes rotate; 0 freezes the field',
+        },
+        toVideo: (raw) => raw,
+      },
+      advect: {
+        spec: {
+          id: 'advect',
+          label: 'advect',
+          range: [0, 0.95],
+          default: 0,
+          curve: 'lin',
+          unit: 'norm',
+          hint: 'temporal accumulation — pixels flow along the field over successive frames',
         },
         toVideo: (raw) => raw,
       },

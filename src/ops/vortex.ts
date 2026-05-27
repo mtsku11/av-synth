@@ -47,6 +47,8 @@ class VortexVideoStage implements VideoStage {
   #uVortices: WebGLUniformLocation;
   #state: Float32Array;
   #uploadBuffer: Float32Array;
+  #uPrev: WebGLUniformLocation;
+  #uAdvect: WebGLUniformLocation;
   #lastTime: number | null = null;
 
   constructor(gl: WebGL2RenderingContext) {
@@ -57,6 +59,8 @@ class VortexVideoStage implements VideoStage {
     this.#uSoftness = reqUniform(gl, this.program, 'u_softness', 'vortex');
     this.#uCount = reqUniform(gl, this.program, 'u_vortex_count', 'vortex');
     this.#uVortices = reqUniform(gl, this.program, 'u_vortices[0]', 'vortex');
+    this.#uPrev = reqUniform(gl, this.program, 'u_prev_frame', 'vortex');
+    this.#uAdvect = reqUniform(gl, this.program, 'u_advect', 'vortex');
     this.#state = seedVortices();
     this.#uploadBuffer = new Float32Array(SHADER_VORTEX_CAPACITY * 4);
   }
@@ -126,6 +130,8 @@ class VortexVideoStage implements VideoStage {
     gl.uniform1f(this.#uSoftness, Math.max(0.001, params['softness'] ?? 0.08));
     gl.uniform1i(this.#uCount, VORTEX_COUNT);
     gl.uniform4fv(this.#uVortices, this.#uploadBuffer);
+    gl.uniform1i(this.#uPrev, 1);
+    gl.uniform1f(this.#uAdvect, params['advect'] ?? 0);
   }
 
   dispose(gl: WebGL2RenderingContext): void {
@@ -135,8 +141,8 @@ class VortexVideoStage implements VideoStage {
 
 export const vortexDef: OperatorDef = {
   op: 'vortex',
-  paramOrder: ['mix', 'strength', 'drift', 'softness'],
-  defaults: { mix: 0, strength: 0.18, drift: 0.4, softness: 0.08 },
+  paramOrder: ['mix', 'strength', 'drift', 'softness', 'advect'],
+  defaults: { mix: 0, strength: 0.18, drift: 0.4, softness: 0.08, advect: 0 },
   coupling: {
     op: 'vortex',
     params: {
@@ -185,6 +191,18 @@ export const vortexDef: OperatorDef = {
           curve: 'lin',
           unit: 'norm',
           hint: 'kernel radius — larger values give broader, lazier swirls',
+        },
+        toVideo: (raw) => raw,
+      },
+      advect: {
+        spec: {
+          id: 'advect',
+          label: 'advect',
+          range: [0, 0.95],
+          default: 0,
+          curve: 'lin',
+          unit: 'norm',
+          hint: 'temporal accumulation — pixels flow along the field over successive frames',
         },
         toVideo: (raw) => raw,
       },

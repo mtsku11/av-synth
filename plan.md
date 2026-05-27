@@ -568,6 +568,23 @@ Direct continuation of §10.5.0. The vortex op was the first of an intended set;
 
 Quality-sprint relevance: closes the authored-field arc explicitly named in §10.5.0. The motion-estimator ceiling (`motion-analysis.frag`) is still the bottleneck for `flow` and routed `modulate*` consumers, but the Feedback family no longer needs a stronger estimator to feel like an instrument.
 
+### 10.5.0b Operator characterisation sweep (2026-05-26)
+
+QA infrastructure that closes the "I turn up the knob and nothing happens" class of bug at the gate rather than relying on a user playing with the app. For every registered unary video operator, the sweep sets up a single-op chain on a paused video frame, walks each parameter min→max in 5 steps, and captures a 16×16 grid of per-channel mean / variance / brightness-weighted centre-of-mass at each step. Per-op JSON is written to `qa/results/op-sweeps/` and compared against `qa/baselines/op-sweeps/`; bless mode (`BLESS=1`) copies results → baselines.
+
+- **Instrumentation.** `VideoRenderer.readFrameStats(grid)` next to the existing `readPixelAt` — same `#prevFrame` FBO trick, returns mean/variance/CoM. QA bridge gains `setChain`, `listRegisteredOps`, `readFrameStats`. The bridge drives sweeps off the operator registry rather than hard-coded lists, so any new op is automatically covered the next time the spec runs.
+- **Spec.** `qa/e2e/op-characterisation.spec.ts`. Single `test()` that walks every op. Fresh chain per param so internal CPU state starts at frame 0 each time; if the op has a `mix` param it's pinned at max while other params sweep so non-mix params are observable. Min-to-max delta must exceed `5e-4` (dead-param assertion); time-dependent ops get a 5× looser tolerance on baseline drift because their output legitimately depends on `ctx.time`.
+- **Baselines.** Checked in under `qa/baselines/op-sweeps/`, 40 ops covered, one JSON per op. Drift surfaces in PRs.
+- **Scripts.** `npm run qa:opSweep` (compare), `npm run qa:opSweep:bless` (write baselines). Steady-state runtime ~2.5 min.
+- **First bless run caught a real bug.** `src/video/shaders/selfMod.frag` was missing `#version 300 es`, so its uniforms read garbage. Not in `DEFAULT_CHAIN` and no preset used it, so the bug was latent — exactly the failure mode the sweep was built to surface. Fixed in the same pass.
+
+Quality-sprint relevance: this is the regression gate behind every future authored-field op and behind any shader refactor in `src/video/shaders/`. Without it, the next "the param doesn't do anything" report comes from a user. With it, the assertion fires the moment a baseline drifts beyond tolerance or a parameter goes flat.
+
+Open follow-ups (not blocking the gate's usefulness, just deferred):
+
+- CI workflow alongside `granulator-soak.yml`, path-filtered on `src/ops/**` / `src/video/shaders/**` / `src/core/operators.ts` / `src/core/coupling.ts`. Steady-state ~2.5 min fits CI.
+- Binary blend coverage via a second pass with a procedural second-input source, its own baseline directory. Held until the unary baselines have proved stable over a few real PRs.
+
 ### 10.5.1 Feedback-family triage (2026-05-25)
 
 Live-app inspection of the first four Feedback-family ops surfaced a mix of one UI-meta bug, one shader balance issue, one design-by-spec misunderstanding, and two architectural ceilings. Recording the boundary explicitly so future work does not relitigate it:
@@ -578,6 +595,17 @@ Live-app inspection of the first four Feedback-family ops surfaced a mix of one 
 - **flow**: the operator is doing its job; the underlying motion-analysis shader (`src/video/shaders/motion-analysis.frag`) is the ceiling. 8-direction block matching with a 1.75-pixel search radius cannot represent the motion present in real footage, so the field arrives quantised and noisy and `u_gate` further filters it to sparse glitches. The same ceiling applies downstream to the future routed `modulate*` family if it consumes the motion texture. Real fix is a multi-scale / larger-radius estimator, scoped as part of stateful-systems quality work rather than the surgical pass.
 
 This subsection exists so the quality sprint does not silently double-count "shipped a feedback-family op" as "shipped a complete feedback-family experience". The deferred items above stay open against §10.5 and the corresponding release blockers in `todo.md` until they ship at release quality.
+
+### 10.5.2 Per-op ownedState FBO + dataMosh operator (2026-05-26)
+
+The "datamosh" look in `flow` (`smear`/`memory`/`glitch` branch) was a motion-vector smear, not the held-keyframe-with-drift signature most users mean by datamosh. Investigation confirmed two things worth recording so we don't reopen them: (a) Datamosher-Pro is bitstream-level AVI surgery (I-/P-frame byte toggling) and is not portable to a browser shader pipeline at all — the `<video>` element only exposes decoded RGB; (b) Akascape's realtime-datamosh Shadertoy is the only pixel-domain reference in the family, but its sparse-refresh accumulator is a visually different (weaker) look and would not have solved the underlying complaint.
+
+The real datamosh signature — frozen content sliding along motion vectors as predictions get mis-applied — needs a self-feedback buffer that holds indefinitely. The shared `temporalHistory` ring is the wrong primitive (capacity-8, frame-granular, shared across all ops) so this pass added a new opt-in:
+
+- **Per-op ownedState FBO infrastructure.** New `OperatorDef.ownedState?: { uniform }` declaration; renderer allocates a per-instance ping-pong (two textures + one rebound FBO) in `#syncNodeTargets`, binds previous state to TEXTURE6, runs the op into ownedState[next], blits to chain target so downstream ops see it, swaps. Lifecycle is symmetric with `#nodeTargets` (allocate on plan-step add, dispose on remove, reset on canvas resize). Single-attachment model (op's output IS its state) chosen over MRT for simplicity; promote if a future op genuinely needs state-distinct-from-output.
+- **`dataMosh` op.** Six params: `mix`, `hold`, `drift`, `release`, `decay`, `chunk`. Registered in the Feedback family. The held image drifts each frame by motion-field vectors, slowly degrades toward grey, and releases to live above a motion-magnitude threshold. `flow` is left untouched — its smear/memory mode stays valid as a separate motion-blur look, and the existing `Datamosh Smear` flagship preset still uses it. A second preset that wires the new `dataMosh` op is an open follow-up.
+
+Scope discipline: this is the first new architectural primitive (per-op self-feedback) since the temporal-history ring. It is opt-in and orthogonal to the existing shared resources, so no existing op is affected. The "Build new architectural primitive" decision was taken explicitly because the alternative paths (port Akascape, or improve `flow` smear in place) would not have produced the look the complaint was about — recorded in `memory.md` 2026-05-26 entry alongside the rejected alternatives so we don't re-evaluate them.
 
 ### 10.6 Role of procedural sources after the pivot
 
