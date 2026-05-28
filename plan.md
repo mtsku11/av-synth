@@ -520,92 +520,22 @@ Release policy:
 - Additional post/presentation-stack expansion is now explicitly late/optional. New finish presets, extra bloom/halation variants, and similar polish-only work should stay behind renderer-system work, flagship-program authoring, and release-gate sign-off unless a concrete launch bug promotes them.
 - Staging deploy can be used to evaluate these effects on real machines; public v1 should wait for quality sign-off or a written scope reduction.
 
-### 10.4.9 Public audio surface finalised (2026-05-25)
+### 10.5.3 Full-project audit recommendations (2026-05-28)
 
-The granulator-first audio direction has been documented since the §0a redirect, but per-operator audio twins (the legacy `AudioStage` interface implemented by every video op + its worklet) still existed in code, even if no longer mounted publicly. They are now permanently gone.
+A read-only audit (gates green: `svelte-check` clean, 215/215 unit tests, granulator `process()` zero-alloc, master softclip→limiter present) surfaced four engineering items and four product-shaping items. Tracked as `R1`–`R8` in `todo.md`; summarised here for release-policy context.
 
-What was removed:
+- **R1 — CI lint blocker.** `npm run lint` exits 1 (34 errors, all in `qa/e2e/*.spec.ts`; `src/` is clean) and short-circuits the `qa:ci` chain. Highest-priority hygiene fix.
+- **R2 — Render-loop allocations.** `renderer.ts:1479` + `coupling.ts evaluateVideoParams` (per op/frame) violate the "render loop never allocates" rule; pre-allocate reusable scratch records.
+- **R3 — Synchronous motion readback.** `readMotionEnergy()` does a blocking `gl.readPixels` on the 120 ms feature-sample interval; move to async PBO or document the trade.
+- **R4 — True-peak limiter.** The `DynamicsCompressor`-based limiter has no lookahead; confirm <0 dBTP on loud presets before sign-off (gate #6), add an oversampled limiter if it overshoots.
+- **R5 — Video-feature → video-param modulation.** `v.luma/flux/edge/motion` feed audio but no video op reads them; closing this loop makes the AV coupling bidirectional and is the strongest identity win.
+- **R6 — `sourceBlend` dedup (= §14.7a G7).** Redundant with `blend(source, sourceB)` now that Source B is graph-addressable; decide keep-as-shortcut vs fold-and-delete.
+- **R7 — Modulatable finish.** Expose at least one presentation-stack param to the LFO/feature bus so the look is performable, not just globally switched.
+- **R8 — Opportunistic real-device metrics.** Capture partial latency/CPU data during the Remote-Desktop staging test to chip away at the D4 / gate #5 hardware blockers.
 
-- `AudioStage` interface and `OperatorDef.createAudioStage`. Every `OperatorInstance` is now `{ id, def, videoStage, params, lfoAssignments }` — no audio side.
-- `OperatorCoupling.kind` and `ParamCoupling.toAudio`. `evaluateAudioParams` deleted; `evaluateVideoParams` is now a trivial 6-line apply over each `toVideo` mapping.
-- `SourceDef.createAudioStage` and `SourceInstance.audioStage`. Procedural sources (osc, noise, voronoi, shape, gradient, solid) are now video-only generators.
-- The legacy AudioRack entirely — `src/core/audio-rack.ts`, `src/ui/AudioRack.svelte`, `src/core/audio-rack.test.ts` deleted. The rack was unmounted from the public shell in C1/C2/C3 but the 600+ lines of scaffolding lingered.
-- 24 video-op worklets (`feedback-freeze.js`, the entire `modulate-*.js` family, `phase-modulator.js`, `phase-offset.js`, `pitch-shifter.js`, `pixelate-*.js`, `self-modulator.js`, `granular.js`, `fold-processor.js`). `public/worklets/` now contains only `granulator.js`. Worklet tests pruned to match.
-- `AudioEngine.setPlan` / `setAudioRack` / bus-return delay infrastructure / per-instance audio param polling. Engine is now ~210 lines; the only public surface is master gain + soft-clip + limiter + meter + `setSource(silent|video-element)` + `attachAuxiliarySource(node)`.
+Release-policy note: `R1`–`R4` are quality/stability defects that fall under the deploy-gate requirement to fix or consciously defer discovered defects in writing. `R5` materially strengthens the "video-derived feature extraction in the shipped path" gate.
 
-What is kept and is now the entire public audio surface:
-
-- `Granulator` (`src/audio/granulator.ts`) — the benchmark-grade dual-domain audio engine.
-- `FeedbackDelay` (`src/audio/feedback-delay.ts`) — the one shared stereo post-effect.
-- Master gain → soft-clip → limiter → analyser → destination, with a pre-limit tap for `MasterMeter`.
-- `VideoElementAudioSource` for routing the loaded clip's audio track through the master bus, and `SilentSource` for the cold-boot state.
-
-Effect on the rest of the product:
-
-- `MasterMeter`, `GranulatorCard`, `FeedbackDelayCard`, and `LfoBank` are unaffected.
-- Six-LFO modulation still applies to video params and to granulator params via the existing `applyGlobalLfoAssignments` path. The mod bank lives on; only the per-operator audio side it used to drive is gone.
-- The release-policy assumption that "video ops have audio analogues" is now formally false, in code and not just in docs. Any future reintroduction of audio-side operators must come with an explicit scope expansion in `plan.md`; the simpler path is to keep extending the granulator and the feedback delay.
-
-### 10.5.0 Authored vector fields and the history-copy fix (2026-05-25)
-
-First operator that ships an *authored* velocity field rather than a measured one. Closes the most concrete part of the visual-quality gap raised when comparing the public chain against the marcscully.com hero (which itself turned out to be a CPU 2D-canvas point-vortex particle system, not a GPU shader).
-
-- **`vortex`** — Biot-Savart sum-of-point-vortices displacement op, registered under the Feedback family. 32 deterministic vortices live in operator-local TS state and are advected per-frame on CPU (~1K ops/frame, free), then uploaded as a `vec4[64]` uniform; the fragment shader sums the same kernel per pixel and samples `u_tex` at the displaced UV. Toroidal wrap on both the vortex advection and the per-pixel displacement so swirls couple smoothly across edges. Four product-visible params: `mix`, `strength`, `drift`, `softness`. Audio side is a pass-through — this is video-only.
-- **`history.frag` is now an identity copy.** The earlier polish-blur + peak-decay terms were proportional to `u_feedback_amount` and darkened `#prevFrame` every frame, which collapsed any trail-shaped op (`mix(current, prev, fb)` and friends) toward black. With this corrected, `feedback` finally produces the trails its semantics imply, the new `vortex` preset can rely on persistence, and the `structure` / `timeDisplace` ops that sample `u_prev_frame` get an accurate history. Renderer guard tightened to match (dead uniform lookups removed; the helper that computes `feedbackAmount` still feeds the presentation/bloom path, which is correct).
-- **`Vortex Field` preset** added under the public allowlist (now 13 programs, previously 12). Demonstrates the op against a video with feedback at 0.86, tight swirls, and a light HSL-feel palette boost. Macros: `swirl`, `persistence`, `palette`.
-
-Quality-sprint relevance: this is the first concrete piece of the §10.5 "stronger authored looks" goal that does *not* depend on the underlying motion estimator. `flow` and any future routed `modulate*` consumer remain ceiling-bound by `motion-analysis.frag`; `vortex` is independent of that ceiling because its field is authored, not measured. Expect more authored-field ops (curl noise, swept saddle, multi-scale vortex packets) before the motion estimator is rebuilt — the latter is real work, the former is fast and visually impactful.
-
-### 10.5.0a Three authored-field follow-ups (2026-05-25)
-
-Direct continuation of §10.5.0. The vortex op was the first of an intended set; the remaining three landed in the same day's pass and the public allowlist grew from 13 to 16 programs. Each is a distinct *class* of authored velocity field — not a re-skin of the same idea — so the Feedback family now covers swirl, fluid turbulence, multi-scale packet, and directional sweep with the same coupling-layer shape:
-
-- **`curlNoise`** — divergence-free curl of a two-octave analytic value-noise potential, fully GPU (no per-frame CPU advection), with an optional second `curl()` evaluation at a once-warped position for a fluid-style self-advection feel. Params: `mix`, `strength`, `scale`, `speed`, `warp`. The chosen contribution here is "turbulent but mass-conserving" — matter cannot pile up or thin out, only swirl.
-- **`vortexPacket`** — same 2D Biot-Savart kernel as `vortex` but with two CPU-advected bands: 6 macro vortices (large softness, slow drift, high strength) layered with 48 micro vortices (small softness, fast drift, low strength), each band advecting under its own softness so they don't collapse into the same scale. Shader blends the two via `macroBalance`. Params: `mix`, `strength`, `drift`, `macroBalance`, `macroSoftness`, `microSoftness`. The chosen contribution here is "structured noise" — separable macro composition and micro texture.
-- **`saddleField`** — 14 oriented 2D saddles, each `vec4(px, py, cosθ, sinθ)` with strength uniform. Per-saddle local velocity `(u, -anisotropy * v)` — stretch along axis, compress across — under a Gaussian envelope. CPU advances each saddle's angle slowly per frame (deterministic per-saddle rotation rate), sweeping the whole field through itself. Params: `mix`, `strength`, `softness`, `anisotropy`, `drift`. The chosen contribution here is "directional flow without rotation" — anisotropic streaks, which is qualitatively distinct from every other op in the Feedback family.
-- **Showcase presets `curlTurbulence`, `vortexPacketStorm`, `saddleSweep`** added to `public/presets.json` and the public allowlist in `src/App.svelte` (now 16 entries, previously 13). All three use the outer shape `feedback → <field-op> → saturate → contrast → chromaShift` so the new op is the dominant character, three macros per preset.
-- **Verification.** `npm run check` 370 files / 0 errors / 0 warnings; `npm run test:run` 182/182; `npm run build` 329 kB (was 316 kB after the audio strip; +13 kB for the three new shaders + ops + presets). Live Playwright verification on each preset against `qa/fixtures/ci-smoke.mp4` — all three render their intended character without GL warnings.
-
-Quality-sprint relevance: closes the authored-field arc explicitly named in §10.5.0. The motion-estimator ceiling (`motion-analysis.frag`) is still the bottleneck for `flow` and routed `modulate*` consumers, but the Feedback family no longer needs a stronger estimator to feel like an instrument.
-
-### 10.5.0b Operator characterisation sweep (2026-05-26)
-
-QA infrastructure that closes the "I turn up the knob and nothing happens" class of bug at the gate rather than relying on a user playing with the app. For every registered unary video operator, the sweep sets up a single-op chain on a paused video frame, walks each parameter min→max in 5 steps, and captures a 16×16 grid of per-channel mean / variance / brightness-weighted centre-of-mass at each step. Per-op JSON is written to `qa/results/op-sweeps/` and compared against `qa/baselines/op-sweeps/`; bless mode (`BLESS=1`) copies results → baselines.
-
-- **Instrumentation.** `VideoRenderer.readFrameStats(grid)` next to the existing `readPixelAt` — same `#prevFrame` FBO trick, returns mean/variance/CoM. QA bridge gains `setChain`, `listRegisteredOps`, `readFrameStats`. The bridge drives sweeps off the operator registry rather than hard-coded lists, so any new op is automatically covered the next time the spec runs.
-- **Spec.** `qa/e2e/op-characterisation.spec.ts`. Single `test()` that walks every op. Fresh chain per param so internal CPU state starts at frame 0 each time; if the op has a `mix` param it's pinned at max while other params sweep so non-mix params are observable. Min-to-max delta must exceed `5e-4` (dead-param assertion); time-dependent ops get a 5× looser tolerance on baseline drift because their output legitimately depends on `ctx.time`.
-- **Baselines.** Checked in under `qa/baselines/op-sweeps/`, 40 ops covered, one JSON per op. Drift surfaces in PRs.
-- **Scripts.** `npm run qa:opSweep` (compare), `npm run qa:opSweep:bless` (write baselines). Steady-state runtime ~2.5 min.
-- **First bless run caught a real bug.** `src/video/shaders/selfMod.frag` was missing `#version 300 es`, so its uniforms read garbage. Not in `DEFAULT_CHAIN` and no preset used it, so the bug was latent — exactly the failure mode the sweep was built to surface. Fixed in the same pass.
-
-Quality-sprint relevance: this is the regression gate behind every future authored-field op and behind any shader refactor in `src/video/shaders/`. Without it, the next "the param doesn't do anything" report comes from a user. With it, the assertion fires the moment a baseline drifts beyond tolerance or a parameter goes flat.
-
-Open follow-ups (not blocking the gate's usefulness, just deferred):
-
-- CI workflow alongside `granulator-soak.yml`, path-filtered on `src/ops/**` / `src/video/shaders/**` / `src/core/operators.ts` / `src/core/coupling.ts`. Steady-state ~2.5 min fits CI.
-- Binary blend coverage via a second pass with a procedural second-input source, its own baseline directory. Held until the unary baselines have proved stable over a few real PRs.
-
-### 10.5.1 Feedback-family triage (2026-05-25)
-
-Live-app inspection of the first four Feedback-family ops surfaced a mix of one UI-meta bug, one shader balance issue, one design-by-spec misunderstanding, and two architectural ceilings. Recording the boundary explicitly so future work does not relitigate it:
-
-- **structure**: the operator was working as coded, but its UI was missing `threshold` / `softness` (so the mask edge could not be moved) and the glow path dominated at high settings. Shipped 2026-05-25 — expanded `OPERATOR_UI_META.structure.coreParams`, rebalanced the glow contribution in `src/video/shaders/structure.frag`, and dropped the default `glow` from 0.25 to 0.18.
-- **feedback.delayTime**: not a bug. The audio worklet (`feedback-freeze`) reads it; the video shader does not, by spec — the param hint in `src/ops/feedback.ts` already declares it as audio-only / video-uncoupled. The real gap is UI clarity: a video-tab user has no way to know it is audio-only. Open follow-up: introduce an "audio-only" marker on coreParams meta so the UI can label these honestly. Until then, the param stays in `paramOrder` because it drives real audio behaviour.
-- **timeDisplace**: the temporal-history ring is fed from the conditioned monitor final (`#prevFrame`), not from the raw source. With timeDisplace as the only op in the chain, the buffer it samples becomes its own past output, so `depth/scan/smear` produce subtle / invisible changes and the visible effect collapses to `mix` × `trailFade` darkening. The renderer-resource layer for temporal history was always intended as a shared system (§10.5 video goals: "stateful temporal/motion/structure systems"); the design decision still to be made is whether timeDisplace should sample a second source-anchored history ring (preferred for the stated semantics) or be honestly relabelled as "post-chain time smear". Either change is architectural, not parameter-tuning, and is deferred until that scoped decision is taken.
-- **flow**: the operator is doing its job; the underlying motion-analysis shader (`src/video/shaders/motion-analysis.frag`) is the ceiling. 8-direction block matching with a 1.75-pixel search radius cannot represent the motion present in real footage, so the field arrives quantised and noisy and `u_gate` further filters it to sparse glitches. The same ceiling applies downstream to the future routed `modulate*` family if it consumes the motion texture. Real fix is a multi-scale / larger-radius estimator, scoped as part of stateful-systems quality work rather than the surgical pass.
-
-This subsection exists so the quality sprint does not silently double-count "shipped a feedback-family op" as "shipped a complete feedback-family experience". The deferred items above stay open against §10.5 and the corresponding release blockers in `todo.md` until they ship at release quality.
-
-### 10.5.2 Per-op ownedState FBO + dataMosh operator (2026-05-26)
-
-The "datamosh" look in `flow` (`smear`/`memory`/`glitch` branch) was a motion-vector smear, not the held-keyframe-with-drift signature most users mean by datamosh. Investigation confirmed two things worth recording so we don't reopen them: (a) Datamosher-Pro is bitstream-level AVI surgery (I-/P-frame byte toggling) and is not portable to a browser shader pipeline at all — the `<video>` element only exposes decoded RGB; (b) Akascape's realtime-datamosh Shadertoy is the only pixel-domain reference in the family, but its sparse-refresh accumulator is a visually different (weaker) look and would not have solved the underlying complaint.
-
-The real datamosh signature — frozen content sliding along motion vectors as predictions get mis-applied — needs a self-feedback buffer that holds indefinitely. The shared `temporalHistory` ring is the wrong primitive (capacity-8, frame-granular, shared across all ops) so this pass added a new opt-in:
-
-- **Per-op ownedState FBO infrastructure.** New `OperatorDef.ownedState?: { uniform }` declaration; renderer allocates a per-instance ping-pong (two textures + one rebound FBO) in `#syncNodeTargets`, binds previous state to TEXTURE6, runs the op into ownedState[next], blits to chain target so downstream ops see it, swaps. Lifecycle is symmetric with `#nodeTargets` (allocate on plan-step add, dispose on remove, reset on canvas resize). Single-attachment model (op's output IS its state) chosen over MRT for simplicity; promote if a future op genuinely needs state-distinct-from-output.
-- **`dataMosh` op.** Six params: `mix`, `hold`, `drift`, `release`, `decay`, `chunk`. Registered in the Feedback family. The held image drifts each frame by motion-field vectors, slowly degrades toward grey, and releases to live above a motion-magnitude threshold. `flow` is left untouched — its smear/memory mode stays valid as a separate motion-blur look, and the existing `Datamosh Smear` flagship preset still uses it. A second preset that wires the new `dataMosh` op is an open follow-up.
-
-Scope discipline: this is the first new architectural primitive (per-op self-feedback) since the temporal-history ring. It is opt-in and orthogonal to the existing shared resources, so no existing op is affected. The "Build new architectural primitive" decision was taken explicitly because the alternative paths (port Akascape, or improve `flow` smear in place) would not have produced the look the complaint was about — recorded in `memory.md` 2026-05-26 entry alongside the rejected alternatives so we don't re-evaluate them.
+> The dated change-log subsections that previously sat here (§10.4.9 audio strip, §10.5.0/0a/0b authored fields + characterisation sweep, §10.5.1 feedback triage, §10.5.2 ownedState/dataMosh) were moved to [docs/archive/build-log.md](docs/archive/build-log.md) on 2026-05-28. Their rationale lives in `memory.md`; full verbose text is in git. The still-open design tensions they recorded (`timeDisplace` source-anchored history, the `flow` motion-estimator ceiling) are tracked in `todo.md` "Deferred / open follow-ups".
 
 ### 10.6 Role of procedural sources after the pivot
 

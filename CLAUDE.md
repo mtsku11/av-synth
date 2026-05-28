@@ -103,7 +103,7 @@ Do not reintroduce the old assumption that "coupled" means "every Hydra operator
 
 ### Audio rules
 
-- The shipped public audio surface is: **granulator + feedback delay + master limiter**. This is now structurally enforced — `OperatorDef` has no `createAudioStage`, every per-op `AudioStage` class has been deleted, and `OperatorCoupling` has no audio side. See `plan.md §10.4.9` for the 2026-05-25 strip.
+- The shipped public audio surface is: **granulator + feedback delay + master limiter**. This is now structurally enforced — `OperatorDef` has no `createAudioStage`, every per-op `AudioStage` class has been deleted, and `OperatorCoupling` has no audio side. See `docs/archive/build-log.md` (audio strip, 2026-05-25) for the strip.
 - Before touching audio, MIDI, or modulation routing, read `references/granulator-port-spec.md`.
 - Do **not** add new public audio-engine families (`FM`, `fold`, `freeze`, `tone`, `space`, etc.) unless the user explicitly changes scope and the docs are updated first. Reintroducing the `AudioStage` interface or any per-op audio worklet is a scope change, not a cleanup; require an explicit decision before doing it.
 - The legacy AudioRack (`src/core/audio-rack.ts`, `src/ui/AudioRack.svelte`) and 24 video-op worklets (`feedback-freeze.js`, `modulate-*.js`, `phase-*.js`, `pitch-shifter.js`, `pixelate-*.js`, `self-modulator.js`, etc.) are deleted, not commented out. Do not resurrect them by reading git history without re-justifying scope.
