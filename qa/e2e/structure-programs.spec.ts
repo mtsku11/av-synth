@@ -105,7 +105,9 @@ test.describe('structure flagship presets', () => {
     const contourPixel = await readCenterPixel(page);
 
     expect(baselineMetrics?.video?.edgeDensity ?? 0).toBeGreaterThan(0.001);
-    expect((edgeMetrics?.video?.temporalDiff ?? 0) - (baselineMetrics?.video?.temporalDiff ?? 0)).toBeGreaterThan(0.0018);
+    expect(
+      (edgeMetrics?.video?.temporalDiff ?? 0) - (baselineMetrics?.video?.temporalDiff ?? 0),
+    ).toBeGreaterThan(0.0018);
     expect(pixelDelta(baselinePixel, edgePixel)).toBeGreaterThan(16);
     expect(pixelDelta(baselinePixel, contourPixel)).toBeGreaterThan(16);
     expect(contourMetrics?.video?.edgeDensity ?? 0).toBeGreaterThan(0.001);

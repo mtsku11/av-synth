@@ -191,7 +191,7 @@ test.describe('Slit-scan op', () => {
       await page.waitForTimeout(500);
     }
 
-    async function meanLumaDiff(a: Buffer, b: Buffer): Promise<number> {
+    async function _meanLumaDiff(a: Buffer, b: Buffer): Promise<number> {
       return page.evaluate(
         async ({ a, b }) => {
           async function decode(b64: string): Promise<ImageData> {
@@ -217,10 +217,8 @@ test.describe('Slit-scan op', () => {
           let sum = 0;
           let n = 0;
           for (let i = 0; i < da.data.length; i += 4 * 8) {
-            const la =
-              0.2126 * da.data[i]! + 0.7152 * da.data[i + 1]! + 0.0722 * da.data[i + 2]!;
-            const lb =
-              0.2126 * db.data[i]! + 0.7152 * db.data[i + 1]! + 0.0722 * db.data[i + 2]!;
+            const la = 0.2126 * da.data[i]! + 0.7152 * da.data[i + 1]! + 0.0722 * da.data[i + 2]!;
+            const lb = 0.2126 * db.data[i]! + 0.7152 * db.data[i + 1]! + 0.0722 * db.data[i + 2]!;
             sum += Math.abs(la - lb);
             n += 1;
           }
@@ -313,8 +311,9 @@ test.describe('Slit-scan op', () => {
         !line.includes('Failed to load resource') &&
         !line.includes('status of 404'),
     );
-    expect(noisyErrors, `Console errors during slit-scan probe: ${noisyErrors.join(' | ')}`).toEqual(
-      [],
-    );
+    expect(
+      noisyErrors,
+      `Console errors during slit-scan probe: ${noisyErrors.join(' | ')}`,
+    ).toEqual([]);
   });
 });

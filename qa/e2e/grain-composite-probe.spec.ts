@@ -58,14 +58,20 @@ test.describe('Grain composite probe', () => {
       const bridge = (window as Window & { __AV_SYNTH_QA__?: any }).__AV_SYNTH_QA__;
       return bridge?.startTransport?.() ?? false;
     });
-    expect(transportStarted, 'A: bridge.startTransport returned false — audio context did not initialise').toBe(true);
+    expect(
+      transportStarted,
+      'A: bridge.startTransport returned false — audio context did not initialise',
+    ).toBe(true);
     await page.waitForTimeout(500);
 
     const granEnabled = await page.evaluate(async () => {
       const bridge = (window as Window & { __AV_SYNTH_QA__?: any }).__AV_SYNTH_QA__;
       return bridge?.setGranulatorEnabled?.(true) ?? false;
     });
-    expect(granEnabled, 'A: setGranulatorEnabled returned false — granulator did not initialise').toBe(true);
+    expect(
+      granEnabled,
+      'A: setGranulatorEnabled returned false — granulator did not initialise',
+    ).toBe(true);
 
     // Audio source needs to be loaded into the granulator for grains to fire.
     await page.evaluate(async () => {
@@ -113,26 +119,23 @@ test.describe('Grain composite probe', () => {
     // ── D. Decode progress reaches end ─────────────────────────────────────
     // The progress pill appears while frames upload; we poll it until either
     // it disappears (decode complete) or we time out.
-    const decodeOutcome = await page.evaluate(
-      async (timeoutMs) => {
-        const start = Date.now();
-        let lastSeen: string | null = null;
-        let everSeen = false;
-        while (Date.now() - start < timeoutMs) {
-          const el = document.querySelector('[data-qa="grain-decode-progress"]');
-          const text = el?.textContent?.trim() ?? null;
-          if (text) {
-            everSeen = true;
-            lastSeen = text;
-          } else if (everSeen) {
-            return { result: 'completed', lastSeen };
-          }
-          await new Promise((r) => setTimeout(r, 200));
+    const decodeOutcome = await page.evaluate(async (timeoutMs) => {
+      const start = Date.now();
+      let lastSeen: string | null = null;
+      let everSeen = false;
+      while (Date.now() - start < timeoutMs) {
+        const el = document.querySelector('[data-qa="grain-decode-progress"]');
+        const text = el?.textContent?.trim() ?? null;
+        if (text) {
+          everSeen = true;
+          lastSeen = text;
+        } else if (everSeen) {
+          return { result: 'completed', lastSeen };
         }
-        return { result: everSeen ? 'timeout-during-decode' : 'never-started', lastSeen };
-      },
-      DECODE_TIMEOUT_MS,
-    );
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      return { result: everSeen ? 'timeout-during-decode' : 'never-started', lastSeen };
+    }, DECODE_TIMEOUT_MS);
     expect(
       decodeOutcome.result,
       `D: decode outcome=${decodeOutcome.result} (last progress text: ${decodeOutcome.lastSeen ?? 'none'})`,
@@ -143,7 +146,10 @@ test.describe('Grain composite probe', () => {
       const bridge = (window as Window & { __AV_SYNTH_QA__?: any }).__AV_SYNTH_QA__;
       return bridge?.isGrainDecoded?.() ?? false;
     });
-    expect(decoded, 'E: isGrainDecoded() returned false even though decode-progress pill disappeared').toBe(true);
+    expect(
+      decoded,
+      'E: isGrainDecoded() returned false even though decode-progress pill disappeared',
+    ).toBe(true);
 
     // ── F. GrainBuffer middle frame is non-black ───────────────────────────
     // Sample three frames spread across the clip; if all three are black,
@@ -169,7 +175,11 @@ test.describe('Grain composite probe', () => {
     //
     // Sample the canvas at intervals over a window because the scheduler fires
     // grains asynchronously — we want at least one lit frame in the window.
-    interface CanvasSample { ts: number; maxChannel: number; meanChannel: number }
+    interface CanvasSample {
+      ts: number;
+      maxChannel: number;
+      meanChannel: number;
+    }
 
     async function sampleCanvas(): Promise<CanvasSample | null> {
       const handle = await page.locator('canvas').first().elementHandle();
@@ -222,7 +232,9 @@ test.describe('Grain composite probe', () => {
       if (s) {
         samples.push(s);
         if (savedFrameCount < 8) {
-          await canvasLoc.screenshot({ path: `qa/results/grain-composite-probe-t${savedFrameCount}.png` });
+          await canvasLoc.screenshot({
+            path: `qa/results/grain-composite-probe-t${savedFrameCount}.png`,
+          });
           savedFrameCount++;
         }
       }
@@ -232,7 +244,9 @@ test.describe('Grain composite probe', () => {
         const bridge = (window as Window & { __AV_SYNTH_QA__?: any }).__AV_SYNTH_QA__;
         const arr = bridge?.getGranulatorRuntimeDiagnostics?.() ?? [];
         const last = arr[arr.length - 1] ?? null;
-        return last ? { spawnCount: last.spawnCount ?? 0, activeVoices: last.activeVoices ?? 0 } : null;
+        return last
+          ? { spawnCount: last.spawnCount ?? 0, activeVoices: last.activeVoices ?? 0 }
+          : null;
       });
       if (diag) diagSamples.push({ ts: Date.now() - start, ...diag });
       await page.waitForTimeout(COMPOSITE_SAMPLE_INTERVAL_MS);

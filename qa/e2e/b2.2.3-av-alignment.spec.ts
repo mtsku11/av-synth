@@ -134,10 +134,7 @@ test.describe('B2.2.3 — AV alignment (gate #2c)', () => {
         return await new Promise<typeof collected>((resolve) => {
           const deadline = performance.now() + MEASURE_MS;
 
-          const onFrame = (
-            _now: DOMHighResTimeStamp,
-            metadata: VideoFrameCallbackMetadata,
-          ) => {
+          const onFrame = (_now: DOMHighResTimeStamp, metadata: VideoFrameCallbackMetadata) => {
             // Synchronous reads — both happen on the same JS task.
             const audioTime = ctx.currentTime;
             collected.push({
@@ -191,7 +188,8 @@ test.describe('B2.2.3 — AV alignment (gate #2c)', () => {
           drifts: [],
         };
       } else {
-        const driftMs = (s.audioTime - current.audioBase) * 1000 - (s.mediaTime - current.mediaBase) * 1000;
+        const driftMs =
+          (s.audioTime - current.audioBase) * 1000 - (s.mediaTime - current.mediaBase) * 1000;
         current.drifts.push(driftMs);
       }
       prevMedia = s.mediaTime;

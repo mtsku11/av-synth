@@ -15,7 +15,14 @@
 // Binary blend ops (inputArity > 1) are still skipped in v1.
 
 import { expect, test } from '@playwright/test';
-import { mkdirSync, writeFileSync, existsSync, readFileSync, copyFileSync, readdirSync } from 'node:fs';
+import {
+  mkdirSync,
+  writeFileSync,
+  existsSync,
+  readFileSync,
+  copyFileSync,
+  readdirSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 
 interface FrameStats {
@@ -48,7 +55,7 @@ const FIXTURE_URL = '/qa/fixtures/ci-smoke.mp4';
 const BLESS = process.env.BLESS === '1';
 const TOLERANCE_MEAN = 0.08;
 const TOLERANCE_VAR = 0.08;
-const TOLERANCE_COM = 0.10;
+const TOLERANCE_COM = 0.1;
 const NOISY_MULTIPLIER = 5;
 const DEAD_THRESHOLD = 5e-4;
 
@@ -59,9 +66,7 @@ const DEAD_THRESHOLD = 5e-4;
 // drift.
 const TEMPORAL_RANGE_LIMIT = 0.45;
 
-const EXPECTED_VIDEO_DEAD: ReadonlySet<string> = new Set([
-  'feedback.delayTime',
-]);
+const EXPECTED_VIDEO_DEAD: ReadonlySet<string> = new Set(['feedback.delayTime']);
 
 const NOISY_OPS: ReadonlySet<string> = new Set([
   'curlNoise',
@@ -100,7 +105,9 @@ const NOISY_OPS: ReadonlySet<string> = new Set([
 // in seconds. Empty / undefined means "every unary op".
 const OP_FILTER_RAW = process.env.OP_FILTER ?? '';
 const OP_FILTER = new Set(
-  OP_FILTER_RAW.split(',').map((s) => s.trim()).filter(Boolean),
+  OP_FILTER_RAW.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
 );
 
 // Optional step / frame overrides so the smoke test can complete in seconds
@@ -108,20 +115,37 @@ const OP_FILTER = new Set(
 // these undefined.
 const STEPS_OVERRIDE = process.env.SWEEP_STEPS ? Number(process.env.SWEEP_STEPS) : undefined;
 const FRAMES_OVERRIDE = process.env.SOURCE_FRAMES
-  ? process.env.SOURCE_FRAMES.split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n))
+  ? process.env.SOURCE_FRAMES.split(',')
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n))
   : undefined;
 const TEMPORAL_MS_OVERRIDE = process.env.TEMPORAL_MS ? Number(process.env.TEMPORAL_MS) : undefined;
 const SKIP_TEMPORAL = process.env.SKIP_TEMPORAL === '1';
 
 const effectiveSteps = STEPS_OVERRIDE ?? SWEEP_STEPS;
-const effectiveFrames = FRAMES_OVERRIDE && FRAMES_OVERRIDE.length > 0 ? FRAMES_OVERRIDE : [...SOURCE_FRAMES];
+const effectiveFrames =
+  FRAMES_OVERRIDE && FRAMES_OVERRIDE.length > 0 ? FRAMES_OVERRIDE : [...SOURCE_FRAMES];
 const effectiveTemporalMs = TEMPORAL_MS_OVERRIDE ?? TEMPORAL_DURATION_MS;
 
-interface StepEntry { value: number; stats: FrameStats | null }
-interface ParamSweep { range: readonly [number, number]; steps: StepEntry[] }
-interface FrameResult { params: Record<string, ParamSweep> }
-interface TemporalSample { ts: number; stats: FrameStats | null }
-interface TemporalResult { paramValues: Record<string, number>; samples: TemporalSample[] }
+interface StepEntry {
+  value: number;
+  stats: FrameStats | null;
+}
+interface ParamSweep {
+  range: readonly [number, number];
+  steps: StepEntry[];
+}
+interface FrameResult {
+  params: Record<string, ParamSweep>;
+}
+interface TemporalSample {
+  ts: number;
+  stats: FrameStats | null;
+}
+interface TemporalResult {
+  paramValues: Record<string, number>;
+  samples: TemporalSample[];
+}
 interface OpResult {
   op: string;
   family: string;
@@ -177,7 +201,8 @@ test.describe('Op characterisation sweeps — thorough', () => {
     const temporalIssues: string[] = [];
 
     const startTime = Date.now();
-    const totalParamSweeps = sweepable.reduce((acc, op) => acc + op.paramOrder.length, 0) * effectiveFrames.length;
+    const totalParamSweeps =
+      sweepable.reduce((acc, op) => acc + op.paramOrder.length, 0) * effectiveFrames.length;
     let completedParamSweeps = 0;
     // eslint-disable-next-line no-console
     console.log(
@@ -313,17 +338,25 @@ test.describe('Op characterisation sweeps — thorough', () => {
                   if (!a || !b) continue;
                   for (let c = 0; c < 3; c++) {
                     if (Math.abs(a.mean[c] - b.mean[c]) > tolMean) {
-                      driftIssues.push(`${op.op}.${pId}@${frameKey}[${i}] mean[${c}] ${a.mean[c].toFixed(4)} → ${b.mean[c].toFixed(4)}`);
+                      driftIssues.push(
+                        `${op.op}.${pId}@${frameKey}[${i}] mean[${c}] ${a.mean[c].toFixed(4)} → ${b.mean[c].toFixed(4)}`,
+                      );
                     }
                     if (Math.abs(a.variance[c] - b.variance[c]) > tolVar) {
-                      driftIssues.push(`${op.op}.${pId}@${frameKey}[${i}] variance[${c}] ${a.variance[c].toFixed(4)} → ${b.variance[c].toFixed(4)}`);
+                      driftIssues.push(
+                        `${op.op}.${pId}@${frameKey}[${i}] variance[${c}] ${a.variance[c].toFixed(4)} → ${b.variance[c].toFixed(4)}`,
+                      );
                     }
                   }
                   if (Math.abs(a.centerOfMass.x - b.centerOfMass.x) > tolCom) {
-                    driftIssues.push(`${op.op}.${pId}@${frameKey}[${i}] CoM.x ${a.centerOfMass.x.toFixed(4)} → ${b.centerOfMass.x.toFixed(4)}`);
+                    driftIssues.push(
+                      `${op.op}.${pId}@${frameKey}[${i}] CoM.x ${a.centerOfMass.x.toFixed(4)} → ${b.centerOfMass.x.toFixed(4)}`,
+                    );
                   }
                   if (Math.abs(a.centerOfMass.y - b.centerOfMass.y) > tolCom) {
-                    driftIssues.push(`${op.op}.${pId}@${frameKey}[${i}] CoM.y ${a.centerOfMass.y.toFixed(4)} → ${b.centerOfMass.y.toFixed(4)}`);
+                    driftIssues.push(
+                      `${op.op}.${pId}@${frameKey}[${i}] CoM.y ${a.centerOfMass.y.toFixed(4)} → ${b.centerOfMass.y.toFixed(4)}`,
+                    );
                   }
                 }
               }
@@ -350,7 +383,9 @@ test.describe('Op characterisation sweeps — thorough', () => {
 
       const noisyOpsInScope = sweepable.filter((op) => NOISY_OPS.has(op.op));
       // eslint-disable-next-line no-console
-      console.log(`[op-sweeps-thorough] === temporal sweep: ${noisyOpsInScope.length} noisy ops ===`);
+      console.log(
+        `[op-sweeps-thorough] === temporal sweep: ${noisyOpsInScope.length} noisy ops ===`,
+      );
 
       for (const op of noisyOpsInScope) {
         const paramValues: Record<string, number> = {};
@@ -395,13 +430,18 @@ test.describe('Op characterisation sweeps — thorough', () => {
         opResults.get(op.op)!.temporal = temporal;
 
         // Bounded-variance assertion: range of each channel must stay sane.
-        const validSamples = samples.filter((s) => s.stats != null) as { ts: number; stats: FrameStats }[];
+        const validSamples = samples.filter((s) => s.stats != null) as {
+          ts: number;
+          stats: FrameStats;
+        }[];
         if (validSamples.length > 1) {
           for (let c = 0; c < 3; c++) {
             const vals = validSamples.map((s) => s.stats.mean[c]);
             const range = Math.max(...vals) - Math.min(...vals);
             if (range > TEMPORAL_RANGE_LIMIT) {
-              temporalIssues.push(`${op.op} temporal mean[${c}] range=${range.toFixed(3)} > ${TEMPORAL_RANGE_LIMIT}`);
+              temporalIssues.push(
+                `${op.op} temporal mean[${c}] range=${range.toFixed(3)} > ${TEMPORAL_RANGE_LIMIT}`,
+              );
             }
             if (vals.some((v) => !Number.isFinite(v))) {
               temporalIssues.push(`${op.op} temporal mean[${c}] non-finite`);
@@ -425,14 +465,20 @@ test.describe('Op characterisation sweeps — thorough', () => {
                 if (!a || !b) continue;
                 for (let c = 0; c < 3; c++) {
                   if (Math.abs(a.mean[c] - b.mean[c]) > tolMean) {
-                    driftIssues.push(`${op.op}.temporal[${i}] mean[${c}] ${a.mean[c].toFixed(4)} → ${b.mean[c].toFixed(4)}`);
+                    driftIssues.push(
+                      `${op.op}.temporal[${i}] mean[${c}] ${a.mean[c].toFixed(4)} → ${b.mean[c].toFixed(4)}`,
+                    );
                   }
                 }
                 if (Math.abs(a.centerOfMass.x - b.centerOfMass.x) > tolCom) {
-                  driftIssues.push(`${op.op}.temporal[${i}] CoM.x ${a.centerOfMass.x.toFixed(4)} → ${b.centerOfMass.x.toFixed(4)}`);
+                  driftIssues.push(
+                    `${op.op}.temporal[${i}] CoM.x ${a.centerOfMass.x.toFixed(4)} → ${b.centerOfMass.x.toFixed(4)}`,
+                  );
                 }
                 if (Math.abs(a.centerOfMass.y - b.centerOfMass.y) > tolCom) {
-                  driftIssues.push(`${op.op}.temporal[${i}] CoM.y ${a.centerOfMass.y.toFixed(4)} → ${b.centerOfMass.y.toFixed(4)}`);
+                  driftIssues.push(
+                    `${op.op}.temporal[${i}] CoM.y ${a.centerOfMass.y.toFixed(4)} → ${b.centerOfMass.y.toFixed(4)}`,
+                  );
                 }
               }
             }
@@ -455,7 +501,9 @@ test.describe('Op characterisation sweeps — thorough', () => {
 
     if (BLESS) {
       // eslint-disable-next-line no-console
-      console.log(`[op-sweeps-thorough] BLESS mode: wrote ${opResults.size} baselines under ${BASELINE_DIR}`);
+      console.log(
+        `[op-sweeps-thorough] BLESS mode: wrote ${opResults.size} baselines under ${BASELINE_DIR}`,
+      );
       return;
     }
 
@@ -464,7 +512,9 @@ test.describe('Op characterisation sweeps — thorough', () => {
       .filter((op) => !existsSync(resolve(BASELINE_DIR, `${op}.json`)));
     if (missingBaselines.length > 0) {
       // eslint-disable-next-line no-console
-      console.log(`[op-sweeps-thorough] new ops without baselines: ${missingBaselines.join(', ')} — run with BLESS=1 to add them`);
+      console.log(
+        `[op-sweeps-thorough] new ops without baselines: ${missingBaselines.join(', ')} — run with BLESS=1 to add them`,
+      );
     }
 
     expect(

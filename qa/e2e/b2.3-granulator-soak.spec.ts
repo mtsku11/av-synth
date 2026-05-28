@@ -62,11 +62,11 @@ test.describe('B2.3 — granulator steady-state long soak (gate #4)', () => {
   // so GC events from that isolate carry the worklet thread's pid/tid. We
   // build a (pid:tid) set from the metadata, then count GC events restricted
   // to that set. Page-wide counts are retained as diagnostic context.
-  test(
-    `64 voices for ${SOAK_S}s after ${WARMUP_MS}ms warm-up, zero worklet major-GC in steady state`,
-    async ({ page }, testInfo) => {
-      // Add 60 s of headroom on top of warm-up + trace so set-up + tear-down fit.
-      test.setTimeout(WARMUP_MS + SOAK_MS + 60_000);
+  test(`64 voices for ${SOAK_S}s after ${WARMUP_MS}ms warm-up, zero worklet major-GC in steady state`, async ({
+    page,
+  }, testInfo) => {
+    // Add 60 s of headroom on top of warm-up + trace so set-up + tear-down fit.
+    test.setTimeout(WARMUP_MS + SOAK_MS + 60_000);
 
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto('/');
@@ -237,8 +237,8 @@ test.describe('B2.3 — granulator steady-state long soak (gate #4)', () => {
     //     (JIT bytecode compaction — benign, not caused by our allocation patterns)
     //   - anything else ("memory pressure", "allocation failure", …) = allocation-
     //     driven GC — this is the gate-#4 metric.
-    let majorCount = 0;       // allocation-driven major GC on worklet (gate metric)
-    let codeGCCount = 0;      // V8 code-flush cycles on worklet (informational)
+    let majorCount = 0; // allocation-driven major GC on worklet (gate metric)
+    let codeGCCount = 0; // V8 code-flush cycles on worklet (informational)
     let minorCount = 0;
     let majorMaxMs = 0;
     let codeGCMaxMs = 0;
@@ -391,6 +391,5 @@ test.describe('B2.3 — granulator steady-state long soak (gate #4)', () => {
 
     expect(attributionOk, 'AudioWorklet thread metadata must be present in the trace').toBe(true);
     expect(majorCount).toBe(0);
-    },
-  );
+  });
 });

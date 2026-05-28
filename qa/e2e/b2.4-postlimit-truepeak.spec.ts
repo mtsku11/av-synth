@@ -56,9 +56,7 @@ test.describe('B2.4 — post-limit true-peak (gate #6)', () => {
             if (n === 0) s = 2 * cutoff;
             else s = Math.sin(2 * Math.PI * cutoff * n) / (Math.PI * n);
             const w =
-              0.42 -
-              0.5 * Math.cos((2 * Math.PI * i) / M) +
-              0.08 * Math.cos((4 * Math.PI * i) / M);
+              0.42 - 0.5 * Math.cos((2 * Math.PI * i) / M) + 0.08 * Math.cos((4 * Math.PI * i) / M);
             h[i] = s * w;
             sum += h[i];
           }

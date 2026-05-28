@@ -14,7 +14,9 @@ interface RgbSample {
   b: number;
 }
 
-async function sampleMetrics(page: import('@playwright/test').Page): Promise<QaMetricSnapshot | null> {
+async function sampleMetrics(
+  page: import('@playwright/test').Page,
+): Promise<QaMetricSnapshot | null> {
   return page.evaluate(async () => {
     const bridge = (
       window as Window & {
@@ -40,10 +42,7 @@ async function readCenterPixel(page: import('@playwright/test').Page): Promise<R
   });
 }
 
-async function applyProgram(
-  page: import('@playwright/test').Page,
-  name: string,
-): Promise<boolean> {
+async function applyProgram(page: import('@playwright/test').Page, name: string): Promise<boolean> {
   return page.evaluate(async (programName) => {
     const bridge = (
       window as Window & {
@@ -78,7 +77,9 @@ test.describe('temporal-history flagship presets', () => {
     });
 
     await page.goto('/');
-    await page.locator('input[type="file"]').setInputFiles(resolveFixturePath('qa/fixtures/ci-smoke.mp4'));
+    await page
+      .locator('input[type="file"]')
+      .setInputFiles(resolveFixturePath('qa/fixtures/ci-smoke.mp4'));
     await page.waitForTimeout(1400);
 
     expect(await applyProgram(page, 'zero')).toBe(true);

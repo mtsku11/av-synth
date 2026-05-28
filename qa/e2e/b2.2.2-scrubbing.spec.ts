@@ -170,7 +170,9 @@ test.describe('B2.2.2-b — grain-buffer frame accuracy (gate §13 #2b)', () => 
             const bridge = (
               window as Window & {
                 __AV_SYNTH_QA__?: {
-                  readGrainBufferFrame(frameIndex: number): { r: number; g: number; b: number } | null;
+                  readGrainBufferFrame(
+                    frameIndex: number,
+                  ): { r: number; g: number; b: number } | null;
                 };
               }
             ).__AV_SYNTH_QA__;
@@ -179,7 +181,10 @@ test.describe('B2.2.2-b — grain-buffer frame accuracy (gate §13 #2b)', () => 
           { frameIndex: frame },
         );
 
-        expect(pixel, `readGrainBufferFrame failed at position ${position} (frame ${frame})`).not.toBeNull();
+        expect(
+          pixel,
+          `readGrainBufferFrame failed at position ${position} (frame ${frame})`,
+        ).not.toBeNull();
 
         const delta = Math.abs(pixel!.r - brightness);
         results.push({

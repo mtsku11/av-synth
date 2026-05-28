@@ -43,25 +43,121 @@ interface GranSweep {
 }
 
 const GRAN_SWEEPS: GranSweep[] = [
-  { name: 'gain',               min: 0,     mid: 0.5,  max: 1,     default: 0.7, measure: 'nocrash',    note: 'video audio dominates master peak at gain=0; mix test below proves signal path is live' },
-  { name: 'mix',                min: 0,     mid: 0.5,  max: 1,     default: 1,   measure: 'peak',       expect: 'higher-at-max' },
-  { name: 'density',            min: 1,     mid: 20,   max: 200,   default: 20,  measure: 'spawnDelta', expect: 'higher-at-max' },
-  { name: 'duration',           min: 5,     mid: 80,   max: 2000,  default: 80,  measure: 'nocrash',    note: 'grain length in ms; meanSamplesPerGrain diag tracks spawn interval not grain length — no auto direction assertion' },
-  { name: 'pitch',              min: -24,   mid: 0,    max: 24,    default: 0,   measure: 'nocrash',    note: 'high-pitch grains expire faster → fewer simultaneous voices → pitchLoad not monotone; no direction assertion' },
-  { name: 'voiceCount',         min: 1,     mid: 32,   max: 64,    default: 32,  measure: 'nocrash',    note: 'activeVoices capped; no direction assertion (√N normalisation absorbs gain)' },
-  { name: 'positionJitter',     min: 0,     mid: 0.5,  max: 1,     default: 0,   measure: 'nocrash' },
-  { name: 'pitchJitter',        min: 0,     mid: 6,    max: 24,    default: 0,   measure: 'nocrash' },
-  { name: 'durationJitter',     min: 0,     mid: 0.5,  max: 1,     default: 0,   measure: 'nocrash' },
-  { name: 'distribution',       min: 0,     mid: 0.5,  max: 1,     default: 0,   measure: 'nocrash',    note: 'cloud-mode Poisson spread; meaningful only when mode=cloud' },
-  { name: 'panSpread',          min: 0,     mid: 0.5,  max: 1,     default: 0,   measure: 'nocrash' },
-  { name: 'ySpread',            min: 0,     mid: 0.5,  max: 1,     default: 0,   measure: 'nocrash' },
-  { name: 'reverseProbability', min: 0,     mid: 0.5,  max: 1,     default: 0,   measure: 'nocrash' },
-  { name: 'fmAmount',           min: 0,     mid: 12,   max: 48,    default: 0,   measure: 'manual',     note: 'FM pitch modulation — vibrato at low fmFreq, digital dirt at high; assess by ear' },
-  { name: 'fmFreq',             min: 0.1,   mid: 50,   max: 500,   default: 10,  measure: 'manual',     note: 'FM rate — interacts with fmAmount; assess by ear' },
-  { name: 'envAttack',          min: 1,     mid: 500,  max: 10000, default: 10,  measure: 'manual',     note: 'ADSR attack time — MIDI-triggered only; test with computer keyboard' },
-  { name: 'envDecay',           min: 1,     mid: 500,  max: 10000, default: 100, measure: 'manual',     note: 'ADSR decay time — MIDI-triggered only' },
-  { name: 'envSustain',         min: 0,     mid: 0.5,  max: 1,     default: 1.0, measure: 'manual',     note: 'ADSR sustain level — MIDI-triggered only' },
-  { name: 'envRelease',         min: 1,     mid: 1000, max: 20000, default: 300, measure: 'manual',     note: 'ADSR release time — MIDI-triggered only' },
+  {
+    name: 'gain',
+    min: 0,
+    mid: 0.5,
+    max: 1,
+    default: 0.7,
+    measure: 'nocrash',
+    note: 'video audio dominates master peak at gain=0; mix test below proves signal path is live',
+  },
+  { name: 'mix', min: 0, mid: 0.5, max: 1, default: 1, measure: 'peak', expect: 'higher-at-max' },
+  {
+    name: 'density',
+    min: 1,
+    mid: 20,
+    max: 200,
+    default: 20,
+    measure: 'spawnDelta',
+    expect: 'higher-at-max',
+  },
+  {
+    name: 'duration',
+    min: 5,
+    mid: 80,
+    max: 2000,
+    default: 80,
+    measure: 'nocrash',
+    note: 'grain length in ms; meanSamplesPerGrain diag tracks spawn interval not grain length — no auto direction assertion',
+  },
+  {
+    name: 'pitch',
+    min: -24,
+    mid: 0,
+    max: 24,
+    default: 0,
+    measure: 'nocrash',
+    note: 'high-pitch grains expire faster → fewer simultaneous voices → pitchLoad not monotone; no direction assertion',
+  },
+  {
+    name: 'voiceCount',
+    min: 1,
+    mid: 32,
+    max: 64,
+    default: 32,
+    measure: 'nocrash',
+    note: 'activeVoices capped; no direction assertion (√N normalisation absorbs gain)',
+  },
+  { name: 'positionJitter', min: 0, mid: 0.5, max: 1, default: 0, measure: 'nocrash' },
+  { name: 'pitchJitter', min: 0, mid: 6, max: 24, default: 0, measure: 'nocrash' },
+  { name: 'durationJitter', min: 0, mid: 0.5, max: 1, default: 0, measure: 'nocrash' },
+  {
+    name: 'distribution',
+    min: 0,
+    mid: 0.5,
+    max: 1,
+    default: 0,
+    measure: 'nocrash',
+    note: 'cloud-mode Poisson spread; meaningful only when mode=cloud',
+  },
+  { name: 'panSpread', min: 0, mid: 0.5, max: 1, default: 0, measure: 'nocrash' },
+  { name: 'ySpread', min: 0, mid: 0.5, max: 1, default: 0, measure: 'nocrash' },
+  { name: 'reverseProbability', min: 0, mid: 0.5, max: 1, default: 0, measure: 'nocrash' },
+  {
+    name: 'fmAmount',
+    min: 0,
+    mid: 12,
+    max: 48,
+    default: 0,
+    measure: 'manual',
+    note: 'FM pitch modulation — vibrato at low fmFreq, digital dirt at high; assess by ear',
+  },
+  {
+    name: 'fmFreq',
+    min: 0.1,
+    mid: 50,
+    max: 500,
+    default: 10,
+    measure: 'manual',
+    note: 'FM rate — interacts with fmAmount; assess by ear',
+  },
+  {
+    name: 'envAttack',
+    min: 1,
+    mid: 500,
+    max: 10000,
+    default: 10,
+    measure: 'manual',
+    note: 'ADSR attack time — MIDI-triggered only; test with computer keyboard',
+  },
+  {
+    name: 'envDecay',
+    min: 1,
+    mid: 500,
+    max: 10000,
+    default: 100,
+    measure: 'manual',
+    note: 'ADSR decay time — MIDI-triggered only',
+  },
+  {
+    name: 'envSustain',
+    min: 0,
+    mid: 0.5,
+    max: 1,
+    default: 1.0,
+    measure: 'manual',
+    note: 'ADSR sustain level — MIDI-triggered only',
+  },
+  {
+    name: 'envRelease',
+    min: 1,
+    mid: 1000,
+    max: 20000,
+    default: 300,
+    measure: 'manual',
+    note: 'ADSR release time — MIDI-triggered only',
+  },
 ];
 
 interface FdSweep {
@@ -73,11 +169,23 @@ interface FdSweep {
 }
 
 const FD_SWEEPS: FdSweep[] = [
-  { name: 'time',     min: 0.005, max: 4.0,               default: 0.25, note: 'delay time in seconds' },
-  { name: 'feedback', min: 0,     max: 0.99,              default: 0,    note: 'runaway risk at > 0.95; capped at 0.99' },
-  { name: 'damping',  min: 200,   max: 20000,             default: 6000, note: 'lowpass cutoff inside feedback loop' },
-  { name: 'cross',    min: 0,     max: Math.PI / 2,       default: 0,    note: '0=self, π/4=ping-pong, π/2=swap' },
-  { name: 'mix',      min: 0,     max: 1,                 default: 0,    note: 'delay return dry/wet' },
+  { name: 'time', min: 0.005, max: 4.0, default: 0.25, note: 'delay time in seconds' },
+  {
+    name: 'feedback',
+    min: 0,
+    max: 0.99,
+    default: 0,
+    note: 'runaway risk at > 0.95; capped at 0.99',
+  },
+  {
+    name: 'damping',
+    min: 200,
+    max: 20000,
+    default: 6000,
+    note: 'lowpass cutoff inside feedback loop',
+  },
+  { name: 'cross', min: 0, max: Math.PI / 2, default: 0, note: '0=self, π/4=ping-pong, π/2=swap' },
+  { name: 'mix', min: 0, max: 1, default: 0, note: 'delay return dry/wet' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -89,7 +197,9 @@ type AnyWindow = Window & { __AV_SYNTH_QA__?: any };
 test.describe('Audio parameter bless — granulator + feedback delay', () => {
   test.setTimeout(600_000); // 10 minutes for the full sweep
 
-  test('all parameters sweep without crash and measurable params respond correctly', async ({ page }) => {
+  test('all parameters sweep without crash and measurable params respond correctly', async ({
+    page,
+  }) => {
     const pageErrors: string[] = [];
     page.on('console', (msg) => {
       if (msg.type() === 'error') pageErrors.push(msg.text());
@@ -159,11 +269,25 @@ test.describe('Audio parameter bless — granulator + feedback delay', () => {
       await page.evaluate(async () => {
         const b = (window as AnyWindow).__AV_SYNTH_QA__!;
         const defaults: Record<string, number> = {
-          gain: 0.7, mix: 1, density: 20, voiceCount: 32, duration: 80,
-          pitch: 0, pitchJitter: 0, positionJitter: 0, durationJitter: 0,
-          distribution: 0, panSpread: 0, ySpread: 0, reverseProbability: 0,
-          fmAmount: 0, fmFreq: 10,
-          envAttack: 10, envDecay: 100, envSustain: 1.0, envRelease: 300,
+          gain: 0.7,
+          mix: 1,
+          density: 20,
+          voiceCount: 32,
+          duration: 80,
+          pitch: 0,
+          pitchJitter: 0,
+          positionJitter: 0,
+          durationJitter: 0,
+          distribution: 0,
+          panSpread: 0,
+          ySpread: 0,
+          reverseProbability: 0,
+          fmAmount: 0,
+          fmFreq: 10,
+          envAttack: 10,
+          envDecay: 100,
+          envSustain: 1.0,
+          envRelease: 300,
         };
         for (const [k, v] of Object.entries(defaults)) {
           await b.setGranulatorParam?.(k, v);
@@ -365,7 +489,12 @@ test.describe('Audio parameter bless — granulator + feedback delay', () => {
     for (const r of granResults) {
       expect(r.ctxOk, `AudioContext suspended during sweep of granulator.${r.name}`).toBe(true);
       if (r.verdict === 'FAIL') {
-        expect.soft(false, `granulator.${r.name}: direction assertion failed (min=${r.minMeasure}, max=${r.maxMeasure})`).toBe(true);
+        expect
+          .soft(
+            false,
+            `granulator.${r.name}: direction assertion failed (min=${r.minMeasure}, max=${r.maxMeasure})`,
+          )
+          .toBe(true);
       }
     }
 

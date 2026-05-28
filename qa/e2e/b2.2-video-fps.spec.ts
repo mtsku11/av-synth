@@ -166,9 +166,10 @@ test.describe('B2.2 — video fps (gate #2a)', () => {
       measure_ms: MEASURE_MS,
       fps_target: FPS_TARGET,
       ...measurement,
-      verdict: measurement.fps.median >= FPS_TARGET
-        ? `PASS — median ${measurement.fps.median.toFixed(1)} fps ≥ ${FPS_TARGET} target`
-        : `FAIL — median ${measurement.fps.median.toFixed(1)} fps < ${FPS_TARGET} target`,
+      verdict:
+        measurement.fps.median >= FPS_TARGET
+          ? `PASS — median ${measurement.fps.median.toFixed(1)} fps ≥ ${FPS_TARGET} target`
+          : `FAIL — median ${measurement.fps.median.toFixed(1)} fps < ${FPS_TARGET} target`,
     };
 
     const outDir = path.resolve(testInfo.config.rootDir, '..', 'results');

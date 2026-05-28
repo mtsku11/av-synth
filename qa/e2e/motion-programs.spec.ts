@@ -21,7 +21,9 @@ interface RgbSample {
   b: number;
 }
 
-async function sampleMetrics(page: import('@playwright/test').Page): Promise<QaMetricSnapshot | null> {
+async function sampleMetrics(
+  page: import('@playwright/test').Page,
+): Promise<QaMetricSnapshot | null> {
   return page.evaluate(async () => {
     const bridge = (
       window as Window & {
@@ -95,7 +97,9 @@ test.describe('motion flagship presets', () => {
     });
 
     await page.goto('/');
-    await page.locator('input[type="file"]').setInputFiles(resolveFixturePath('qa/fixtures/ci-smoke.mp4'));
+    await page
+      .locator('input[type="file"]')
+      .setInputFiles(resolveFixturePath('qa/fixtures/ci-smoke.mp4'));
     await page.waitForTimeout(1400);
 
     expect(await applyProgram(page, 'zero')).toBe(true);
@@ -123,9 +127,19 @@ test.describe('motion flagship presets', () => {
     const meltState = await getState(page);
 
     expect(baselineState?.videoFeatures.available).toBe(true);
-    expect(Math.max(datamoshState?.videoFeatures.motion ?? 0, meltState?.videoFeatures.motion ?? 0)).toBeGreaterThan(0.001);
-    expect(Math.abs((datamoshMetrics?.video?.temporalDiff ?? 0) - (baselineMetrics?.video?.temporalDiff ?? 0))).toBeGreaterThan(0.0018);
-    expect(Math.abs((meltMetrics?.video?.temporalDiff ?? 0) - (baselineMetrics?.video?.temporalDiff ?? 0))).toBeGreaterThan(0.0008);
+    expect(
+      Math.max(datamoshState?.videoFeatures.motion ?? 0, meltState?.videoFeatures.motion ?? 0),
+    ).toBeGreaterThan(0.001);
+    expect(
+      Math.abs(
+        (datamoshMetrics?.video?.temporalDiff ?? 0) - (baselineMetrics?.video?.temporalDiff ?? 0),
+      ),
+    ).toBeGreaterThan(0.0018);
+    expect(
+      Math.abs(
+        (meltMetrics?.video?.temporalDiff ?? 0) - (baselineMetrics?.video?.temporalDiff ?? 0),
+      ),
+    ).toBeGreaterThan(0.0008);
     expect(pixelDelta(baselinePixel, datamoshPixel)).toBeGreaterThan(16);
     expect(pixelDelta(baselinePixel, meltPixel)).toBeGreaterThan(16);
     expect(consoleErrors).toEqual([]);

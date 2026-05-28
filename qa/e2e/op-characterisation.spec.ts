@@ -12,7 +12,14 @@
 // input and aren't where the dead-param bugs have shown up.
 
 import { expect, test } from '@playwright/test';
-import { mkdirSync, writeFileSync, existsSync, readFileSync, copyFileSync, readdirSync } from 'node:fs';
+import {
+  mkdirSync,
+  writeFileSync,
+  existsSync,
+  readFileSync,
+  copyFileSync,
+  readdirSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 
 interface FrameStats {
@@ -40,16 +47,14 @@ const FIXTURE_URL = '/qa/fixtures/ci-smoke.mp4';
 const BLESS = process.env.BLESS === '1';
 const TOLERANCE_MEAN = 0.08;
 const TOLERANCE_VAR = 0.08;
-const TOLERANCE_COM = 0.10;
+const TOLERANCE_COM = 0.1;
 const NOISY_MULTIPLIER = 5;
 const DEAD_THRESHOLD = 5e-4;
 
 // Params known to be intentionally invisible in the video domain (audio-only,
 // or driven by automation rather than direct sweep). These still get a JSON
 // row written, but the dead-param structural assertion is skipped.
-const EXPECTED_VIDEO_DEAD: ReadonlySet<string> = new Set([
-  'feedback.delayTime',
-]);
+const EXPECTED_VIDEO_DEAD: ReadonlySet<string> = new Set(['feedback.delayTime']);
 
 // Ops whose internal CPU advection, noise time, or direct ctx.time sampling
 // produces meaningful step-to-step variance that the strict baseline test
@@ -145,7 +150,10 @@ test.describe('Op characterisation sweeps', () => {
       const opResult: {
         op: string;
         family: string;
-        params: Record<string, { range: readonly [number, number]; steps: { value: number; stats: FrameStats | null }[] }>;
+        params: Record<
+          string,
+          { range: readonly [number, number]; steps: { value: number; stats: FrameStats | null }[] }
+        >;
       } = { op: op.op, family: op.family, params: {} };
 
       for (const paramId of op.paramOrder) {
@@ -239,17 +247,25 @@ test.describe('Op characterisation sweeps', () => {
             if (!a || !b) continue;
             for (let c = 0; c < 3; c++) {
               if (Math.abs(a.mean[c] - b.mean[c]) > tolMean) {
-                driftIssues.push(`${op.op}.${pId}[${i}] mean[${c}] drifted ${a.mean[c].toFixed(4)} → ${b.mean[c].toFixed(4)}`);
+                driftIssues.push(
+                  `${op.op}.${pId}[${i}] mean[${c}] drifted ${a.mean[c].toFixed(4)} → ${b.mean[c].toFixed(4)}`,
+                );
               }
               if (Math.abs(a.variance[c] - b.variance[c]) > tolVar) {
-                driftIssues.push(`${op.op}.${pId}[${i}] variance[${c}] drifted ${a.variance[c].toFixed(4)} → ${b.variance[c].toFixed(4)}`);
+                driftIssues.push(
+                  `${op.op}.${pId}[${i}] variance[${c}] drifted ${a.variance[c].toFixed(4)} → ${b.variance[c].toFixed(4)}`,
+                );
               }
             }
             if (Math.abs(a.centerOfMass.x - b.centerOfMass.x) > tolCom) {
-              driftIssues.push(`${op.op}.${pId}[${i}] CoM.x drifted ${a.centerOfMass.x.toFixed(4)} → ${b.centerOfMass.x.toFixed(4)}`);
+              driftIssues.push(
+                `${op.op}.${pId}[${i}] CoM.x drifted ${a.centerOfMass.x.toFixed(4)} → ${b.centerOfMass.x.toFixed(4)}`,
+              );
             }
             if (Math.abs(a.centerOfMass.y - b.centerOfMass.y) > tolCom) {
-              driftIssues.push(`${op.op}.${pId}[${i}] CoM.y drifted ${a.centerOfMass.y.toFixed(4)} → ${b.centerOfMass.y.toFixed(4)}`);
+              driftIssues.push(
+                `${op.op}.${pId}[${i}] CoM.y drifted ${a.centerOfMass.y.toFixed(4)} → ${b.centerOfMass.y.toFixed(4)}`,
+              );
             }
           }
         }
@@ -261,7 +277,9 @@ test.describe('Op characterisation sweeps', () => {
     // first offender.
     if (BLESS) {
       // eslint-disable-next-line no-console
-      console.log(`[op-sweeps] BLESS mode: wrote ${sweepable.length} baselines under ${BASELINE_DIR}`);
+      console.log(
+        `[op-sweeps] BLESS mode: wrote ${sweepable.length} baselines under ${BASELINE_DIR}`,
+      );
       return;
     }
 
@@ -270,10 +288,15 @@ test.describe('Op characterisation sweeps', () => {
       .filter((op) => !existsSync(resolve(BASELINE_DIR, `${op}.json`)));
     if (missingBaselines.length > 0) {
       // eslint-disable-next-line no-console
-      console.log(`[op-sweeps] new ops without baselines: ${missingBaselines.join(', ')} — run with BLESS=1 to add them`);
+      console.log(
+        `[op-sweeps] new ops without baselines: ${missingBaselines.join(', ')} — run with BLESS=1 to add them`,
+      );
     }
 
-    expect(deadParams, `Dead video params detected (curve flat across full range):\n${deadParams.join('\n')}`).toEqual([]);
+    expect(
+      deadParams,
+      `Dead video params detected (curve flat across full range):\n${deadParams.join('\n')}`,
+    ).toEqual([]);
     expect(driftIssues, `Baseline drift detected:\n${driftIssues.join('\n')}`).toEqual([]);
 
     // Also write a summary index so reviewers can see at a glance what was

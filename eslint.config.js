@@ -34,6 +34,13 @@ export default ts.config(
     },
   },
   {
+    // Playwright evaluate() returns are typed any by nature; suppress in test files only.
+    files: ['qa/e2e/**'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
     ignores: [
       'dist/',
       '.vite/',
