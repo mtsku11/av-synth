@@ -95,8 +95,15 @@ export function applyGlobalLfoAssignments(
   specs: Readonly<Record<string, { spec: ParamSpec }>>,
   assignments: Readonly<ParamLfoAssignments>,
   ctx: CouplingContext,
+  scratch?: Record<string, number>,
 ): Record<string, number> {
-  const next: Record<string, number> = { ...rawParams };
+  let next: Record<string, number>;
+  if (scratch) {
+    next = scratch;
+    for (const key of Object.keys(rawParams)) next[key] = rawParams[key]!;
+  } else {
+    next = { ...rawParams };
+  }
   for (const [paramId, assignment] of Object.entries(assignments)) {
     const lfoIndex = assignment?.lfoIndex ?? null;
     if (lfoIndex === null) continue;
@@ -135,10 +142,6 @@ export function formatGlobalLfoAmount(amount: number): string {
   return `${Math.round(amount * 100)}%`;
 }
 
-export function morphGlobalLfoValue(
-  current: number,
-  target: number,
-  alpha: number,
-): number {
+export function morphGlobalLfoValue(current: number, target: number, alpha: number): number {
   return lerp(current, target, clamp(alpha, 0, 1));
 }

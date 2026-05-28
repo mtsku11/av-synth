@@ -846,6 +846,11 @@ export class VideoRenderer {
   #sourceBStage: VideoSourceStage | null = null;
   #sourceBTarget: OffscreenTarget | null = null;
   #instances: readonly OperatorInstance[] = [];
+  #instanceScratch = new Map<
+    string,
+    { raw: Record<string, number>; eval: Record<string, number> }
+  >();
+  #sourceScratch: Record<string, number> = {};
   #plan: GraphExecutionPlan = {
     monitorBus: 0 as BusIndex,
     monitorNodeId: null,
@@ -1265,6 +1270,11 @@ export class VideoRenderer {
     this.#source = source;
     this.#sourceParams = params ?? {};
     this.#sourceCoupling = coupling ?? null;
+    if (coupling) {
+      const scratch: Record<string, number> = {};
+      for (const k of Object.keys(coupling.params)) scratch[k] = 0;
+      this.#sourceScratch = scratch;
+    }
     old.dispose(this.gl);
   }
 
@@ -1296,6 +1306,17 @@ export class VideoRenderer {
   setPlan(plan: GraphExecutionPlan): void {
     this.#plan = plan;
     this.#instances = plan.executableInstances;
+    this.#instanceScratch.clear();
+    for (const step of plan.steps) {
+      const keys = Object.keys(step.instance.def.coupling.params);
+      const raw: Record<string, number> = {};
+      const ev: Record<string, number> = {};
+      for (const k of keys) {
+        raw[k] = 0;
+        ev[k] = 0;
+      }
+      this.#instanceScratch.set(step.id, { raw, eval: ev });
+    }
     this.#syncNodeTargets();
   }
 
@@ -1366,8 +1387,12 @@ export class VideoRenderer {
         const r = Math.max(0, Math.min(1, px[0]!));
         const g = Math.max(0, Math.min(1, px[1]!));
         const b = Math.max(0, Math.min(1, px[2]!));
-        sum[0] += r; sum[1] += g; sum[2] += b;
-        sumSq[0] += r * r; sumSq[1] += g * g; sumSq[2] += b * b;
+        sum[0] += r;
+        sum[1] += g;
+        sum[2] += b;
+        sumSq[0] += r * r;
+        sumSq[1] += g * g;
+        sumSq[2] += b * b;
         const luma = 0.299 * r + 0.587 * g + 0.114 * b;
         lumaSum += luma;
         lumaX += luma * nx;
@@ -1383,9 +1408,7 @@ export class VideoRenderer {
       Math.max(0, sumSq[1] / n - mean[1] * mean[1]),
       Math.max(0, sumSq[2] / n - mean[2] * mean[2]),
     ];
-    const center = lumaSum > 1e-6
-      ? { x: lumaX / lumaSum, y: lumaY / lumaSum }
-      : { x: 0.5, y: 0.5 };
+    const center = lumaSum > 1e-6 ? { x: lumaX / lumaSum, y: lumaY / lumaSum } : { x: 0.5, y: 0.5 };
     return { grid: gridSize, mean, variance, centerOfMass: center };
   }
 
@@ -1441,8 +1464,14 @@ export class VideoRenderer {
     this.#deleteTarget(this.#structureAnalysisTarget);
     this.#deleteTarget(this.#motionFieldTarget);
     this.#deleteTarget(this.#prevMotionFieldTarget);
-    if (this.#sourceBStage) { this.#sourceBStage.dispose(gl); this.#sourceBStage = null; }
-    if (this.#sourceBTarget) { this.#deleteTarget(this.#sourceBTarget); this.#sourceBTarget = null; }
+    if (this.#sourceBStage) {
+      this.#sourceBStage.dispose(gl);
+      this.#sourceBStage = null;
+    }
+    if (this.#sourceBTarget) {
+      this.#deleteTarget(this.#sourceBTarget);
+      this.#sourceBTarget = null;
+    }
     this.#deleteTemporalHistory();
     this.#deleteBloomPyramid();
     for (const asset of this.#lutTextures.values()) gl.deleteTexture(asset.texture);
@@ -1475,11 +1504,11 @@ export class VideoRenderer {
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
 
-    const ctxTime = this.#couplingCtx.time > 0 ? this.#couplingCtx.time : t;
-    const ctx: CouplingContext = { ...this.#couplingCtx, time: ctxTime };
+    this.#couplingCtx.time = this.#couplingCtx.time > 0 ? this.#couplingCtx.time : t;
+    const ctx = this.#couplingCtx;
     const feedbackAmount = this.#resolveFeedbackAmount(ctx);
     const sourceParams = this.#sourceCoupling
-      ? evaluateVideoParams(this.#sourceCoupling, this.#sourceParams, ctx)
+      ? evaluateVideoParams(this.#sourceCoupling, this.#sourceParams, ctx, this.#sourceScratch)
       : this.#sourceParams;
 
     this.#syncNodeTargets();
@@ -1515,7 +1544,7 @@ export class VideoRenderer {
       }
 
       const ownedState = instance.def.ownedState
-        ? this.#ownedStateBuffers.get(step.id) ?? null
+        ? (this.#ownedStateBuffers.get(step.id) ?? null)
         : null;
 
       if (ownedState) {
@@ -1563,13 +1592,15 @@ export class VideoRenderer {
         gl.bindTexture(gl.TEXTURE_2D, ownedState.current);
       }
 
+      const stepScratch = this.#instanceScratch.get(step.id);
       const rawParams = applyGlobalLfoAssignments(
         instance.params,
         instance.def.coupling.params,
         instance.lfoAssignments,
         ctx,
+        stepScratch?.raw,
       );
-      const params = evaluateVideoParams(instance.def.coupling, rawParams, ctx);
+      const params = evaluateVideoParams(instance.def.coupling, rawParams, ctx, stepScratch?.eval);
       instance.videoStage.bindRendererResources?.(gl, {
         temporalHistory: {
           textureUnit: 3,
@@ -2157,13 +2188,15 @@ export class VideoRenderer {
     let amount = 0;
     for (const instance of this.#instances) {
       if (instance.def.op !== 'feedback' || isNeutralInstance(instance)) continue;
+      const fbScratch = this.#instanceScratch.get(instance.id);
       const rawParams = applyGlobalLfoAssignments(
         instance.params,
         instance.def.coupling.params,
         instance.lfoAssignments,
         ctx,
+        fbScratch?.raw,
       );
-      const params = evaluateVideoParams(instance.def.coupling, rawParams, ctx);
+      const params = evaluateVideoParams(instance.def.coupling, rawParams, ctx, fbScratch?.eval);
       amount = Math.max(amount, params['feedback'] ?? 0);
     }
     return amount;
