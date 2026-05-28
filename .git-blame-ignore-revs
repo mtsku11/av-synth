@@ -4,3 +4,6 @@
 
 # R1: prettier --write qa/e2e/** (2026-05-28)
 d0038df
+
+# format: prettier --write across remaining committed files (2026-05-28)
+92a9cde6a49575fad7e134f51df4297d88a88743
