@@ -58,7 +58,17 @@ class PolarRippleVideoStage implements VideoStage {
 
 export const polarRippleDef: OperatorDef = {
   op: 'polarRipple',
-  paramOrder: ['mix', 'amplitude', 'frequency', 'phase', 'falloff', 'centerX', 'centerY', 'drift', 'advect'],
+  paramOrder: [
+    'mix',
+    'amplitude',
+    'frequency',
+    'phase',
+    'falloff',
+    'centerX',
+    'centerY',
+    'drift',
+    'advect',
+  ],
   defaults: {
     mix: 0,
     amplitude: 0.08,

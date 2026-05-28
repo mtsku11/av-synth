@@ -61,7 +61,18 @@ class MagneticDipoleVideoStage implements VideoStage {
 
 export const magneticDipoleDef: OperatorDef = {
   op: 'magneticDipole',
-  paramOrder: ['mix', 'strength', 'separation', 'angle', 'falloff', 'centerX', 'centerY', 'balance', 'drift', 'advect'],
+  paramOrder: [
+    'mix',
+    'strength',
+    'separation',
+    'angle',
+    'falloff',
+    'centerX',
+    'centerY',
+    'balance',
+    'drift',
+    'advect',
+  ],
   defaults: {
     mix: 0,
     strength: 0.18,

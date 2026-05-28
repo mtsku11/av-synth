@@ -163,22 +163,64 @@ const SPECS: Readonly<Record<GranulatorSliderParam, GranulatorParamMeta>> = {
     spec: { id: 'mix', label: 'mix', range: [0, 1], default: 1, curve: 'lin', unit: 'norm' },
   },
   fmAmount: {
-    spec: { id: 'fmAmount', label: 'fm amount', range: [0, 48], default: 0, curve: 'lin', unit: 'cents' },
+    spec: {
+      id: 'fmAmount',
+      label: 'fm amount',
+      range: [0, 48],
+      default: 0,
+      curve: 'lin',
+      unit: 'cents',
+    },
   },
   fmFreq: {
-    spec: { id: 'fmFreq', label: 'fm freq', range: [0.1, 500], default: 10, curve: 'lin', unit: 'hz' },
+    spec: {
+      id: 'fmFreq',
+      label: 'fm freq',
+      range: [0.1, 500],
+      default: 10,
+      curve: 'lin',
+      unit: 'hz',
+    },
   },
   envAttack: {
-    spec: { id: 'envAttack', label: 'attack', range: [1, 10000], default: 10, curve: 'lin', unit: 'ms' },
+    spec: {
+      id: 'envAttack',
+      label: 'attack',
+      range: [1, 10000],
+      default: 10,
+      curve: 'lin',
+      unit: 'ms',
+    },
   },
   envDecay: {
-    spec: { id: 'envDecay', label: 'decay', range: [1, 10000], default: 100, curve: 'lin', unit: 'ms' },
+    spec: {
+      id: 'envDecay',
+      label: 'decay',
+      range: [1, 10000],
+      default: 100,
+      curve: 'lin',
+      unit: 'ms',
+    },
   },
   envSustain: {
-    spec: { id: 'envSustain', label: 'sustain', range: [0, 1], default: 1.0, curve: 'lin', unit: 'norm' },
+    spec: {
+      id: 'envSustain',
+      label: 'sustain',
+      range: [0, 1],
+      default: 1.0,
+      curve: 'lin',
+      unit: 'norm',
+    },
   },
   envRelease: {
-    spec: { id: 'envRelease', label: 'release', range: [1, 20000], default: 300, curve: 'lin', unit: 'ms' },
+    spec: {
+      id: 'envRelease',
+      label: 'release',
+      range: [1, 20000],
+      default: 300,
+      curve: 'lin',
+      unit: 'ms',
+    },
   },
 };
 

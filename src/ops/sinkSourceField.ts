@@ -58,7 +58,17 @@ class SinkSourceFieldVideoStage implements VideoStage {
 
 export const sinkSourceFieldDef: OperatorDef = {
   op: 'sinkSourceField',
-  paramOrder: ['mix', 'strength', 'radius', 'falloff', 'centerX', 'centerY', 'spin', 'drift', 'advect'],
+  paramOrder: [
+    'mix',
+    'strength',
+    'radius',
+    'falloff',
+    'centerX',
+    'centerY',
+    'spin',
+    'drift',
+    'advect',
+  ],
   defaults: {
     mix: 0,
     strength: 0.25,

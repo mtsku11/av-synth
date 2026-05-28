@@ -97,9 +97,7 @@ export function planGrainBuffer(input: GrainBufferPlanInput): GrainBufferPlanRes
   if (bytes > GRAIN_BUFFER_MAX_BYTES) {
     const mb = (bytes / (1024 * 1024)).toFixed(0);
     const capMb = (GRAIN_BUFFER_MAX_BYTES / (1024 * 1024)).toFixed(0);
-    const secondsAtCap = Math.floor(
-      GRAIN_BUFFER_MAX_BYTES / Math.max(1, width * height * 4 * fps),
-    );
+    const secondsAtCap = Math.floor(GRAIN_BUFFER_MAX_BYTES / Math.max(1, width * height * 4 * fps));
     return {
       ok: false,
       reason:
@@ -201,14 +199,7 @@ export class GrainBuffer {
       throw new Error('grain-buffer: already allocated; create a new GrainBuffer instead');
     }
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texture);
-    gl.texStorage3D(
-      gl.TEXTURE_2D_ARRAY,
-      1,
-      gl.RGBA8,
-      plan.width,
-      plan.height,
-      plan.frameCount,
-    );
+    gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, plan.width, plan.height, plan.frameCount);
     this.#width = plan.width;
     this.#height = plan.height;
     this.#frameCount = plan.frameCount;

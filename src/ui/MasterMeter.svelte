@@ -132,14 +132,7 @@
     top: 0;
     left: 0;
     bottom: 0;
-    background: linear-gradient(
-      to right,
-      #2a6 0%,
-      #2a6 70%,
-      #cc4 85%,
-      #d62 95%,
-      #e44 100%
-    );
+    background: linear-gradient(to right, #2a6 0%, #2a6 70%, #cc4 85%, #d62 95%, #e44 100%);
     background-size: 142.857% 100%; /* stretch gradient so colour anchors at -30/-9/-3/0 dBFS */
     background-position: left center;
     transition: width 40ms linear;

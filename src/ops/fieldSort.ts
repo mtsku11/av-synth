@@ -17,15 +17,15 @@ class FieldSortVideoStage implements VideoStage {
   #frame = 0;
 
   constructor(gl: WebGL2RenderingContext) {
-    this.program    = compileProgram(gl, frag, 'fieldSort');
-    this.#uTex          = reqUniform(gl, this.program, 'u_tex',           'fieldSort');
-    this.#uPrev         = reqUniform(gl, this.program, 'u_prev_frame',    'fieldSort');
-    this.#uMix          = reqUniform(gl, this.program, 'u_mix',           'fieldSort');
-    this.#uThreshold    = reqUniform(gl, this.program, 'u_threshold',     'fieldSort');
-    this.#uAngle        = reqUniform(gl, this.program, 'u_angle',         'fieldSort');
-    this.#uBands        = reqUniform(gl, this.program, 'u_bands',         'fieldSort');
-    this.#uSpeed        = reqUniform(gl, this.program, 'u_speed',         'fieldSort');
-    this.#uFrameParity  = reqUniform(gl, this.program, 'u_frame_parity',  'fieldSort');
+    this.program = compileProgram(gl, frag, 'fieldSort');
+    this.#uTex = reqUniform(gl, this.program, 'u_tex', 'fieldSort');
+    this.#uPrev = reqUniform(gl, this.program, 'u_prev_frame', 'fieldSort');
+    this.#uMix = reqUniform(gl, this.program, 'u_mix', 'fieldSort');
+    this.#uThreshold = reqUniform(gl, this.program, 'u_threshold', 'fieldSort');
+    this.#uAngle = reqUniform(gl, this.program, 'u_angle', 'fieldSort');
+    this.#uBands = reqUniform(gl, this.program, 'u_bands', 'fieldSort');
+    this.#uSpeed = reqUniform(gl, this.program, 'u_speed', 'fieldSort');
+    this.#uFrameParity = reqUniform(gl, this.program, 'u_frame_parity', 'fieldSort');
   }
 
   setUniforms(
@@ -33,13 +33,13 @@ class FieldSortVideoStage implements VideoStage {
     params: Readonly<Record<string, number>>,
     _ctx: CouplingContext,
   ): void {
-    gl.uniform1i(this.#uTex,         0);
-    gl.uniform1i(this.#uPrev,        1);
-    gl.uniform1f(this.#uMix,         params['mix']       ?? 0);
-    gl.uniform1f(this.#uThreshold,   params['threshold'] ?? 0.15);
-    gl.uniform1f(this.#uAngle,       params['angle']     ?? 0.125);   // default: 45° diagonal
-    gl.uniform1f(this.#uBands,       Math.max(1, params['bands'] ?? 5));
-    gl.uniform1f(this.#uSpeed,       Math.max(1, params['speed'] ?? 1));
+    gl.uniform1i(this.#uTex, 0);
+    gl.uniform1i(this.#uPrev, 1);
+    gl.uniform1f(this.#uMix, params['mix'] ?? 0);
+    gl.uniform1f(this.#uThreshold, params['threshold'] ?? 0.15);
+    gl.uniform1f(this.#uAngle, params['angle'] ?? 0.125); // default: 45° diagonal
+    gl.uniform1f(this.#uBands, Math.max(1, params['bands'] ?? 5));
+    gl.uniform1f(this.#uSpeed, Math.max(1, params['speed'] ?? 1));
     gl.uniform1f(this.#uFrameParity, this.#frame % 2);
     this.#frame++;
   }

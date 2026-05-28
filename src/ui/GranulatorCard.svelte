@@ -7,14 +7,14 @@
     GranulatorQuality,
     GranulatorRuntimeSnapshot,
   } from '../audio/granulator';
-  import { GRANULATOR_ENVELOPES, GRANULATOR_MODES, GRANULATOR_QUALITIES } from '../audio/granulator';
+  import {
+    GRANULATOR_ENVELOPES,
+    GRANULATOR_MODES,
+    GRANULATOR_QUALITIES,
+  } from '../audio/granulator';
   import { GRANULATOR_SLIDER_ORDER, type GranulatorSliderParam } from '../audio/granulator-params';
   import type { MidiBinding, MidiRouter } from '../core/midi';
-  import {
-    listGlobalLfoOptions,
-    type GlobalLfo,
-    type ParamLfoAssignments,
-  } from '../core/mod-bank';
+  import { listGlobalLfoOptions, type GlobalLfo, type ParamLfoAssignments } from '../core/mod-bank';
 
   interface Props {
     granulator: Granulator | null;
@@ -72,26 +72,26 @@
   // ordering and parameter names are sourced from the canonical GRANULATOR_SLIDER_ORDER
   // in granulator-params.ts.
   const SLIDER_DISPLAY: Readonly<Record<GranulatorSliderParam, Omit<ControlSpec, 'name'>>> = {
-    position:           { label: 'position',     min: 0,    max: 1,    step: 0.001, unit: '0–1' },
-    positionJitter:     { label: 'pos jitter',   min: 0,    max: 1,    step: 0.001, unit: '0–1' },
-    pitch:              { label: 'pitch',        min: -48,  max: 48,   step: 0.01,  unit: 'st' },
-    pitchJitter:        { label: 'pitch jitter', min: 0,    max: 24,   step: 0.01,  unit: 'st' },
-    duration:           { label: 'duration',     min: 5,    max: 2000, step: 1,     unit: 'ms' },
-    durationJitter:     { label: 'dur jitter',   min: 0,    max: 1,    step: 0.001, unit: '0–1' },
-    density:            { label: 'density',      min: 0.1,  max: 200,  step: 0.1,   unit: 'Hz' },
-    distribution:       { label: 'distribution', min: 0,    max: 1,    step: 0.001, unit: '0–1' },
-    panSpread:          { label: 'pan spread',   min: 0,    max: 1,    step: 0.001, unit: '0–1' },
-    ySpread:            { label: 'y spread',     min: 0,    max: 1,    step: 0.001, unit: '0–1' },
-    reverseProbability: { label: 'reverse p',    min: 0,    max: 1,    step: 0.001, unit: '0–1' },
-    voiceCount:         { label: 'voices',       min: 1,    max: 64,   step: 1,     unit: '' },
-    gain:               { label: 'gain',         min: 0,    max: 1,    step: 0.001, unit: '0–1' },
-    mix:                { label: 'mix',          min: 0,    max: 1,    step: 0.001, unit: '0–1' },
-    fmAmount:           { label: 'fm amount',    min: 0,    max: 48,   step: 0.01,  unit: 'st' },
-    fmFreq:             { label: 'fm freq',      min: 0.1,  max: 500,  step: 0.1,   unit: 'Hz' },
-    envAttack:          { label: 'attack',       min: 1,    max: 10000, step: 1,    unit: 'ms' },
-    envDecay:           { label: 'decay',        min: 1,    max: 10000, step: 1,    unit: 'ms' },
-    envSustain:         { label: 'sustain',      min: 0,    max: 1,    step: 0.001, unit: '0–1' },
-    envRelease:         { label: 'release',      min: 1,    max: 20000, step: 1,    unit: 'ms' },
+    position: { label: 'position', min: 0, max: 1, step: 0.001, unit: '0–1' },
+    positionJitter: { label: 'pos jitter', min: 0, max: 1, step: 0.001, unit: '0–1' },
+    pitch: { label: 'pitch', min: -48, max: 48, step: 0.01, unit: 'st' },
+    pitchJitter: { label: 'pitch jitter', min: 0, max: 24, step: 0.01, unit: 'st' },
+    duration: { label: 'duration', min: 5, max: 2000, step: 1, unit: 'ms' },
+    durationJitter: { label: 'dur jitter', min: 0, max: 1, step: 0.001, unit: '0–1' },
+    density: { label: 'density', min: 0.1, max: 200, step: 0.1, unit: 'Hz' },
+    distribution: { label: 'distribution', min: 0, max: 1, step: 0.001, unit: '0–1' },
+    panSpread: { label: 'pan spread', min: 0, max: 1, step: 0.001, unit: '0–1' },
+    ySpread: { label: 'y spread', min: 0, max: 1, step: 0.001, unit: '0–1' },
+    reverseProbability: { label: 'reverse p', min: 0, max: 1, step: 0.001, unit: '0–1' },
+    voiceCount: { label: 'voices', min: 1, max: 64, step: 1, unit: '' },
+    gain: { label: 'gain', min: 0, max: 1, step: 0.001, unit: '0–1' },
+    mix: { label: 'mix', min: 0, max: 1, step: 0.001, unit: '0–1' },
+    fmAmount: { label: 'fm amount', min: 0, max: 48, step: 0.01, unit: 'st' },
+    fmFreq: { label: 'fm freq', min: 0.1, max: 500, step: 0.1, unit: 'Hz' },
+    envAttack: { label: 'attack', min: 1, max: 10000, step: 1, unit: 'ms' },
+    envDecay: { label: 'decay', min: 1, max: 10000, step: 1, unit: 'ms' },
+    envSustain: { label: 'sustain', min: 0, max: 1, step: 0.001, unit: '0–1' },
+    envRelease: { label: 'release', min: 1, max: 20000, step: 1, unit: 'ms' },
   };
 
   const SLIDERS: readonly ControlSpec[] = GRANULATOR_SLIDER_ORDER.map((name) => ({
@@ -107,7 +107,10 @@
 
   const lfoOptions = $derived(listGlobalLfoOptions(lfoBank));
 
-  async function startLearn(param: GranulatorParamName, range: { min: number; max: number }): Promise<void> {
+  async function startLearn(
+    param: GranulatorParamName,
+    range: { min: number; max: number },
+  ): Promise<void> {
     if (!midiRouter) return;
     if (learningParam === param) {
       midiRouter.cancelLearn();
@@ -138,10 +141,14 @@
     const s = b.source;
     const ch = s.channel === 'any' ? 'any' : `ch${s.channel}`;
     switch (s.kind) {
-      case 'cc': return `CC${s.controller} ${ch}`;
-      case 'pitchBend': return `PB ${ch}`;
-      case 'channelPressure': return `AT ${ch}`;
-      case 'noteVelocity': return `vel ${ch}`;
+      case 'cc':
+        return `CC${s.controller} ${ch}`;
+      case 'pitchBend':
+        return `PB ${ch}`;
+      case 'channelPressure':
+        return `AT ${ch}`;
+      case 'noteVelocity':
+        return `vel ${ch}`;
     }
   }
 
@@ -271,7 +278,9 @@
     </div>
     <div class="diag-row">
       <span class="diag-label">pitch load</span>
-      <span class="diag-value">{runtimeSnapshot ? runtimeSnapshot.pitchLoad.toFixed(1) : 'n/a'}</span>
+      <span class="diag-value"
+        >{runtimeSnapshot ? runtimeSnapshot.pitchLoad.toFixed(1) : 'n/a'}</span
+      >
     </div>
   </section>
 
@@ -286,15 +295,21 @@
           max={ctrl.max}
           step={ctrl.step}
           value={values[ctrl.name]}
-          oninput={(e) => onSetParam(ctrl.name, Number((e.currentTarget as HTMLInputElement).value))}
+          oninput={(e) =>
+            onSetParam(ctrl.name, Number((e.currentTarget as HTMLInputElement).value))}
           disabled={!granulator}
           data-qa={`gran-${ctrl.name}`}
         />
-        <span class="slider-value">{(values[ctrl.name] ?? 0).toFixed(ctrl.step < 1 ? 3 : 0)}{ctrl.unit ? ` ${ctrl.unit}` : ''}</span>
+        <span class="slider-value"
+          >{(values[ctrl.name] ?? 0).toFixed(ctrl.step < 1 ? 3 : 0)}{ctrl.unit
+            ? ` ${ctrl.unit}`
+            : ''}</span
+        >
         <label class="lfo-select">
           <span class="visually-hidden">lfo</span>
           <select
-            value={lfoAssignments[ctrl.name]?.lfoIndex === null || lfoAssignments[ctrl.name]?.lfoIndex === undefined
+            value={lfoAssignments[ctrl.name]?.lfoIndex === null ||
+            lfoAssignments[ctrl.name]?.lfoIndex === undefined
               ? ''
               : String(lfoAssignments[ctrl.name]?.lfoIndex)}
             onchange={(event) => {
@@ -321,7 +336,9 @@
               : startLearn(ctrl.name, { min: ctrl.min, max: ctrl.max })}
           data-qa={`gran-learn-${ctrl.name}`}
         >
-          {learningParam === ctrl.name ? 'waiting…' : bindingLabel(bindingsByParam[ctrl.name] ?? null)}
+          {learningParam === ctrl.name
+            ? 'waiting…'
+            : bindingLabel(bindingsByParam[ctrl.name] ?? null)}
         </button>
       </div>
     {/each}
@@ -512,7 +529,12 @@
     color: #e8f6f0;
   }
   @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
   }
 </style>

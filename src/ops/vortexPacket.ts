@@ -28,7 +28,12 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-function seedBand(count: number, seed: number, strengthMin: number, strengthMax: number): Float32Array {
+function seedBand(
+  count: number,
+  seed: number,
+  strengthMin: number,
+  strengthMax: number,
+): Float32Array {
   const data = new Float32Array(count * 3);
   const rand = mulberry32(seed);
   for (let i = 0; i < count; i++) {
@@ -169,7 +174,15 @@ class VortexPacketVideoStage implements VideoStage {
 
 export const vortexPacketDef: OperatorDef = {
   op: 'vortexPacket',
-  paramOrder: ['mix', 'strength', 'drift', 'macroBalance', 'macroSoftness', 'microSoftness', 'advect'],
+  paramOrder: [
+    'mix',
+    'strength',
+    'drift',
+    'macroBalance',
+    'macroSoftness',
+    'microSoftness',
+    'advect',
+  ],
   defaults: {
     mix: 0,
     strength: 0.22,

@@ -12,11 +12,11 @@ class SourceBlendVideoStage implements VideoStage {
   #uMode: WebGLUniformLocation;
 
   constructor(gl: WebGL2RenderingContext) {
-    this.program   = compileProgram(gl, frag, 'sourceBlend');
-    this.#uTex     = reqUniform(gl, this.program, 'u_tex',      'sourceBlend');
+    this.program = compileProgram(gl, frag, 'sourceBlend');
+    this.#uTex = reqUniform(gl, this.program, 'u_tex', 'sourceBlend');
     this.#uSourceB = reqUniform(gl, this.program, 'u_source_b', 'sourceBlend');
-    this.#uMix     = reqUniform(gl, this.program, 'u_mix',      'sourceBlend');
-    this.#uMode    = reqUniform(gl, this.program, 'u_mode',     'sourceBlend');
+    this.#uMix = reqUniform(gl, this.program, 'u_mix', 'sourceBlend');
+    this.#uMode = reqUniform(gl, this.program, 'u_mode', 'sourceBlend');
   }
 
   setUniforms(
@@ -24,10 +24,10 @@ class SourceBlendVideoStage implements VideoStage {
     params: Readonly<Record<string, number>>,
     _ctx: CouplingContext,
   ): void {
-    gl.uniform1i(this.#uTex,     0);
+    gl.uniform1i(this.#uTex, 0);
     gl.uniform1i(this.#uSourceB, 8);
-    gl.uniform1f(this.#uMix,     params['mix']  ?? 0);
-    gl.uniform1f(this.#uMode,    Math.round(params['mode'] ?? 0));
+    gl.uniform1f(this.#uMix, params['mix'] ?? 0);
+    gl.uniform1f(this.#uMode, Math.round(params['mode'] ?? 0));
   }
 
   dispose(gl: WebGL2RenderingContext): void {

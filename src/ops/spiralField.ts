@@ -58,7 +58,17 @@ class SpiralFieldVideoStage implements VideoStage {
 
 export const spiralFieldDef: OperatorDef = {
   op: 'spiralField',
-  paramOrder: ['mix', 'twist', 'radius', 'falloff', 'centerX', 'centerY', 'phase', 'drift', 'advect'],
+  paramOrder: [
+    'mix',
+    'twist',
+    'radius',
+    'falloff',
+    'centerX',
+    'centerY',
+    'phase',
+    'drift',
+    'advect',
+  ],
   defaults: {
     mix: 0,
     twist: 1.0,

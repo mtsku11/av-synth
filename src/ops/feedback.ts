@@ -29,10 +29,7 @@ class FeedbackVideoStage implements VideoStage {
     this.#uChromaDrift = reqUniform(gl, this.program, 'u_chroma_drift', 'feedback');
   }
 
-  bindRendererResources(
-    gl: WebGL2RenderingContext,
-    resources: VideoStageRendererResources,
-  ): void {
+  bindRendererResources(gl: WebGL2RenderingContext, resources: VideoStageRendererResources): void {
     gl.uniform1i(this.#uMotion, resources.motionField?.textureUnit ?? 5);
   }
 

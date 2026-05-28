@@ -15,12 +15,12 @@ class PixelSortVideoStage implements VideoStage {
 
   constructor(gl: WebGL2RenderingContext) {
     this.program = compileProgram(gl, frag, 'pixelSort');
-    this.#uTex       = reqUniform(gl, this.program, 'u_tex',       'pixelSort');
-    this.#uPrev      = reqUniform(gl, this.program, 'u_prev_frame','pixelSort');
-    this.#uMix       = reqUniform(gl, this.program, 'u_mix',       'pixelSort');
+    this.#uTex = reqUniform(gl, this.program, 'u_tex', 'pixelSort');
+    this.#uPrev = reqUniform(gl, this.program, 'u_prev_frame', 'pixelSort');
+    this.#uMix = reqUniform(gl, this.program, 'u_mix', 'pixelSort');
     this.#uThreshold = reqUniform(gl, this.program, 'u_threshold', 'pixelSort');
     this.#uDirection = reqUniform(gl, this.program, 'u_direction', 'pixelSort');
-    this.#uSpeed     = reqUniform(gl, this.program, 'u_speed',     'pixelSort');
+    this.#uSpeed = reqUniform(gl, this.program, 'u_speed', 'pixelSort');
   }
 
   setUniforms(
@@ -28,12 +28,12 @@ class PixelSortVideoStage implements VideoStage {
     params: Readonly<Record<string, number>>,
     _ctx: CouplingContext,
   ): void {
-    gl.uniform1i(this.#uTex,       0);
-    gl.uniform1i(this.#uPrev,      1);
-    gl.uniform1f(this.#uMix,       params['mix']       ?? 0);
+    gl.uniform1i(this.#uTex, 0);
+    gl.uniform1i(this.#uPrev, 1);
+    gl.uniform1f(this.#uMix, params['mix'] ?? 0);
     gl.uniform1f(this.#uThreshold, params['threshold'] ?? 0.3);
     gl.uniform1f(this.#uDirection, params['direction'] ?? 0);
-    gl.uniform1f(this.#uSpeed,     Math.max(1, params['speed'] ?? 2));
+    gl.uniform1f(this.#uSpeed, Math.max(1, params['speed'] ?? 2));
   }
 
   dispose(gl: WebGL2RenderingContext): void {

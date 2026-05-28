@@ -312,10 +312,7 @@ export function buildPatchNodeViews(
     const currentPrimary = node.inputs[0] ? nodeById.get(node.inputs[0]) : null;
     const sourceOptions: PatchInputOption[] = [{ id: SOURCE_NODE_ID, label: 'source' }];
     if (sourceBPresent) sourceOptions.push({ id: SOURCE_B_NODE_ID, label: 'sourceB' });
-    const primaryInputOptions: PatchInputOption[] = [
-      ...sourceOptions,
-      ...busReturnOptions,
-    ];
+    const primaryInputOptions: PatchInputOption[] = [...sourceOptions, ...busReturnOptions];
     if (
       currentPrimary &&
       !selectableNodes.some((candidate) => candidate.id === currentPrimary.id)

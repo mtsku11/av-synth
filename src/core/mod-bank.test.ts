@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_VIDEO_FEATURES } from './coupling';
-import {
-  applyGlobalLfoAssignments,
-  createDefaultGlobalLfoBank,
-  sampleGlobalLfo,
-} from './mod-bank';
+import { applyGlobalLfoAssignments, createDefaultGlobalLfoBank, sampleGlobalLfo } from './mod-bank';
 
 describe('global lfo bank', () => {
   it('creates six public lfos with stable labels', () => {

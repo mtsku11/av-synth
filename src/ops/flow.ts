@@ -37,7 +37,8 @@ class FlowVideoStage implements VideoStage {
 
   bindRendererResources(gl: WebGL2RenderingContext, resources: VideoStageRendererResources): void {
     const stageResolution = resources.temporalHistory ?? resources.structureAnalysis;
-    if (stageResolution) gl.uniform2f(this.#uResolution, stageResolution.width, stageResolution.height);
+    if (stageResolution)
+      gl.uniform2f(this.#uResolution, stageResolution.width, stageResolution.height);
     else gl.uniform2f(this.#uResolution, 1, 1);
 
     const motion = resources.motionField;

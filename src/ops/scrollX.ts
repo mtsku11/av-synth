@@ -6,7 +6,13 @@
 // delay time and reading like unintended vibrato.
 
 import frag from '../video/shaders/scrollX.frag?raw';
-import { createVideoOperatorDef, paramUniform, passthroughParam, PRIMARY_SOURCE_UNIFORM, TIME_UNIFORM } from './shared';
+import {
+  createVideoOperatorDef,
+  paramUniform,
+  passthroughParam,
+  PRIMARY_SOURCE_UNIFORM,
+  TIME_UNIFORM,
+} from './shared';
 
 export const scrollXDef = createVideoOperatorDef({
   op: 'scrollX',

@@ -213,7 +213,8 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
   },
   fieldSort: {
     family: 'Feedback',
-    blurb: 'vector-field pixel sort — diagonal odd-even transposition sort with parametric angle and banding',
+    blurb:
+      'vector-field pixel sort — diagonal odd-even transposition sort with parametric angle and banding',
     intents: ['feedback', 'glitch', 'video texture'],
     coreParams: ['mix', 'threshold', 'angle', 'bands', 'speed'],
   },
@@ -593,7 +594,8 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
   },
   sourceBlend: {
     family: 'Blend/Composite',
-    blurb: 'composite Source B (second loaded video) over the chain — over, add, multiply, or screen',
+    blurb:
+      'composite Source B (second loaded video) over the chain — over, add, multiply, or screen',
     intents: ['composite', 'multi-source', 'blend'],
     coreParams: ['mix', 'mode'],
   },

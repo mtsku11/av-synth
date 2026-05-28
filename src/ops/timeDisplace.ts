@@ -30,13 +30,15 @@ class TimeDisplaceVideoStage implements VideoStage {
     this.#uDecay = reqUniform(gl, this.program, 'u_decay', 'timeDisplace');
     this.#uHistoryCapacity = reqUniform(gl, this.program, 'u_history_capacity', 'timeDisplace');
     this.#uHistoryValid = reqUniform(gl, this.program, 'u_history_valid', 'timeDisplace');
-    this.#uHistoryWriteIndex = reqUniform(gl, this.program, 'u_history_write_index', 'timeDisplace');
+    this.#uHistoryWriteIndex = reqUniform(
+      gl,
+      this.program,
+      'u_history_write_index',
+      'timeDisplace',
+    );
   }
 
-  bindRendererResources(
-    gl: WebGL2RenderingContext,
-    resources: VideoStageRendererResources,
-  ): void {
+  bindRendererResources(gl: WebGL2RenderingContext, resources: VideoStageRendererResources): void {
     const temporal = resources.temporalHistory;
     if (temporal) {
       gl.uniform1i(this.#uHistoryTex, temporal.textureUnit);

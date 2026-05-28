@@ -273,7 +273,12 @@ export function applyBinding(binding: MidiBinding, msg: MidiMessage): number | n
 export function defaultMpeBindings(): readonly MidiBinding[] {
   return [
     { param: 'density', source: { kind: 'channelPressure', channel: 'any' }, min: 20, max: 200 },
-    { param: 'positionJitter', source: { kind: 'cc', channel: 'any', controller: 74 }, min: 0, max: 1 },
+    {
+      param: 'positionJitter',
+      source: { kind: 'cc', channel: 'any', controller: 74 },
+      min: 0,
+      max: 1,
+    },
   ];
 }
 
@@ -329,7 +334,7 @@ export class MidiRouter {
     // AudioParam + sustained `gain` envelope.
     if (msg.type === 'noteOn') {
       const baseSt = semitonesFromRoot(msg.note, this.#rootNote);
-      const bend = this.#mpeEnabled ? this.#mpe.get(msg.channel)?.pitchBend ?? 0 : 0;
+      const bend = this.#mpeEnabled ? (this.#mpe.get(msg.channel)?.pitchBend ?? 0) : 0;
       const pitchSt = baseSt + bend * this.#pbRangeSt;
       if (this.#sink.triggerNoteOn) {
         // Triggered mode: one immediate grain with baked per-grain velocity. The
@@ -392,10 +397,7 @@ export class MidiRouter {
     }
   }
 
-  learn(
-    param: GranulatorParamName,
-    range: { min: number; max: number },
-  ): Promise<MidiBinding> {
+  learn(param: GranulatorParamName, range: { min: number; max: number }): Promise<MidiBinding> {
     this.#pendingLearnParam = param;
     this.#pendingLearnRange = { ...range };
     return new Promise<MidiBinding>((resolve) => {
@@ -468,11 +470,7 @@ export interface WebMidiDevice {
   readonly name: string;
 }
 
-export type RawMidiHandler = (
-  bytes: Uint8Array,
-  deviceName: string,
-  timeStamp: number,
-) => void;
+export type RawMidiHandler = (bytes: Uint8Array, deviceName: string, timeStamp: number) => void;
 
 interface MIDIAccessLike {
   inputs: { values(): IterableIterator<MIDIInputLike> };

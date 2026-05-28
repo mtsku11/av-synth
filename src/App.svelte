@@ -83,7 +83,11 @@
     type VideoEffectProgram,
     type VideoEffectRenderStyle,
   } from './core/presets';
-  import { buildPatchNodeViews, compileGraphExecution, orderInstancesByGraph } from './core/patch-chain';
+  import {
+    buildPatchNodeViews,
+    compileGraphExecution,
+    orderInstancesByGraph,
+  } from './core/patch-chain';
   import { BLEND_OPS } from './ops/blend';
   import FeedbackDelayCard from './ui/FeedbackDelayCard.svelte';
   import GranulatorCard from './ui/GranulatorCard.svelte';
@@ -152,8 +156,21 @@
   let midiUnavailableReason = $state<string | null>(null);
   let selectedMidiSource = $state<string>('all');
   const KEY_TO_NOTE: Readonly<Record<string, number>> = {
-    a: 60, w: 61, s: 62, e: 63, d: 64, f: 65, t: 66,
-    g: 67, y: 68, h: 69, u: 70, j: 71, k: 72, o: 73, l: 74,
+    a: 60,
+    w: 61,
+    s: 62,
+    e: 63,
+    d: 64,
+    f: 65,
+    t: 66,
+    g: 67,
+    y: 68,
+    h: 69,
+    u: 70,
+    j: 71,
+    k: 72,
+    o: 73,
+    l: 74,
   };
   const heldKeys = new Set<string>();
   let grainBuffer: GrainBuffer | null = null;
@@ -2431,8 +2448,14 @@
     videoElB.muted = true;
     videoElB.preload = 'auto';
     await new Promise<void>((resolve) => {
-      const onReady = () => { videoElB!.removeEventListener('loadeddata', onReady); resolve(); };
-      if (videoElB!.readyState >= 2) { resolve(); return; }
+      const onReady = () => {
+        videoElB!.removeEventListener('loadeddata', onReady);
+        resolve();
+      };
+      if (videoElB!.readyState >= 2) {
+        resolve();
+        return;
+      }
       videoElB!.addEventListener('loadeddata', onReady);
     });
     void videoElB.play().catch(() => {});
@@ -2443,8 +2466,13 @@
   function clearSourceB(): void {
     if (!renderer) return;
     renderer.setSourceB(null);
-    if (videoElB) { videoElB.src = ''; }
-    if (sourceBObjectUrl) { URL.revokeObjectURL(sourceBObjectUrl); sourceBObjectUrl = null; }
+    if (videoElB) {
+      videoElB.src = '';
+    }
+    if (sourceBObjectUrl) {
+      URL.revokeObjectURL(sourceBObjectUrl);
+      sourceBObjectUrl = null;
+    }
     sourceBLoaded = false;
     loadedVideoBName = null;
   }
@@ -2452,7 +2480,12 @@
   function onKeyDown(e: KeyboardEvent): void {
     if (e.repeat) return;
     const t = e.target;
-    if (t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement) return;
+    if (
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLSelectElement ||
+      t instanceof HTMLTextAreaElement
+    )
+      return;
     if (selectedMidiSource !== 'all' && selectedMidiSource !== 'keyboard') return;
     const note = KEY_TO_NOTE[e.key.toLowerCase()];
     if (note === undefined) return;
@@ -2497,8 +2530,7 @@
                   : `monitor bus ${bus}`}
             >
               o{bus}{#if sourceBLoaded && bus === 0}<span class="bus-source">·A</span
-                >{:else if sourceBLoaded && bus === 1}<span class="bus-source">·B</span
-                >{/if}
+                >{:else if sourceBLoaded && bus === 1}<span class="bus-source">·B</span>{/if}
             </button>
           {/each}
         </div>
@@ -2567,12 +2599,15 @@
         </span>
         <label class="file source-file">
           load source B
-          <input data-qa="source-b-file-input" type="file" accept="video/*" onchange={onSourceBChange} />
+          <input
+            data-qa="source-b-file-input"
+            type="file"
+            accept="video/*"
+            onchange={onSourceBChange}
+          />
         </label>
         {#if sourceBLoaded}
-          <button class="source-kind-button" type="button" onclick={clearSourceB}>
-            clear B
-          </button>
+          <button class="source-kind-button" type="button" onclick={clearSourceB}> clear B </button>
         {/if}
       </div>
       {#if grainSourceMessage}
@@ -2604,7 +2639,9 @@
           class="midi-source-select"
           data-qa="midi-source-select"
           value={selectedMidiSource}
-          onchange={(e) => { selectedMidiSource = (e.currentTarget as HTMLSelectElement).value; }}
+          onchange={(e) => {
+            selectedMidiSource = (e.currentTarget as HTMLSelectElement).value;
+          }}
           disabled={!!midiUnavailableReason}
         >
           <option value="all">all devices</option>

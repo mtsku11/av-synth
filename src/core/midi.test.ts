@@ -200,8 +200,12 @@ describe('applyBinding', () => {
 
   it('respects an explicit channel filter', () => {
     const b: MidiBinding = { ...ccBind, source: { kind: 'cc', channel: 2, controller: 74 } };
-    expect(applyBinding(b, { type: 'controlChange', channel: 1, controller: 74, value: 1 })).toBeNull();
-    expect(applyBinding(b, { type: 'controlChange', channel: 2, controller: 74, value: 1 })).toBe(1);
+    expect(
+      applyBinding(b, { type: 'controlChange', channel: 1, controller: 74, value: 1 }),
+    ).toBeNull();
+    expect(applyBinding(b, { type: 'controlChange', channel: 2, controller: 74, value: 1 })).toBe(
+      1,
+    );
   });
 
   it('maps pitchBend to 0..1 then to range', () => {

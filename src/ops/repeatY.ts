@@ -3,7 +3,12 @@
 // than an abstract repetition texture.
 
 import frag from '../video/shaders/repeatY.frag?raw';
-import { createVideoOperatorDef, paramUniform, passthroughParam, PRIMARY_SOURCE_UNIFORM } from './shared';
+import {
+  createVideoOperatorDef,
+  paramUniform,
+  passthroughParam,
+  PRIMARY_SOURCE_UNIFORM,
+} from './shared';
 
 export const repeatYDef = createVideoOperatorDef({
   op: 'repeatY',

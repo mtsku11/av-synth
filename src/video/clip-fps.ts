@@ -1,13 +1,4 @@
-const COMMON_VIDEO_FPS = [
-  23.976,
-  24,
-  25,
-  29.97,
-  30,
-  50,
-  59.94,
-  60,
-] as const;
+const COMMON_VIDEO_FPS = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60] as const;
 
 function roundFps(value: number): number {
   return Math.round(value * 1000) / 1000;
@@ -40,8 +31,7 @@ export function estimateVideoFpsFromMediaTimes(mediaTimesSec: readonly number[])
   if (frameDeltasSec.length === 0) return null;
   const sorted = [...frameDeltasSec].sort((left, right) => left - right);
   const mid = Math.floor(sorted.length / 2);
-  const median =
-    sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) * 0.5 : sorted[mid]!;
+  const median = sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) * 0.5 : sorted[mid]!;
   if (!Number.isFinite(median) || median <= 0) return null;
   return snapCommonVideoFps(1 / median);
 }

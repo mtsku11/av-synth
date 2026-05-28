@@ -2308,7 +2308,15 @@
     "videoIntent": "Authored field study for auditioning how the cheaper coordinate-warp operators stack under feedback.",
     "audioIntent": "Keep the granulator and delay present but secondary so the visual field motion stays readable while testing modulation.",
     "operatorFocus": ["spiralField", "sinkSourceField", "polarRipple"],
-    "chain": ["feedback", "domainFold", "spiralField", "sinkSourceField", "polarRipple", "saturate", "contrast"],
+    "chain": [
+      "feedback",
+      "domainFold",
+      "spiralField",
+      "sinkSourceField",
+      "polarRipple",
+      "saturate",
+      "contrast"
+    ],
     "render": {
       "look": "kinetic",
       "quality": "standard",

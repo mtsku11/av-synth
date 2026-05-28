@@ -94,9 +94,9 @@ const LN2_12 = 0.05776226504666211;
 const TWO_PI = 6.283185307179586;
 const DEFAULT_CONTROL_VALUES = new Float32Array([
   // pos  posJ  pit  pitJ  dur  durJ  den  dist  env  panS  yS  revP  vc  mode qual gain  mix
-  0.5,     0,    0,   0,   80,   0,   20,   0,    0,   0,   0,   0,  32,   0,   1, 0.7,  1.0,
+  0.5, 0, 0, 0, 80, 0, 20, 0, 0, 0, 0, 0, 32, 0, 1, 0.7, 1.0,
   // fmAmt  fmFreq  envAtk  envDcy  envSus  envRel
-  0,        10,     10,     100,    1.0,    300,
+  0, 10, 10, 100, 1.0, 300,
 ]);
 
 const MODE_CLASSIC = 0;
@@ -1095,8 +1095,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         effectiveQuality = QUALITY_ECO;
       }
     }
-    const sincTapCount =
-      effectiveQuality === QUALITY_HIGH ? SINC_TAPS_HIGH : SINC_TAPS_BALANCED;
+    const sincTapCount = effectiveQuality === QUALITY_HIGH ? SINC_TAPS_HIGH : SINC_TAPS_BALANCED;
     const interpBudget =
       interpBudgetOverride ??
       (effectiveQuality === QUALITY_ECO
@@ -1117,7 +1116,10 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       }
     }
 
-    while (this.enableRuntimeSnapshotWrites && this.runtimeDiagElapsedSec >= this.runtimeDiagNextSampleSec) {
+    while (
+      this.enableRuntimeSnapshotWrites &&
+      this.runtimeDiagElapsedSec >= this.runtimeDiagNextSampleSec
+    ) {
       this.writeRuntimeDiagnosticSnapshot(
         activeNow,
         fadingNow,
@@ -1140,15 +1142,24 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       const blockSec = N / sampleRate;
       if (this.adsrPhase === 1) {
         this.adsrGain += blockSec / (envAttack * 0.001);
-        if (this.adsrGain >= 1.0) { this.adsrGain = 1.0; this.adsrPhase = 2; }
+        if (this.adsrGain >= 1.0) {
+          this.adsrGain = 1.0;
+          this.adsrPhase = 2;
+        }
       } else if (this.adsrPhase === 2) {
-        this.adsrGain -= (1.0 - envSustain) * blockSec / (envDecay * 0.001);
-        if (this.adsrGain <= envSustain) { this.adsrGain = envSustain; this.adsrPhase = 3; }
+        this.adsrGain -= ((1.0 - envSustain) * blockSec) / (envDecay * 0.001);
+        if (this.adsrGain <= envSustain) {
+          this.adsrGain = envSustain;
+          this.adsrPhase = 3;
+        }
       } else if (this.adsrPhase === 3) {
         this.adsrGain = envSustain;
       } else if (this.adsrPhase === 4) {
         this.adsrGain -= blockSec / (envRelease * 0.001);
-        if (this.adsrGain <= 0) { this.adsrGain = 1.0; this.adsrPhase = 0; }
+        if (this.adsrGain <= 0) {
+          this.adsrGain = 1.0;
+          this.adsrPhase = 0;
+        }
       }
     }
 
@@ -1213,7 +1224,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       let aaR = this.vAaR[v];
       let fadeRem = this.vFadeRem[v];
       const fmActive = fmAmount > 0.001;
-      const fmPhaseInc = fmActive ? TWO_PI * fmFreq / sampleRate : 0;
+      const fmPhaseInc = fmActive ? (TWO_PI * fmFreq) / sampleRate : 0;
       let fmPhase = this.vFmPhase[v];
       let fmAccPos = this.vFmAccPos[v];
 

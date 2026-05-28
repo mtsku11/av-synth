@@ -3,7 +3,12 @@
 // stacked product chains.
 
 import frag from '../video/shaders/repeatX.frag?raw';
-import { createVideoOperatorDef, paramUniform, passthroughParam, PRIMARY_SOURCE_UNIFORM } from './shared';
+import {
+  createVideoOperatorDef,
+  paramUniform,
+  passthroughParam,
+  PRIMARY_SOURCE_UNIFORM,
+} from './shared';
 
 export const repeatXDef = createVideoOperatorDef({
   op: 'repeatX',

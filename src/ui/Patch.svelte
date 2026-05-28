@@ -83,7 +83,8 @@
       coreSet.size > 0
         ? node.params.filter((param) => coreSet.has(param.id))
         : node.params.slice(0, Math.min(4, node.params.length));
-    const fallbackPrimary = primary.length > 0 ? primary : node.params.slice(0, Math.min(4, node.params.length));
+    const fallbackPrimary =
+      primary.length > 0 ? primary : node.params.slice(0, Math.min(4, node.params.length));
     const primaryIds = new Set(fallbackPrimary.map((param) => param.id));
     const secondary = node.params.filter((param) => !primaryIds.has(param.id));
     return { primary: fallbackPrimary, secondary };
@@ -139,10 +140,7 @@
               class="family-select"
               value={familySelections[family] ?? ''}
               onchange={(event) =>
-                handleFamilySelection(
-                  family,
-                  (event.currentTarget as HTMLSelectElement).value,
-                )}
+                handleFamilySelection(family, (event.currentTarget as HTMLSelectElement).value)}
             >
               <option value="">{family.toLowerCase()}</option>
               {#each choices as choice (choice.op)}
@@ -669,5 +667,4 @@
     color: var(--muted);
     opacity: 0.55;
   }
-
 </style>

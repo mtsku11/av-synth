@@ -42,9 +42,7 @@
     "expectedAudio": [
       "the coupled sound should feel like a thin moving spectral cut with persistence and scrape more than obvious detune"
     ],
-    "manualChecks": [
-      "Does the slit layer read as motion memory instead of a noisy mask artifact?"
-    ]
+    "manualChecks": ["Does the slit layer read as motion memory instead of a noisy mask artifact?"]
   },
   "steps": [
     {

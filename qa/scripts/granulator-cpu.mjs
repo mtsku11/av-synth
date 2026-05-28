@@ -27,36 +27,47 @@ const BLOCKS = Math.ceil((SECONDS * SR) / BLOCK);
 const source = readFileSync(resolve(process.cwd(), 'public/worklets/granulator.js'), 'utf-8');
 
 class FakeAudioWorkletProcessor {
-  constructor() { this.port = { onmessage: null, postMessage: () => {} }; }
+  constructor() {
+    this.port = { onmessage: null, postMessage: () => {} };
+  }
 }
 let RegisteredCtor = null;
-const registerProcessor = (_name, cls) => { RegisteredCtor = cls; };
+const registerProcessor = (_name, cls) => {
+  RegisteredCtor = cls;
+};
 new Function('AudioWorkletProcessor', 'registerProcessor', 'sampleRate', 'currentTime', source)(
-  FakeAudioWorkletProcessor, registerProcessor, SR, 0,
+  FakeAudioWorkletProcessor,
+  registerProcessor,
+  SR,
+  0,
 );
 if (!RegisteredCtor) throw new Error('granulator processor failed to register');
 
-function paramBlock(value) { const a = new Float32Array(1); a[0] = value; return a; }
+function paramBlock(value) {
+  const a = new Float32Array(1);
+  a[0] = value;
+  return a;
+}
 
 function heavyParams() {
   // Spec-target heavy load: 32 voices, busy density, 8-tap sinc engaged (the worklet
   // uses sinc for any non-trivial pitch ratio; positive pitchJitter guarantees this).
   return {
-    position:           paramBlock(0.4),
-    positionJitter:     paramBlock(0.1),
-    pitch:              paramBlock(0),
-    pitchJitter:        paramBlock(12),
-    duration:           paramBlock(70),
-    durationJitter:     paramBlock(0.3),
-    density:            paramBlock(60),
-    distribution:       paramBlock(0.3),
-    envelope:           paramBlock(0),
-    panSpread:          paramBlock(0.6),
-    ySpread:            paramBlock(0.3),
+    position: paramBlock(0.4),
+    positionJitter: paramBlock(0.1),
+    pitch: paramBlock(0),
+    pitchJitter: paramBlock(12),
+    duration: paramBlock(70),
+    durationJitter: paramBlock(0.3),
+    density: paramBlock(60),
+    distribution: paramBlock(0.3),
+    envelope: paramBlock(0),
+    panSpread: paramBlock(0.6),
+    ySpread: paramBlock(0.3),
     reverseProbability: paramBlock(0.15),
-    voiceCount:         paramBlock(32),
-    mode:               paramBlock(0),
-    gain:               paramBlock(0.6),
+    voiceCount: paramBlock(32),
+    mode: paramBlock(0),
+    gain: paramBlock(0.6),
   };
 }
 
@@ -93,7 +104,7 @@ function runOnce(seed) {
 }
 
 const runs = [];
-for (let i = 0; i < 5; i++) runs.push(runOnce(0xB2CCC0DE + i));
+for (let i = 0; i < 5; i++) runs.push(runOnce(0xb2ccc0de + i));
 runs.sort((a, b) => a.ratio - b.ratio);
 const median = runs[Math.floor(runs.length / 2)];
 const min = runs[0];
@@ -102,20 +113,35 @@ const max = runs[runs.length - 1];
 const cpuList = cpus();
 const cpuModel = cpuList[0]?.model ?? 'unknown';
 
-console.log(JSON.stringify({
-  gate: '§13 #5 (CPU < 20% of one core at 32 voices, 8-tap sinc, ref 2020 MBP)',
-  scope: 'granulator worklet only, node-side, no browser audio thread overhead',
-  host: { platform: platform(), arch: arch(), cpu: cpuModel, cores: cpuList.length, hostname: hostname() },
-  settings: { voiceCount: 32, density: 60, duration_ms: 70, pitchJitter_cents: 12 },
-  seconds: SECONDS,
-  runs,
-  summary: {
-    min_ratio: min.ratio, median_ratio: median.ratio, max_ratio: max.ratio,
-    min_pct: `${(min.ratio * 100).toFixed(2)}%`,
-    median_pct: `${(median.ratio * 100).toFixed(2)}%`,
-    max_pct: `${(max.ratio * 100).toFixed(2)}%`,
-  },
-  verdict_headroom: median.ratio < 0.20
-    ? 'HEADROOM-PASS on this host (median < 20%). 2020 MBP canonical sign-off still required.'
-    : 'HEADROOM-FAIL on this host. Investigation needed before MBP sign-off attempt.',
-}, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      gate: '§13 #5 (CPU < 20% of one core at 32 voices, 8-tap sinc, ref 2020 MBP)',
+      scope: 'granulator worklet only, node-side, no browser audio thread overhead',
+      host: {
+        platform: platform(),
+        arch: arch(),
+        cpu: cpuModel,
+        cores: cpuList.length,
+        hostname: hostname(),
+      },
+      settings: { voiceCount: 32, density: 60, duration_ms: 70, pitchJitter_cents: 12 },
+      seconds: SECONDS,
+      runs,
+      summary: {
+        min_ratio: min.ratio,
+        median_ratio: median.ratio,
+        max_ratio: max.ratio,
+        min_pct: `${(min.ratio * 100).toFixed(2)}%`,
+        median_pct: `${(median.ratio * 100).toFixed(2)}%`,
+        max_pct: `${(max.ratio * 100).toFixed(2)}%`,
+      },
+      verdict_headroom:
+        median.ratio < 0.2
+          ? 'HEADROOM-PASS on this host (median < 20%). 2020 MBP canonical sign-off still required.'
+          : 'HEADROOM-FAIL on this host. Investigation needed before MBP sign-off attempt.',
+    },
+    null,
+    2,
+  ),
+);

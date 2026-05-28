@@ -32,13 +32,22 @@ class FakeAudioWorkletProcessor {
   }
 }
 let RegisteredCtor = null;
-const registerProcessor = (_name, cls) => { RegisteredCtor = cls; };
+const registerProcessor = (_name, cls) => {
+  RegisteredCtor = cls;
+};
 new Function('AudioWorkletProcessor', 'registerProcessor', 'sampleRate', 'currentTime', source)(
-  FakeAudioWorkletProcessor, registerProcessor, SR, 0,
+  FakeAudioWorkletProcessor,
+  registerProcessor,
+  SR,
+  0,
 );
 if (!RegisteredCtor) throw new Error('granulator processor failed to register');
 
-function paramBlock(value) { const a = new Float32Array(1); a[0] = value; return a; }
+function paramBlock(value) {
+  const a = new Float32Array(1);
+  a[0] = value;
+  return a;
+}
 
 function adversarialParams() {
   // Worst-case-loud combination:
@@ -48,21 +57,21 @@ function adversarialParams() {
   //   - distribution 0 → strictly periodic (constructive interference possible)
   //   - gain 1.0
   return {
-    position:           paramBlock(0.5),
-    positionJitter:     paramBlock(0.0),
-    pitch:              paramBlock(0),
-    pitchJitter:        paramBlock(0),
-    duration:           paramBlock(80),
-    durationJitter:     paramBlock(0),
-    density:            paramBlock(200),
-    distribution:       paramBlock(0),
-    envelope:           paramBlock(0),
-    panSpread:          paramBlock(0),
-    ySpread:            paramBlock(0),
+    position: paramBlock(0.5),
+    positionJitter: paramBlock(0.0),
+    pitch: paramBlock(0),
+    pitchJitter: paramBlock(0),
+    duration: paramBlock(80),
+    durationJitter: paramBlock(0),
+    density: paramBlock(200),
+    distribution: paramBlock(0),
+    envelope: paramBlock(0),
+    panSpread: paramBlock(0),
+    ySpread: paramBlock(0),
     reverseProbability: paramBlock(0),
-    voiceCount:         paramBlock(64),
-    mode:               paramBlock(0),
-    gain:               paramBlock(1.0),
+    voiceCount: paramBlock(64),
+    mode: paramBlock(0),
+    gain: paramBlock(1.0),
   };
 }
 
@@ -71,16 +80,21 @@ function adversarialParams() {
 function makeSource() {
   const len = SR * 10;
   const buf = new Float32Array(len);
-  let b0 = 0, b1 = 0, b2 = 0;
+  let b0 = 0,
+    b1 = 0,
+    b2 = 0;
   for (let i = 0; i < len; i++) {
     const w = Math.random() * 2 - 1;
-    b0 = 0.99765 * b0 + w * 0.0990460;
-    b1 = 0.96300 * b1 + w * 0.2965164;
-    b2 = 0.57000 * b2 + w * 1.0526913;
+    b0 = 0.99765 * b0 + w * 0.099046;
+    b1 = 0.963 * b1 + w * 0.2965164;
+    b2 = 0.57 * b2 + w * 1.0526913;
     buf[i] = b0 + b1 + b2 + w * 0.1848;
   }
   let peak = 0;
-  for (let i = 0; i < len; i++) { const a = Math.abs(buf[i]); if (a > peak) peak = a; }
+  for (let i = 0; i < len; i++) {
+    const a = Math.abs(buf[i]);
+    if (a > peak) peak = a;
+  }
   if (peak > 0) for (let i = 0; i < len; i++) buf[i] /= peak;
   return buf;
 }
@@ -151,8 +165,10 @@ function runOnce(seed) {
   }
   let samplePeak = 0;
   for (let i = 0; i < outL.length; i++) {
-    const a = Math.abs(outL[i]); if (a > samplePeak) samplePeak = a;
-    const b2 = Math.abs(outR[i]); if (b2 > samplePeak) samplePeak = b2;
+    const a = Math.abs(outL[i]);
+    if (a > samplePeak) samplePeak = a;
+    const b2 = Math.abs(outR[i]);
+    if (b2 > samplePeak) samplePeak = b2;
   }
   const tpL = truePeakOversample4x(outL);
   const tpR = truePeakOversample4x(outR);
@@ -162,7 +178,7 @@ function runOnce(seed) {
 
 const runs = [];
 for (let i = 0; i < 3; i++) {
-  runs.push(runOnce(0xB2C0FFEE + i));
+  runs.push(runOnce(0xb2c0ffee + i));
 }
 runs.sort((a, b) => b.truePeak - a.truePeak);
 
@@ -170,16 +186,38 @@ const worst = runs[0];
 const samplePeakDb = toDbfs(worst.samplePeak);
 const truePeakDb = toDbfs(worst.truePeak);
 
-console.log(JSON.stringify({
-  gate: '§13 #6 (true-peak ≤ 0 dBFS)',
-  scope: 'granulator output, pre-limiter',
-  settings: { density: 200, duration_ms: 80, voiceCount: 64, gain: 1.0, panSpread: 0, distribution: 0 },
-  seconds: SECONDS,
-  runs: runs.map((r) => ({
-    samplePeak: r.samplePeak, samplePeak_dBFS: toDbfs(r.samplePeak),
-    truePeak: r.truePeak, truePeak_dBFS: toDbfs(r.truePeak),
-  })),
-  worst: { samplePeak: worst.samplePeak, samplePeak_dBFS: samplePeakDb, truePeak: worst.truePeak, truePeak_dBFS: truePeakDb },
-  verdict_preLimit: truePeakDb <= 0 ? 'PASS (gate trivially satisfied — limiter unstressed)'
-                                    : 'EXCEEDS pre-limit; limiter is required and the post-limit measurement (B2.4) is mandatory',
-}, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      gate: '§13 #6 (true-peak ≤ 0 dBFS)',
+      scope: 'granulator output, pre-limiter',
+      settings: {
+        density: 200,
+        duration_ms: 80,
+        voiceCount: 64,
+        gain: 1.0,
+        panSpread: 0,
+        distribution: 0,
+      },
+      seconds: SECONDS,
+      runs: runs.map((r) => ({
+        samplePeak: r.samplePeak,
+        samplePeak_dBFS: toDbfs(r.samplePeak),
+        truePeak: r.truePeak,
+        truePeak_dBFS: toDbfs(r.truePeak),
+      })),
+      worst: {
+        samplePeak: worst.samplePeak,
+        samplePeak_dBFS: samplePeakDb,
+        truePeak: worst.truePeak,
+        truePeak_dBFS: truePeakDb,
+      },
+      verdict_preLimit:
+        truePeakDb <= 0
+          ? 'PASS (gate trivially satisfied — limiter unstressed)'
+          : 'EXCEEDS pre-limit; limiter is required and the post-limit measurement (B2.4) is mandatory',
+    },
+    null,
+    2,
+  ),
+);

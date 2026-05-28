@@ -4,7 +4,12 @@
 // resonator when stacked in the product path.
 
 import frag from '../video/shaders/repeat.frag?raw';
-import { createVideoOperatorDef, paramUniform, passthroughParam, PRIMARY_SOURCE_UNIFORM } from './shared';
+import {
+  createVideoOperatorDef,
+  paramUniform,
+  passthroughParam,
+  PRIMARY_SOURCE_UNIFORM,
+} from './shared';
 
 export const repeatDef = createVideoOperatorDef({
   op: 'repeat',

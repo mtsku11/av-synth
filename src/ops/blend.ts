@@ -188,9 +188,7 @@ export const layerDef: OperatorDef = {
   coupling: {
     op: 'layer',
     params: {
-      amount: amountCoupling(
-        'wet layer amount (video keyed over / audio ducked overlay)',
-      ),
+      amount: amountCoupling('wet layer amount (video keyed over / audio ducked overlay)'),
       threshold: literalCoupling(
         'threshold',
         'threshold',

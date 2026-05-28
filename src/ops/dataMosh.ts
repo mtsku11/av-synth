@@ -31,10 +31,7 @@ class DataMoshVideoStage implements VideoStage {
     this.#uChunk = reqUniform(gl, this.program, 'u_chunk', 'dataMosh');
   }
 
-  bindRendererResources(
-    gl: WebGL2RenderingContext,
-    resources: VideoStageRendererResources,
-  ): void {
+  bindRendererResources(gl: WebGL2RenderingContext, resources: VideoStageRendererResources): void {
     const owned = resources.ownedState;
     if (owned) {
       gl.uniform1i(this.#uOwnedState, owned.textureUnit);

@@ -2,7 +2,13 @@
 // plan.md §2.7: amount = pan position; speed = pan LFO rate (auto-pan).
 
 import frag from '../video/shaders/scrollY.frag?raw';
-import { createVideoOperatorDef, paramUniform, passthroughParam, PRIMARY_SOURCE_UNIFORM, TIME_UNIFORM } from './shared';
+import {
+  createVideoOperatorDef,
+  paramUniform,
+  passthroughParam,
+  PRIMARY_SOURCE_UNIFORM,
+  TIME_UNIFORM,
+} from './shared';
 
 export const scrollYDef = createVideoOperatorDef({
   op: 'scrollY',

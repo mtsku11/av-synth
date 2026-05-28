@@ -125,12 +125,7 @@ export class GrainCompositeSource implements VideoSourceStage {
     gl.uniform2f(this.#uHalfSize, this.#halfSize, this.#halfSize);
 
     gl.enable(gl.BLEND);
-    gl.blendFuncSeparate(
-      gl.ONE,
-      gl.ONE_MINUS_SRC_ALPHA,
-      gl.ONE,
-      gl.ONE_MINUS_SRC_ALPHA,
-    );
+    gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
     for (let i = 0; i < voices.length; i++) {
       const v = voices[i]!;

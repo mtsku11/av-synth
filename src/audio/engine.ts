@@ -9,7 +9,11 @@
 import { clock } from '../core/clock.svelte';
 import { SilentSource, type AudioSourceStage } from './sources';
 import { ensureAudioWorklets } from './worklets';
-import { EMPTY_VIDEO_FEATURES, type CouplingContext, type VideoFeatureState } from '../core/coupling';
+import {
+  EMPTY_VIDEO_FEATURES,
+  type CouplingContext,
+  type VideoFeatureState,
+} from '../core/coupling';
 
 const PARAM_POLL_MS = 16; // ~60Hz; setTargetAtTime smooths the audible jumps.
 

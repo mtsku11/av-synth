@@ -59,7 +59,10 @@
           <select
             value={lfo.waveform}
             onchange={(event) =>
-              onSetWaveform?.(index, (event.currentTarget as HTMLSelectElement).value as GlobalLfoWaveform)}
+              onSetWaveform?.(
+                index,
+                (event.currentTarget as HTMLSelectElement).value as GlobalLfoWaveform,
+              )}
           >
             {#each waveformOptions as waveform (waveform)}
               <option value={waveform}>{waveform}</option>
@@ -67,7 +70,11 @@
           </select>
         </div>
         <div class="lfo-controls">
-          <Slider spec={rateSpec} value={lfo.rate} onValueChange={(value) => onSetRate?.(index, value)} />
+          <Slider
+            spec={rateSpec}
+            value={lfo.rate}
+            onValueChange={(value) => onSetRate?.(index, value)}
+          />
           <Slider
             spec={amountSpec}
             value={lfo.amount}

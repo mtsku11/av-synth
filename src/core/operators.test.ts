@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { getDef, getOperatorUiMeta, isNeutralInstance, listOperatorFamilies, listOps } from './operators';
+import {
+  getDef,
+  getOperatorUiMeta,
+  isNeutralInstance,
+  listOperatorFamilies,
+  listOps,
+} from './operators';
 import { DEFAULT_CHAIN, registerAllOps } from '../ops';
 
 registerAllOps();
@@ -166,7 +172,10 @@ describe('operator UI metadata', () => {
   it('keeps audited alias-family operators wired to real shaders, neutral defaults, and QA cases', () => {
     const auditedOps = listOps()
       .map((op) => ({ op, audit: getDef(op).audit }))
-      .filter((entry): entry is { op: string; audit: NonNullable<ReturnType<typeof getDef>['audit']> } => !!entry.audit);
+      .filter(
+        (entry): entry is { op: string; audit: NonNullable<ReturnType<typeof getDef>['audit']> } =>
+          !!entry.audit,
+      );
     expect(auditedOps.length).toBeGreaterThan(0);
 
     for (const { op, audit } of auditedOps) {
@@ -174,7 +183,10 @@ describe('operator UI metadata', () => {
       const expectedCaseOperator = audit.caseOperator ?? op;
       for (const caseId of audit.qaCaseIds) {
         const casePath = resolve(process.cwd(), `qa/cases/${caseId}.json`);
-        expect(existsSync(casePath), `missing case file qa/cases/${caseId}.json for op '${op}'`).toBe(true);
+        expect(
+          existsSync(casePath),
+          `missing case file qa/cases/${caseId}.json for op '${op}'`,
+        ).toBe(true);
         const caseDoc = JSON.parse(readFileSync(casePath, 'utf8')) as {
           audit?: { operator?: string };
         };

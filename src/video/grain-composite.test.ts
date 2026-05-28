@@ -6,15 +6,19 @@ vi.mock('./grain-composite.frag?raw', () => ({ default: 'fragment shader' }));
 vi.mock('./grain-buffer', () => ({
   GrainBuffer: class {
     allocate() {}
-    getTexture() { return {}; }
+    getTexture() {
+      return {};
+    }
     bind() {}
-  }
+  },
 }));
 
 vi.mock('./grain-scheduler', () => ({
   GrainScheduler: class {
-    getActiveVoices() { return []; }
-  }
+    getActiveVoices() {
+      return [];
+    }
+  },
 }));
 
 const _gl: WebGL2RenderingContext = {

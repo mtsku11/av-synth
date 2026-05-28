@@ -33,10 +33,7 @@ class SlitScanVideoStage implements VideoStage {
     this.#uHistoryWriteIndex = reqUniform(gl, this.program, 'u_history_write_index', 'slitScan');
   }
 
-  bindRendererResources(
-    gl: WebGL2RenderingContext,
-    resources: VideoStageRendererResources,
-  ): void {
+  bindRendererResources(gl: WebGL2RenderingContext, resources: VideoStageRendererResources): void {
     const temporal = resources.temporalHistory;
     if (temporal) {
       gl.uniform1i(this.#uHistoryTex, temporal.textureUnit);

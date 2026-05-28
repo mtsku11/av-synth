@@ -98,5 +98,4 @@ describe('planGrainBuffer', () => {
     if (!result.ok) return;
     expect(result.plan.frameCount).toBeGreaterThanOrEqual(1);
   });
-
 });
