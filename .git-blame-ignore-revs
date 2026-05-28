@@ -1,0 +1,6 @@
+# Commits that are purely mechanical reformats — ignore in git blame.
+# Usage: git blame --ignore-revs-file .git-blame-ignore-revs <file>
+# Or set permanently: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# R1: prettier --write qa/e2e/** (2026-05-28)
+d0038df
