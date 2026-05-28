@@ -1,7 +1,7 @@
 name: Deploy GitHub Pages
 
 # Builds the Vite app and publishes to GitHub Pages. Independent of the
-# Cloudflare-based deploy-pages.yml; both can coexist.
+# Cloudflare-based deploy-cloudflare.yml; both can coexist.
 
 on:
   push:

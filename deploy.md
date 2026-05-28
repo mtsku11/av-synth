@@ -27,7 +27,7 @@ The Cloudflare Pages project must already exist. The workflow uses Wrangler dire
 
 ## Workflow
 
-Use [deploy-pages.yml](./.github/workflows/deploy-pages.yml) through `workflow_dispatch`.
+Use [deploy-cloudflare.yml](./.github/workflows/deploy-cloudflare.yml) through `workflow_dispatch`.
 
 Inputs:
 

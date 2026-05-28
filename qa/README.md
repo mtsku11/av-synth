@@ -25,7 +25,8 @@ This repo uses a layered QA model:
 - App-side capture/export of rendered canvas + mixed audio as `.webm`
 - Granulator MIDI-latency proxy harness at `qa/e2e/d4-midi-latency-proxy.spec.ts`
 - A GitHub Actions workflow at `.github/workflows/qa.yml` that runs the committed QA pipeline in CI
-- A manual Cloudflare Pages workflow at `.github/workflows/deploy-pages.yml` for staging/private deploy plus optional post-deploy smoke
+- A manual Cloudflare Pages workflow at `.github/workflows/deploy-cloudflare.yml` for staging/private deploy plus optional post-deploy smoke (SAB-capable release target)
+- An auto GitHub Pages workflow at `.github/workflows/deploy-gh-pages.yml` for fast staging URLs on push to main; SAB unavailable so it's not the release path
 - Live checkpoint metrics captured during Playwright cases and persisted as `metrics.json` beside each case's artifacts
 
 ## Current limitation

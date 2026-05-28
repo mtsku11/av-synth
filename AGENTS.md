@@ -40,7 +40,8 @@ Browser-based video-first audio/visual effects app with Hydra-inspired video ope
 - `deploy.md` — staging/public deploy policy, Cloudflare inputs, and manual fallback commands
 - `qa/analyze.js` — post-Playwright artifact extraction and `analysis.json` generation
 - `.github/workflows/qa.yml` — GitHub Actions entrypoint for the QA pipeline
-- `.github/workflows/deploy-pages.yml` — manual Cloudflare Pages staging/production deploy workflow
+- `.github/workflows/deploy-cloudflare.yml` — manual Cloudflare Pages staging/production deploy workflow (SAB-capable release target)
+- `.github/workflows/deploy-gh-pages.yml` — auto GitHub Pages deploy on push to main; SAB unavailable (fast staging / Remote-Desktop testing only)
 - `qa/cases/` — manifest-driven browser QA cases and parameter sweeps
 - `src/ops/` and `src/sources/` — per-operator and per-source AV implementations
 
