@@ -22,7 +22,7 @@
     onAddNode?: (op: string) => void;
     onMove?: (id: string, direction: -1 | 1) => void;
     onRemove?: (id: string) => void;
-    onSetNodeParamLfo?: (id: string, paramId: string, lfoIndex: number | null) => void;
+    onSetNodeModSource?: (id: string, paramId: string, encoded: string) => void;
     onSetNodeParam?: (id: string, paramId: string, value: number) => void;
     onSetNodeBus?: (id: string, bus: BusIndex) => void;
     onSetNodePrimaryInput?: (id: string, inputId: string | null) => void;
@@ -40,7 +40,7 @@
     onAddNode,
     onMove,
     onRemove,
-    onSetNodeParamLfo,
+    onSetNodeModSource,
     onSetNodeParam,
     onSetNodeBus,
     onSetNodePrimaryInput,
@@ -190,14 +190,16 @@
                   <label class="mod-select">
                     <span>mod</span>
                     <select
-                      value={param.lfo.lfoIndex === null ? '' : String(param.lfo.lfoIndex)}
+                      value={param.lfo.videoFeature !== null
+                        ? `v:${param.lfo.videoFeature}`
+                        : param.lfo.lfoIndex === null
+                          ? ''
+                          : String(param.lfo.lfoIndex)}
                       onchange={(event) =>
-                        onSetNodeParamLfo?.(
+                        onSetNodeModSource?.(
                           node.id,
                           param.id,
-                          (event.currentTarget as HTMLSelectElement).value === ''
-                            ? null
-                            : Number((event.currentTarget as HTMLSelectElement).value),
+                          (event.currentTarget as HTMLSelectElement).value,
                         )}
                     >
                       {#each lfoOptions as option (option.id)}
@@ -284,14 +286,16 @@
                       <label class="mod-select">
                         <span>mod</span>
                         <select
-                          value={param.lfo.lfoIndex === null ? '' : String(param.lfo.lfoIndex)}
+                          value={param.lfo.videoFeature !== null
+                            ? `v:${param.lfo.videoFeature}`
+                            : param.lfo.lfoIndex === null
+                              ? ''
+                              : String(param.lfo.lfoIndex)}
                           onchange={(event) =>
-                            onSetNodeParamLfo?.(
+                            onSetNodeModSource?.(
                               node.id,
                               param.id,
-                              (event.currentTarget as HTMLSelectElement).value === ''
-                                ? null
-                                : Number((event.currentTarget as HTMLSelectElement).value),
+                              (event.currentTarget as HTMLSelectElement).value,
                             )}
                         >
                           {#each lfoOptions as option (option.id)}

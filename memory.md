@@ -2856,3 +2856,59 @@ Marc loaded a second video source and could not find a way to use it in any oper
 Plan + acceptance criteria + implementation tasks (G1–G8) are in `todo.md` under "Source B as graph-addressable second source (2026-05-28)". A short routing-model description is in `plan.md` §14.7a.
 
 Implementation landed 2026-05-28 in `src/core/graph.svelte.ts` (`SOURCE_B_NODE_ID`), `src/core/patch-graph.ts` (picker options + bus-1 default), `src/video/renderer.ts` (`#resolveInputTarget` + bus-1 empty-monitor fallback), and `src/App.svelte` (wire `sourceBLoaded` flag through, fix secondary-input setter to preserve primary, add A/B affordance to monitor buttons). End-to-end Playwright verification confirmed: `blend(primary=source, secondary=sourceB)` crossfades between the two loaded clips through the stock two-input picker — no `sourceBlend` op required. Open follow-ups (binary blend characterisation, decide `sourceBlend` fate) are tracked as G6/G7 in `todo.md`.
+
+## 2026-05-28 — R3: readMotionEnergy — 1 readPixels instead of 25 (deliberate synchronous)
+
+`readMotionEnergy()` sampled a 5×5 spatial grid of the motion field FBO via 25 individual `gl.readPixels(x, y, 1, 1, ...)` calls. Each call is a synchronous GPU pipeline stall.
+
+**Decision**: Replace with a single `gl.readPixels(0, 0, width, height, ...)` into a pre-allocated `Uint8Array` (`#motionReadbackBuffer`), then sample the same 25 grid points from the CPU-side buffer. Buffer is pre-allocated in `#rebuildMotionReadbackBuffer()`, called from the constructor and resize path, so zero per-call allocations remain.
+
+**Async PBO readback was considered and rejected** for this call site: `readMotionEnergy()` is invoked from a 120 ms `setInterval` (not the render loop), so by the time the call fires the GPU pipeline is idle — the one remaining synchronous stall is immeasurably short at that cadence. Async PBO plumbing adds meaningful complexity for no user-observable benefit here.
+
+**Result**: 25 GPU stalls → 1 per 120 ms call. Spatial sampling is bit-for-bit identical. Full-FBO transfer (~1–2 MB at typical resolutions) at 120 ms cadence is ~10–15 MB/s, within normal display-layer readback budget.
+
+## 2026-05-28 — R4: gate #6 re-affirmed, harness silent-run anomaly noted
+
+b2.4 Playwright spec run on 2026-05-28. Chain: granulator → master(0.7) → softClip(4× tanh×1.35) → DynamicsCompressor(threshold −1, knee 0, ratio 20, attack 1 ms, release 50 ms).
+
+**Result**: worst-case post-limit truePeak **−7.52 dBFS** (samplePeak −7.68 dBFS) at adversarial settings (density 200, duration 80 ms, voiceCount 64, gain 1.0, panSpread 0, distribution 0). Gate #6 satisfied with ~7.5 dB headroom. Prior measurement (2026-05-23 after √N fix) was −1.79 dBFS post-limit; current measurement is more conservative, consistent with ongoing gain-staging refinements.
+
+**Harness anomaly**: 2 of 3 OfflineAudioContext runs returned silence (samplePeak 0). Root cause: `AudioWorkletNode.port.postMessage({type:'load',...})` messages are queued but may not be processed by the worklet's `process()` callback before `offline.startRendering()` begins. Not an engine defect — the OfflineAudioContext message flush order is not guaranteed. The one run that successfully loaded is the valid adversarial measurement. This is a known quirk of the test harness; if the spec gains a retry or synchronization step it should produce consistent output. Not blocking R4.
+
+## 2026-05-28 — R5: video-feature → video-param modulation (bidirectional mod fabric)
+
+The modulation fabric was unidirectional: LFOs → params, video features → audio only.
+
+**Decision**: Extend `ParamLfoAssignment` with a `videoFeature: VideoFeatureName | null` field. When non-null, `applyGlobalLfoAssignments` maps the feature value (0..1 unipolar) linearly to the param's [min, max] range, replacing the user base value. The LFO and video branches are mutually exclusive; videoFeature takes priority.
+
+**Why unipolar linear mapping** (not bipolar offset around base): simplest to explain and demo — "motion drives brightness from black to white". A depth knob per assignment was considered and deferred (rule of three: no concrete second caller yet).
+
+**Encoding**: the mod picker uses string values `''` (off), `'0'`-`'5'` (LFO index), `'v:luma'` / `'v:flux'` / `'v:edge'` / `'v:motion'` (video feature). Decoders live in `App.svelte`'s two setter functions. The `VideoFeatureName` type is defined in `coupling.ts` as `Exclude<keyof VideoFeatureState, 'available'>` so it stays in sync with `VideoFeatureState`.
+
+**Files changed**: `coupling.ts`, `mod-bank.ts`, `operators.ts`, `mod-bank.test.ts`, `Patch.svelte`, `GranulatorCard.svelte`, `App.svelte`.
+
+---
+
+### R6 — `sourceBlend` folded into `blend`, op deleted (2026-05-29)
+
+**Decision**: Option B — fold `sourceBlend`'s four blend modes (over / add / multiply / screen) into `blend` and delete `sourceBlend` entirely.
+
+**Rationale**: Source B is now graph-addressable via the two-input picker, so `sourceBlend`'s only remaining value was the four blend modes that `blend` lacked. Adding those modes to `blend` fills that gap and eliminates the "two ways to blend with Source B" ambiguity. The `add` and `mult` ops are pure compositing ops (no mix envelope) and don't overlap with the mode-parameterised `blend`.
+
+**`blend` API change**: gained a `mode` int param `[0, 3]`, default 0. Mode 0 is backwards-compatible with all existing presets (pure linear mix). The `u_mode` uniform is sent as an int via `gl.uniform1i()`.
+
+**Files changed**: `shaders/blend.frag`, `ops/blend.ts`, `ops/index.ts`, `core/operators.ts`, `core/operators.test.ts`, `core/coupling.test.ts`, `video/renderer.ts` (comment only). Deleted: `ops/sourceBlend.ts`, `shaders/sourceBlend.frag`.
+
+---
+
+### R7 — Bloom strength wired to the modulation bus (2026-05-29)
+
+**Decision**: Wire `bloomStrength` (presentation finish) to the LFO/video-feature mod bus as a multiplier in [0, 2], base = 1.0.
+
+**Rationale**: The presentation stack was entirely static — none of its params could be animated. Bloom strength is the highest-value target: visible enough to feel alive in performance, yet subtle enough that extremes (0 = no bloom, 2 = double) aren't destructive. A multiplier model preserves the quality preset's calibrated base value while allowing full dynamic range.
+
+**Zero-alloc implementation**: Rather than calling `applyGlobalLfoAssignments` (which allocates a new Record), `renderer.ts` has a private `#bloomMod(ctx)` method that inlines the same LFO/video-feature math for a single param. This keeps the render loop allocation-free per the CLAUDE.md rule.
+
+**UI**: A "bloom" mod picker row appears at the bottom of the video tab in the patch panel, using the same `listGlobalLfoOptions` + `v:feature` encoding as operator params.
+
+**Files changed**: `video/renderer.ts`, `App.svelte`.

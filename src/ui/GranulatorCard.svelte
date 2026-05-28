@@ -34,7 +34,7 @@
     onSetQuality: (next: GranulatorQuality) => void;
     onSetAdaptiveQuality: (next: boolean) => void;
     onSetParam: (name: GranulatorSliderParam, value: number) => void;
-    onSetParamLfo: (name: GranulatorSliderParam, lfoIndex: number | null) => void;
+    onSetParamLfo: (name: GranulatorSliderParam, encoded: string) => void;
   }
 
   let {
@@ -308,13 +308,13 @@
         <label class="lfo-select">
           <span class="visually-hidden">lfo</span>
           <select
-            value={lfoAssignments[ctrl.name]?.lfoIndex === null ||
-            lfoAssignments[ctrl.name]?.lfoIndex === undefined
-              ? ''
-              : String(lfoAssignments[ctrl.name]?.lfoIndex)}
+            value={lfoAssignments[ctrl.name]?.videoFeature != null
+              ? `v:${lfoAssignments[ctrl.name]?.videoFeature}`
+              : lfoAssignments[ctrl.name]?.lfoIndex == null
+                ? ''
+                : String(lfoAssignments[ctrl.name]?.lfoIndex)}
             onchange={(event) => {
-              const raw = (event.currentTarget as HTMLSelectElement).value;
-              onSetParamLfo(ctrl.name, raw === '' ? null : Number(raw));
+              onSetParamLfo(ctrl.name, (event.currentTarget as HTMLSelectElement).value);
             }}
             disabled={!granulator}
             data-qa={`gran-lfo-${ctrl.name}`}

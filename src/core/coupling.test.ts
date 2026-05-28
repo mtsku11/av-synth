@@ -50,7 +50,7 @@ describe('evaluateVideoParams', () => {
     expect(evaluateVideoParams(colorDef.coupling, { r: 1.2, g: 0.8, b: 1.5, a: 0.9 }, ctx)).toEqual(
       { r: 1.2, g: 0.8, b: 1.5, a: 0.9 },
     );
-    expect(evaluateVideoParams(blendDef.coupling, { amount: 0.35 }, ctx)).toEqual({ amount: 0.35 });
+    expect(evaluateVideoParams(blendDef.coupling, { amount: 0.35 }, ctx)).toEqual({ amount: 0.35, mode: 0 });
     expect(
       evaluateVideoParams(sumDef.coupling, { amount: 0.42, r: 1.6, g: 0.2, a: 1.1 }, ctx),
     ).toEqual({ amount: 0.42, r: 1.6, g: 0.2, b: 1, a: 1.1 });

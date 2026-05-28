@@ -85,7 +85,6 @@ const EXPECTED_OPERATOR_IDS = [
   'layer',
   'blend',
   'mask',
-  'sourceBlend',
 ] as const;
 
 describe('operator UI metadata', () => {

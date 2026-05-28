@@ -34,10 +34,18 @@ interface SaddleState {
 function seedSaddles(): SaddleState[] {
   const rand = mulberry32(SEED);
   const out: SaddleState[] = [];
+  // Jittered 4×4 stratified grid: one saddle per cell, jittered ±40 % of
+  // cell size. The last 2 cells (bottom-right) are left empty but covered
+  // by neighbours at the wider default softness. Pure-random placement left
+  // visible dead zones between clustered saddles.
+  const cellW = 0.25;
+  const cellH = 0.25;
   for (let i = 0; i < SADDLE_COUNT; i++) {
+    const col = i % 4;
+    const row = Math.floor(i / 4);
     out.push({
-      x: rand(),
-      y: rand(),
+      x: (col + 0.5) * cellW + (rand() - 0.5) * cellW * 0.8,
+      y: (row + 0.5) * cellH + (rand() - 0.5) * cellH * 0.8,
       angle: rand() * Math.PI * 2,
       rotRate: (rand() < 0.5 ? -1 : 1) * (0.15 + rand() * 0.35),
     });
@@ -110,7 +118,7 @@ class SaddleFieldVideoStage implements VideoStage {
     gl.uniform1i(this.#uTex, 0);
     gl.uniform1f(this.#uMix, params['mix'] ?? 0);
     gl.uniform1f(this.#uStrength, params['strength'] ?? 0.2);
-    gl.uniform1f(this.#uSoftness, Math.max(0.02, params['softness'] ?? 0.12));
+    gl.uniform1f(this.#uSoftness, Math.max(0.02, params['softness'] ?? 0.25));
     gl.uniform1f(this.#uAnisotropy, params['anisotropy'] ?? 1.0);
     gl.uniform1i(this.#uCount, SADDLE_COUNT);
     gl.uniform4fv(this.#uSaddles, this.#uploadBuffer);
@@ -126,7 +134,7 @@ class SaddleFieldVideoStage implements VideoStage {
 export const saddleFieldDef: OperatorDef = {
   op: 'saddleField',
   paramOrder: ['mix', 'strength', 'softness', 'anisotropy', 'drift', 'advect'],
-  defaults: { mix: 0, strength: 0.2, softness: 0.12, anisotropy: 1.0, drift: 0.4, advect: 0 },
+  defaults: { mix: 0, strength: 0.2, softness: 0.25, anisotropy: 1.0, drift: 0.4, advect: 0 },
   coupling: {
     op: 'saddleField',
     params: {
@@ -159,7 +167,7 @@ export const saddleFieldDef: OperatorDef = {
           id: 'softness',
           label: 'softness',
           range: [0.04, 0.4],
-          default: 0.12,
+          default: 0.25,
           curve: 'lin',
           unit: 'norm',
           hint: 'Gaussian envelope width — larger values let each saddle reach further',

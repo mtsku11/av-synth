@@ -1,5 +1,7 @@
-import type { CouplingContext } from './coupling';
+import type { CouplingContext, VideoFeatureName } from './coupling';
 import type { ParamSpec } from './params';
+
+export type { VideoFeatureName };
 import { TAU, clamp, lerp } from '../lib/math';
 
 export type GlobalLfoWaveform = 'sine' | 'triangle' | 'saw' | 'ramp' | 'square' | 'sample-hold';
@@ -15,10 +17,13 @@ export interface GlobalLfo {
 
 export interface ParamLfoAssignment {
   lfoIndex: number | null;
+  /** When non-null, the named video feature drives the param (takes priority over lfoIndex). */
+  videoFeature: VideoFeatureName | null;
 }
 
 export interface ParamLfoAssignmentView {
   readonly lfoIndex: number | null;
+  readonly videoFeature: VideoFeatureName | null;
   readonly label: string;
 }
 
@@ -71,18 +76,23 @@ export function createDefaultGlobalLfoBank(): GlobalLfo[] {
 }
 
 export function createParamLfoAssignment(): ParamLfoAssignment {
-  return { lfoIndex: null };
+  return { lfoIndex: null, videoFeature: null };
 }
 
 export function buildParamLfoAssignmentView(
   assignments: Readonly<ParamLfoAssignments>,
   paramId: string,
 ): ParamLfoAssignmentView {
-  const lfoIndex = assignments[paramId]?.lfoIndex ?? null;
-  return {
-    lfoIndex,
-    label: lfoIndex === null ? 'mod off' : `lfo ${lfoIndex + 1}`,
-  };
+  const a = assignments[paramId];
+  const lfoIndex = a?.lfoIndex ?? null;
+  const videoFeature = a?.videoFeature ?? null;
+  let label: string;
+  if (videoFeature !== null) {
+    label = `v.${videoFeature}`;
+  } else {
+    label = lfoIndex === null ? 'mod off' : `lfo ${lfoIndex + 1}`;
+  }
+  return { lfoIndex, videoFeature, label };
 }
 
 export function sampleGlobalLfo(lfo: GlobalLfo, time: number): number {
@@ -105,19 +115,30 @@ export function applyGlobalLfoAssignments(
     next = { ...rawParams };
   }
   for (const [paramId, assignment] of Object.entries(assignments)) {
+    const coupling = specs[paramId];
+    if (!coupling) continue;
+    const [min, max] = coupling.spec.range;
+    const span = max - min;
+
+    if (assignment?.videoFeature) {
+      // Map feature (0..1) linearly across the parameter's full range.
+      const fv = ctx.videoFeatures[assignment.videoFeature] ?? 0;
+      next[paramId] = clamp(min + fv * span, min, max);
+      continue;
+    }
+
     const lfoIndex = assignment?.lfoIndex ?? null;
     if (lfoIndex === null) continue;
     const lfo = ctx.lfoBank[lfoIndex];
-    const coupling = specs[paramId];
-    if (!lfo || !coupling) continue;
-    const [min, max] = coupling.spec.range;
-    const span = max - min;
+    if (!lfo) continue;
     const base = next[paramId] ?? coupling.spec.default;
     const delta = sampleGlobalLfo(lfo, ctx.time) * lfo.amount * span * 0.5;
     next[paramId] = clamp(base + delta, min, max);
   }
   return next;
 }
+
+const VIDEO_FEATURE_NAMES: readonly VideoFeatureName[] = ['luma', 'flux', 'edge', 'motion'];
 
 export function listGlobalLfoOptions(
   bank: readonly GlobalLfo[],
@@ -128,6 +149,11 @@ export function listGlobalLfoOptions(
       id: lfo.id,
       value: String(index),
       label: `lfo ${index + 1}`,
+    })),
+    ...VIDEO_FEATURE_NAMES.map((f) => ({
+      id: `v-${f}`,
+      value: `v:${f}`,
+      label: `v.${f}`,
     })),
   ];
 }

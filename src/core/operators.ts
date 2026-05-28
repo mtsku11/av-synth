@@ -592,13 +592,6 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['matte', 'composite'],
     coreParams: ['amount', 'threshold', 'tolerance', 'invert'],
   },
-  sourceBlend: {
-    family: 'Blend/Composite',
-    blurb:
-      'composite Source B (second loaded video) over the chain — over, add, multiply, or screen',
-    intents: ['composite', 'multi-source', 'blend'],
-    coreParams: ['mix', 'mode'],
-  },
 };
 
 export function registerOp(def: OperatorDef): void {
@@ -683,7 +676,8 @@ export function disposeInstance(instance: OperatorInstance, gl: WebGL2RenderingC
 
 export function isNeutralInstance(instance: OperatorInstance): boolean {
   for (const assignment of Object.values(instance.lfoAssignments)) {
-    if ((assignment?.lfoIndex ?? null) !== null) return false;
+    if ((assignment?.lfoIndex ?? null) !== null || (assignment?.videoFeature ?? null) !== null)
+      return false;
   }
   if (instance.def.paramOrder.length === 0) return false;
   for (const paramId of instance.def.paramOrder) {

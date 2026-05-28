@@ -99,8 +99,11 @@
   import {
     applyGlobalLfoAssignments,
     createParamLfoAssignment,
+    listGlobalLfoOptions,
     type GlobalLfoWaveform,
+    type ParamLfoAssignment,
     type ParamLfoAssignments,
+    type VideoFeatureName,
   } from './core/mod-bank';
 
   let canvasEl: HTMLCanvasElement | undefined = $state();
@@ -224,6 +227,7 @@
     PRESENTATION_LENS_DIRTS,
   ) as PresentationLensDirtName[];
   let presentationLensDirt = $state<PresentationLensDirtName>('none');
+  let bloomStrengthAssignment = $state<ParamLfoAssignment>(createParamLfoAssignment());
   const PUBLIC_PROGRAM_KEYS = new Set([
     'temporalBloomGhost',
     'slitScanEcho',
@@ -972,12 +976,21 @@
     renderer?.resetTemporalState();
   }
 
-  function setOperatorParamLfo(instanceId: string, paramId: string, lfoIndex: number | null): void {
+  function setOperatorModSource(instanceId: string, paramId: string, encoded: string): void {
     const instance = instances.find((candidate) => candidate.id === instanceId);
     if (!instance) return;
     const assignment = instance.lfoAssignments[paramId];
     if (!assignment) return;
-    assignment.lfoIndex = lfoIndex;
+    if (encoded === '') {
+      assignment.lfoIndex = null;
+      assignment.videoFeature = null;
+    } else if (encoded.startsWith('v:')) {
+      assignment.lfoIndex = null;
+      assignment.videoFeature = encoded.slice(2) as VideoFeatureName;
+    } else {
+      assignment.videoFeature = null;
+      assignment.lfoIndex = Number(encoded);
+    }
     instances = [...instances];
     activeProgram = null;
   }
@@ -1163,12 +1176,35 @@
     granulatorRuntimeSnapshot = snapshots.at(-1) ?? null;
   }
 
-  function setGranulatorParamLfo(name: GranulatorSliderParam, lfoIndex: number | null): void {
+  function setGranulatorModSource(name: GranulatorSliderParam, encoded: string): void {
     const existing = granulatorLfoAssignments[name] ?? createParamLfoAssignment();
-    granulatorLfoAssignments = {
-      ...granulatorLfoAssignments,
-      [name]: { ...existing, lfoIndex },
-    };
+    let next = { ...existing };
+    if (encoded === '') {
+      next.lfoIndex = null;
+      next.videoFeature = null;
+    } else if (encoded.startsWith('v:')) {
+      next.lfoIndex = null;
+      next.videoFeature = encoded.slice(2) as VideoFeatureName;
+    } else {
+      next.videoFeature = null;
+      next.lfoIndex = Number(encoded);
+    }
+    granulatorLfoAssignments = { ...granulatorLfoAssignments, [name]: next };
+  }
+
+  function setBloomStrengthModSource(encoded: string): void {
+    const next = { ...bloomStrengthAssignment };
+    if (encoded === '') {
+      next.lfoIndex = null;
+      next.videoFeature = null;
+    } else if (encoded.startsWith('v:')) {
+      next.lfoIndex = null;
+      next.videoFeature = encoded.slice(2) as VideoFeatureName;
+    } else {
+      next.videoFeature = null;
+      next.lfoIndex = Number(encoded);
+    }
+    bloomStrengthAssignment = next;
   }
 
   async function ensureGranulatorClipLoaded(): Promise<boolean> {
@@ -2317,6 +2353,10 @@
   });
 
   $effect(() => {
+    renderer?.setBloomStrengthAssignment(bloomStrengthAssignment);
+  });
+
+  $effect(() => {
     renderer?.setPreviewMode(previewMode);
   });
 
@@ -2739,13 +2779,30 @@
             onAddNode={onAddPatchNode}
             onMove={onMovePatchNode}
             onRemove={onRemovePatchNode}
-            onSetNodeParamLfo={setOperatorParamLfo}
+            onSetNodeModSource={setOperatorModSource}
             onSetNodeParam={setOperatorParamValue}
             onSetNodeBus={onSetPatchNodeBus}
             onSetNodePrimaryInput={onSetPatchNodePrimaryInput}
             onSetNodeSecondaryInput={onSetPatchNodeSecondaryInput}
             onSetSourceControl={setSourceParamValue}
           />
+          <div class="finish-mod-row">
+            <span class="finish-mod-label">bloom</span>
+            <select
+              class="mod-select"
+              value={bloomStrengthAssignment.videoFeature !== null
+                ? `v:${bloomStrengthAssignment.videoFeature}`
+                : bloomStrengthAssignment.lfoIndex === null
+                  ? ''
+                  : String(bloomStrengthAssignment.lfoIndex)}
+              onchange={(e) =>
+                setBloomStrengthModSource((e.currentTarget as HTMLSelectElement).value)}
+            >
+              {#each listGlobalLfoOptions(clock.lfoBank) as opt (opt.id)}
+                <option value={opt.value}>{opt.label}</option>
+              {/each}
+            </select>
+          </div>
         {:else if activeWorkspaceSurface === 'audio'}
           <MasterMeter poll={() => audio.getMasterPeak()} />
           <GranulatorCard
@@ -2766,7 +2823,7 @@
             onSetQuality={setGranulatorQuality}
             onSetAdaptiveQuality={setGranulatorAdaptiveQuality}
             onSetParam={setGranulatorParam}
-            onSetParamLfo={setGranulatorParamLfo}
+            onSetParamLfo={setGranulatorModSource}
           />
           <FeedbackDelayCard values={feedbackDelayParams} onSetParam={setFeedbackDelayParam} />
         {:else if activeWorkspaceSurface === 'lfo'}
@@ -2966,6 +3023,32 @@
   }
 
   .midi-source-select {
+    background: #1d1f25;
+    border: 1px solid #2a2d36;
+    color: #c8ccd4;
+    padding: 2px 4px;
+    font-size: 0.7rem;
+    font-family: inherit;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  .finish-mod-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.6rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .finish-mod-label {
+    color: var(--muted);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    min-width: 3rem;
+  }
+
+  .mod-select {
     background: #1d1f25;
     border: 1px solid #2a2d36;
     color: #c8ccd4;

@@ -38,7 +38,7 @@ describe('global lfo bank', () => {
           },
         },
       },
-      { amount: { lfoIndex: 1 } },
+      { amount: { lfoIndex: 1, videoFeature: null } },
       {
         baseFreq: 1,
         bpm: 120,

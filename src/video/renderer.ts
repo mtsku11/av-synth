@@ -19,7 +19,11 @@
 import type { OperatorInstance } from '../core/operators';
 import { isNeutralInstance } from '../core/operators';
 import { evaluateVideoParams, type CouplingContext, type OperatorCoupling } from '../core/coupling';
-import { applyGlobalLfoAssignments } from '../core/mod-bank';
+import {
+  applyGlobalLfoAssignments,
+  sampleGlobalLfo,
+  type ParamLfoAssignment,
+} from '../core/mod-bank';
 import {
   BUS_INDICES,
   SOURCE_NODE_ID,
@@ -866,8 +870,10 @@ export class VideoRenderer {
   #presentationLut: PresentationLutSelection = 'neutral';
   #presentationPostPreset: PresentationPostPresetName = 'none';
   #presentationLensDirt: PresentationLensDirtName = 'none';
+  #bloomStrengthAssignment: ParamLfoAssignment | null = null;
   #previewMode: PreviewMode = 'single';
   #hasSourceHistory = false;
+  #motionReadbackBuffer: Uint8Array = new Uint8Array(0);
 
   #running = false;
   #rafId = 0;
@@ -902,6 +908,7 @@ export class VideoRenderer {
     this.#structureAnalysisTarget = createTarget(gl, w, h, gl.RGBA8);
     this.#motionFieldTarget = createTarget(gl, motionWidth, motionHeight, gl.RGBA8);
     this.#prevMotionFieldTarget = createTarget(gl, motionWidth, motionHeight, gl.RGBA8);
+    this.#rebuildMotionReadbackBuffer();
     this.#temporalHistory = createTemporalHistoryBuffer(
       gl,
       w,
@@ -1244,6 +1251,27 @@ export class VideoRenderer {
     this.#presentationLensDirt = name;
   }
 
+  setBloomStrengthAssignment(a: ParamLfoAssignment): void {
+    this.#bloomStrengthAssignment = a;
+  }
+
+  // Bloom strength multiplier in [0, 2]. Base = 1.0, span = 2.0.
+  // Zero-alloc: inlines the same math as applyGlobalLfoAssignments for a single param.
+  #bloomMod(ctx: CouplingContext): number {
+    const a = this.#bloomStrengthAssignment;
+    if (!a) return 1.0;
+    if (a.videoFeature !== null) {
+      const fv = ctx.videoFeatures[a.videoFeature] ?? 0;
+      return Math.max(0, Math.min(2, fv * 2));
+    }
+    if (a.lfoIndex === null) return 1.0;
+    const lfo = ctx.lfoBank[a.lfoIndex];
+    if (!lfo) return 1.0;
+    // span=2, base=1.0 → delta = sampleGlobalLfo * amount * span * 0.5 = sample * amount
+    const delta = sampleGlobalLfo(lfo, ctx.time) * lfo.amount;
+    return Math.max(0, Math.min(2, 1.0 + delta));
+  }
+
   setImportedPresentationLut(lut: ImportedPresentationLut | null): void {
     const gl = this.gl;
     if (this.#importedLutAsset) {
@@ -1412,37 +1440,34 @@ export class VideoRenderer {
     return { grid: gridSize, mean, variance, centerOfMass: center };
   }
 
+  #rebuildMotionReadbackBuffer(): void {
+    const { width, height } = this.#motionFieldTarget;
+    const needed = width * height * 4;
+    if (this.#motionReadbackBuffer.length !== needed) {
+      this.#motionReadbackBuffer = new Uint8Array(needed);
+    }
+  }
+
   readMotionEnergy(): number | null {
     const gl = this.gl;
+    const { fbo, width, height } = this.#motionFieldTarget;
     const prevFbo = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.#motionFieldTarget.fbo);
-    const sample = new Uint8Array(4);
-    const xs = [
-      0,
-      Math.max(0, Math.floor(this.#motionFieldTarget.width * 0.25)),
-      Math.max(0, Math.floor(this.#motionFieldTarget.width * 0.5)),
-      Math.max(0, Math.floor(this.#motionFieldTarget.width * 0.75)),
-      Math.max(0, this.#motionFieldTarget.width - 1),
-    ];
-    const ys = [
-      0,
-      Math.max(0, Math.floor(this.#motionFieldTarget.height * 0.25)),
-      Math.max(0, Math.floor(this.#motionFieldTarget.height * 0.5)),
-      Math.max(0, Math.floor(this.#motionFieldTarget.height * 0.75)),
-      Math.max(0, this.#motionFieldTarget.height - 1),
-    ];
-    let total = 0;
-    let count = 0;
-    for (const y of ys) {
-      for (const x of xs) {
-        gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, sample);
-        total += sample[2] ?? 0;
-        count += 1;
-      }
-    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, this.#motionReadbackBuffer);
     const err = gl.getError();
     gl.bindFramebuffer(gl.FRAMEBUFFER, prevFbo);
     if (err !== gl.NO_ERROR) return null;
+    // Sample a 5×5 spatial grid from the CPU-side buffer (same points as before).
+    let total = 0;
+    let count = 0;
+    for (let yi = 0; yi < 5; yi++) {
+      const y = yi === 0 ? 0 : yi === 4 ? height - 1 : Math.floor(height * yi * 0.25);
+      for (let xi = 0; xi < 5; xi++) {
+        const x = xi === 0 ? 0 : xi === 4 ? width - 1 : Math.floor(width * xi * 0.25);
+        total += this.#motionReadbackBuffer[(y * width + x) * 4 + 2] ?? 0;
+        count += 1;
+      }
+    }
     return total / (Math.max(1, count) * 255);
   }
 
@@ -1520,7 +1545,7 @@ export class VideoRenderer {
     this.#updateStructureAnalysis();
     this.#updateMotionField();
 
-    // Render Source B into its target (if loaded) and bind to TEXTURE8 for sourceBlend.
+    // Render Source B into its target (if loaded) and bind to TEXTURE8.
     if (this.#sourceBStage && this.#sourceBTarget) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.#sourceBTarget.fbo);
       gl.viewport(0, 0, this.#sourceBTarget.width, this.#sourceBTarget.height);
@@ -1940,7 +1965,7 @@ export class VideoRenderer {
     gl.uniform1f(this.#uPresentationFeedbackAmount, feedbackAmount);
     const look = PRESENTATION_LOOKS[this.#presentationLook];
     gl.uniform4fv(this.#uPresentationBloomWeights, quality.bloomWeights);
-    gl.uniform1f(this.#uPresentationBloomStrength, quality.bloomStrength);
+    gl.uniform1f(this.#uPresentationBloomStrength, quality.bloomStrength * this.#bloomMod(ctx));
     gl.uniform1f(this.#uPresentationHalationStrength, quality.halationStrength);
     gl.uniform1f(this.#uPresentationGrainAmount, quality.grainAmount);
     gl.uniform3fv(this.#uPresentationBloomTint, look.bloomTint);
@@ -2247,6 +2272,7 @@ export class VideoRenderer {
       scaledDimension(height, MOTION_FIELD_SCALE),
       this.gl.RGBA8,
     );
+    this.#rebuildMotionReadbackBuffer();
     this.#temporalHistory = createTemporalHistoryBuffer(
       this.gl,
       width,

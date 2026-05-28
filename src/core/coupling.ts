@@ -22,6 +22,9 @@ export interface VideoFeatureState {
   motion: number;
 }
 
+/** The four video-derived feature signals available as modulation sources. */
+export type VideoFeatureName = Exclude<keyof VideoFeatureState, 'available'>;
+
 export const EMPTY_VIDEO_FEATURES: VideoFeatureState = {
   available: false,
   luma: 0,

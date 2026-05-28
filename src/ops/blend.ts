@@ -217,19 +217,52 @@ export const layerDef: OperatorDef = {
   },
 };
 
+class BlendVideoStage implements VideoStage {
+  readonly op = 'blend';
+  readonly program: WebGLProgram;
+  #uTex: WebGLUniformLocation;
+  #uTexB: WebGLUniformLocation;
+  #uAmount: WebGLUniformLocation;
+  #uMode: WebGLUniformLocation;
+
+  constructor(gl: WebGL2RenderingContext) {
+    this.program = compileProgram(gl, blendFrag, 'blend');
+    this.#uTex = reqUniform(gl, this.program, 'u_tex', 'blend');
+    this.#uTexB = reqUniform(gl, this.program, 'u_tex_b', 'blend');
+    this.#uAmount = reqUniform(gl, this.program, 'u_amount', 'blend');
+    this.#uMode = reqUniform(gl, this.program, 'u_mode', 'blend');
+  }
+
+  setUniforms(
+    gl: WebGL2RenderingContext,
+    params: Readonly<Record<string, number>>,
+    _ctx: CouplingContext,
+  ): void {
+    gl.uniform1i(this.#uTex, 0);
+    gl.uniform1i(this.#uTexB, 2);
+    gl.uniform1f(this.#uAmount, params['amount'] ?? 0);
+    gl.uniform1i(this.#uMode, Math.round(params['mode'] ?? 0));
+  }
+
+  dispose(gl: WebGL2RenderingContext): void {
+    gl.deleteProgram(this.program);
+  }
+}
+
 export const blendDef: OperatorDef = {
   op: 'blend',
   inputArity: 2,
-  paramOrder: ['amount'],
-  defaults: { amount: 0 },
+  paramOrder: ['amount', 'mode'],
+  defaults: { amount: 0, mode: 0 },
   coupling: {
     op: 'blend',
     params: {
       amount: amountCoupling('crossfade amount (video linear mix / audio equal-power crossfade)'),
+      mode: literalCoupling('mode', 'mode', [0, 3], 0, '0=over  1=add  2=multiply  3=screen'),
     },
   },
   createVideoStage(gl) {
-    return new BinaryVideoStage(gl, 'blend', blendFrag);
+    return new BlendVideoStage(gl);
   },
 };
 
