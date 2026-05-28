@@ -1,7 +1,12 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 
+// GH Pages serves the app from a project subpath (https://<user>.github.io/av-synth/),
+// so the deploy workflow sets VITE_BASE=/av-synth/ at build time. Dev mode stays at '/'.
+const base = process.env.VITE_BASE || '/';
+
 export default defineConfig({
+  base,
   plugins: [svelte()],
 
   // Treat shader sources as raw strings: `import frag from './foo.frag?raw'`
