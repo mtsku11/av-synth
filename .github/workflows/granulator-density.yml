@@ -1,0 +1,69 @@
+name: 'Granulator density-ramp probe'
+
+# Path-filtered probe that ramps density across the UI range and asserts the
+# master peak stays steady. Catches density-related output collapse (e.g.
+# voice-steal / envelope interactions that mute the engine at high spawn
+# rates). Runs on push/PR touching the granulator core, worklet, or params.
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'src/audio/granulator.ts'
+      - 'public/worklets/granulator.js'
+      - 'src/audio/granulator-params.ts'
+      - 'qa/e2e/granulator-density-ramp.spec.ts'
+      - 'qa/playwright.config.ts'
+      - '.github/workflows/granulator-density.yml'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'src/audio/granulator.ts'
+      - 'public/worklets/granulator.js'
+      - 'src/audio/granulator-params.ts'
+      - 'qa/e2e/granulator-density-ramp.spec.ts'
+      - 'qa/playwright.config.ts'
+      - '.github/workflows/granulator-density.yml'
+
+jobs:
+  density-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run granulator density-ramp probe
+        env:
+          PLAYWRIGHT_SERVER_MODE: preview
+          CI: 'true'
+        run: npm run qa:granulatorDensity
+
+      - name: Upload probe artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: granulator-density-probe
+          path: |
+            qa/results/playwright/**
+          retention-days: 14

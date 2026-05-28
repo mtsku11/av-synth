@@ -19,13 +19,16 @@
 
 import { expect, test } from '@playwright/test';
 
-// Use ci-smoke (real video with spatial detail) rather than frame-ramp.
-// frame-ramp's per-frame solid colours make the slit-scan effect rearrange
-// pixels of the same hue across the image — visually different but invisible
-// to a mean-luma diff because the total luminance distribution is identical.
-const FIXTURE_URL = '/qa/fixtures/ci-smoke.mp4';
+// frame-ramp.mp4 is 90 frames of monotonically-increasing solid gray. That
+// determinism lets us read the slit-scan signature directly: with the slit at
+// x=0 and scanSpeed=1, column x maps to a specific past frame, so column
+// brightness varies strongly with x and rows stay flat. Orientation flip
+// pivots that asymmetry to the other axis. ci-smoke (real footage) hides this
+// in a mean-luma diff because the total luminance distribution is preserved
+// across the rearrangement.
+const FIXTURE_URL = '/qa/fixtures/frame-ramp.mp4';
 const WARMUP_MS = 2500;
-const SAMPLE_STRIDE = 8;
+const SAMPLE_STRIDE = 4;
 
 interface CanvasStats {
   width: number;
@@ -146,7 +149,7 @@ test.describe('Slit-scan op', () => {
       if (!fileInput) throw new Error('A: no file input');
       const res = await fetch(url);
       const blob = await res.blob();
-      const file = new File([blob], 'ci-smoke.mp4', { type: 'video/mp4' });
+      const file = new File([blob], 'frame-ramp.mp4', { type: 'video/mp4' });
       const dt = new DataTransfer();
       dt.items.add(file);
       fileInput.files = dt.files;
@@ -236,54 +239,69 @@ test.describe('Slit-scan op', () => {
       scanSpeed: 0,
       depth: 1,
     });
-    const identityBuf = await captureCanvasBuffer(page, 'identity');
+    const identityStats = await captureCanvasStats(page, 'identity');
 
-    // Vertical slit, scanSpeed=1 — output should be visually distinct from identity.
+    // Vertical slit at x=0, scanSpeed=1 — columns map to past frames, so
+    // column-luma should vary strongly across X while row-luma stays flat.
     await setParams({ orientation: 0, slitX: 0, scanSpeed: 1 });
-    const verticalBuf = await captureCanvasBuffer(page, 'vertical');
+    const verticalStats = await captureCanvasStats(page, 'vertical');
 
-    // Horizontal slit, scanSpeed=1 — output should be visually distinct from both.
+    // Horizontal slit at y=0, scanSpeed=1 — pivots the asymmetry to the other
+    // axis: rows vary strongly across Y, columns stay flat.
     await setParams({ orientation: 1, slitY: 0, scanSpeed: 1 });
-    const horizontalBuf = await captureCanvasBuffer(page, 'horizontal');
+    const horizontalStats = await captureCanvasStats(page, 'horizontal');
 
-    // Vertical with slit at the other edge — output should differ from slitX=0.
+    // Vertical with slit at the other edge — column-luma gradient direction
+    // flips sign (column 0 is now oldest instead of newest).
     await setParams({ orientation: 0, slitX: 1, scanSpeed: 1 });
-    const verticalRightBuf = await captureCanvasBuffer(page, 'vertical-right');
+    const verticalRightStats = await captureCanvasStats(page, 'vertical-right');
 
-    const diffActive = await meanLumaDiff(identityBuf, verticalBuf);
-    const diffOrient = await meanLumaDiff(verticalBuf, horizontalBuf);
-    const diffSlit = await meanLumaDiff(verticalBuf, verticalRightBuf);
+    const identitySpread = spread(identityStats.columnsY) + spread(identityStats.rowsX);
+    const verticalColSpread = spread(verticalStats.columnsY);
+    const verticalRowSpread = spread(verticalStats.rowsX);
+    const horizontalColSpread = spread(horizontalStats.columnsY);
+    const horizontalRowSpread = spread(horizontalStats.rowsX);
+    const verticalAsymmetry = verticalColSpread / Math.max(verticalRowSpread, 0.5);
+    const horizontalAsymmetry = horizontalRowSpread / Math.max(horizontalColSpread, 0.5);
+    const verticalGradient =
+      verticalStats.columnsY[0]! - verticalStats.columnsY[verticalStats.columnsY.length - 1]!;
+    const verticalRightGradient =
+      verticalRightStats.columnsY[0]! -
+      verticalRightStats.columnsY[verticalRightStats.columnsY.length - 1]!;
 
     // eslint-disable-next-line no-console
     console.log(
-      `slit-scan diffs: identity↔vertical=${diffActive.toFixed(2)}, vertical↔horizontal=${diffOrient.toFixed(2)}, slitX=0↔slitX=1=${diffSlit.toFixed(2)}`,
+      `slit-scan: identity-spread=${identitySpread.toFixed(2)}, vertical col/row=${verticalColSpread.toFixed(2)}/${verticalRowSpread.toFixed(2)} (asym ${verticalAsymmetry.toFixed(2)}), horizontal col/row=${horizontalColSpread.toFixed(2)}/${horizontalRowSpread.toFixed(2)} (asym ${horizontalAsymmetry.toFixed(2)}), slitX=0 grad=${verticalGradient.toFixed(2)}, slitX=1 grad=${verticalRightGradient.toFixed(2)}`,
     );
 
-    // ── Gate 1 (strict): scanSpeed=0 vs scanSpeed=1 — the op must produce
-    // output that actually depends on scan speed. This proves the shader is
-    // compiling, the history ring is being sampled, and the mix is applied.
+    // ── Gate 1 (strict): scanSpeed=1 produces a column-luma spread that
+    // identity (a single solid gray) cannot. Proves shader + history-ring +
+    // mix are wired.
     expect(
-      diffActive,
-      `Gate 1: scanSpeed=1 must differ from scanSpeed=0. mean luma diff = ${diffActive.toFixed(2)} (need ≥ 0.5)`,
-    ).toBeGreaterThan(0.5);
+      verticalColSpread,
+      `Gate 1: vertical scanSpeed=1 must spread column luma. col-spread = ${verticalColSpread.toFixed(2)} (need > identity-spread ${identitySpread.toFixed(2)} + 8)`,
+    ).toBeGreaterThan(identitySpread + 8);
 
-    // ── Gate 2 (soft): orientation flip and slit-position change. With the
-    // ci-smoke fixture (mostly-static SMPTE bars) the visible motion is small
-    // and the whole-image luma-diff between orientations sits near the noise
-    // floor — even though the per-frame visuals differ. We log both numbers
-    // for observation and only fail if either is essentially zero (which
-    // would mean the parameter wasn't wired through at all).
+    // ── Gate 2 (strict): orientation flip pivots which axis carries the
+    // variance. Vertical mode → columns vary, rows flat. Horizontal mode →
+    // rows vary, columns flat. Asymmetry ratio must be > 2 in each mode and
+    // must swap when orientation flips.
     expect(
-      diffOrient,
-      `Gate 2: vertical and horizontal must not collapse to identical output. mean luma diff = ${diffOrient.toFixed(2)} (need > 0.05)`,
-    ).toBeGreaterThan(0.05);
+      verticalAsymmetry,
+      `Gate 2a: vertical mode must vary across columns, not rows. asymmetry = ${verticalAsymmetry.toFixed(2)} (need > 2)`,
+    ).toBeGreaterThan(2);
     expect(
-      diffSlit,
-      `Gate 3: moving slit position must not collapse to identical output. mean luma diff = ${diffSlit.toFixed(2)} (need > 0.05)`,
-    ).toBeGreaterThan(0.05);
+      horizontalAsymmetry,
+      `Gate 2b: horizontal mode must vary across rows, not columns. asymmetry = ${horizontalAsymmetry.toFixed(2)} (need > 2)`,
+    ).toBeGreaterThan(2);
 
-    void spread;
-    void captureCanvasStats;
+    // ── Gate 3 (strict): moving slit from x=0 to x=1 flips the column-luma
+    // gradient direction. Same signed magnitude, opposite sign — the past
+    // tail now extends from the other side.
+    expect(
+      Math.sign(verticalGradient) * Math.sign(verticalRightGradient),
+      `Gate 3: slitX=0 and slitX=1 must produce opposite-signed column gradients. slitX=0=${verticalGradient.toFixed(2)}, slitX=1=${verticalRightGradient.toFixed(2)}`,
+    ).toBe(-1);
 
     // Quiet console expected — filter known benign noise (404s for optional
     // assets like favicons/probe fixtures, preserveDrawingBuffer warnings,

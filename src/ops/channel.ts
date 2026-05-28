@@ -23,6 +23,7 @@ function makeChannelDef(op: ChannelMode) {
       neutralDefault: false,
       qaCaseIds: ['audit-channel-isolate'],
       qaCoverage: 'shared',
+      caseOperator: 'channel',
     },
   });
 }

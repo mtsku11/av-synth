@@ -63,6 +63,7 @@ import { hueDef } from './hue';
 import { coloramaDef } from './colorama';
 import { addDef, blendDef, diffDef, layerDef, maskDef, multDef, subDef } from './blend';
 import { sumDef } from './sum';
+import { sourceBlendDef } from './sourceBlend';
 
 let registered = false;
 
@@ -140,6 +141,7 @@ export function registerAllOps(): void {
   registerOp(layerDef);
   registerOp(blendDef);
   registerOp(maskDef);
+  registerOp(sourceBlendDef);
 }
 
 // Chain order matches the typical Hydra source-→-geometry-→-color flow,
@@ -211,4 +213,5 @@ export const DEFAULT_CHAIN: readonly string[] = [
   'modulateHueRouted',
   'hue',
   'colorama',
+  'sourceBlend',
 ];

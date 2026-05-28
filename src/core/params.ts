@@ -16,6 +16,11 @@ export type ParamUnit =
   | 'pct' // percent (value × 100)
   | 'amp'; // linear amplitude
 
+export interface ParamChoice {
+  readonly value: number;
+  readonly label: string;
+}
+
 export interface ParamSpec {
   readonly id: string;
   readonly label: string;
@@ -24,6 +29,10 @@ export interface ParamSpec {
   readonly curve: ParamCurve;
   readonly unit: ParamUnit;
   readonly hint?: string;
+  // Discrete enum values for params that read as a mode/picker rather than a
+  // continuous slider (e.g. slitScan.orientation = vertical|horizontal). UIs
+  // render a segmented picker when present; engine still receives a number.
+  readonly choices?: readonly ParamChoice[];
 }
 
 // Where a parameter's value comes from. `static` is the default — a user-set
@@ -49,6 +58,19 @@ export const staticAutomation: AutomationSource = { kind: 'static' };
 // Format a value for display next to a control. Keep this lean — heavier
 // formatting (e.g. note-name display for pitch) goes in dedicated formatters.
 export function formatValue(spec: ParamSpec, value: number): string {
+  const choices = spec.choices;
+  if (choices && choices.length > 0) {
+    let nearest = choices[0]!;
+    let bestDelta = Math.abs(value - nearest.value);
+    for (const choice of choices) {
+      const delta = Math.abs(value - choice.value);
+      if (delta < bestDelta) {
+        bestDelta = delta;
+        nearest = choice;
+      }
+    }
+    return nearest.label;
+  }
   switch (spec.unit) {
     case 'hz':
       if (value < 100) return `${value.toFixed(2)} Hz`;

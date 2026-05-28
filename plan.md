@@ -978,6 +978,21 @@ That stack is:
 
 No GPL/LGPL source from `references/` is copied into `src/`.
 
+### 14.7a Multi-source routing model (2026-05-28, landed)
+
+The video graph previously had one canonical input — `source` (the loaded clip). A second loaded video ("Source B") existed as a renderer-side FBO bound to texture unit 8, but was only addressable through the bespoke `sourceBlend` operator. That violated the coupling-layer principle in this document: routing should be uniform, not per-op.
+
+Model now in place (G1–G5 + G8 landed 2026-05-28; G6/G7 deferred and tracked in `todo.md`):
+
+- Add a second source node `sourceB` alongside `source` in the patch graph (`src/core/graph.svelte.ts`).
+- Every two-input operator's primary/secondary input picker already enumerates `source` + bus returns `src(o0..o3)`; `sourceB` joins that list whenever a second clip is loaded.
+- Bus 1's chain-start defaults to `sourceB` (so "A occupies monitor o0, B occupies monitor o1" works out of the box); buses 0/2/3 still default to `source`. Users override per-node.
+- The dedicated `sourceBlend` op becomes redundant with `blend(primary=source, secondary=sourceB)` — kept for now, deprecation deferred.
+
+This is a routing / coupling change, not a shader or operator-set change. No new audio engines, no expansion of the granulator surface. It is compatible with both the granulator-first audio direction (§0a) and the Hydra-shaped video rack (§1–§7).
+
+If the routing model ever needs to scale to N sources (live webcam, procedural patterns, MIDI-selected clip slots), the same node-in-graph pattern generalises — `sourceC`, `sourceD`, etc. — without changing the two-input operator surface. v1 ships with exactly two sources.
+
 ### 14.8 Status
 
 - `in-progress` (2026-05-24): the reference stack is in-repo, the spec is written, and the granulator implementation is materially underway.

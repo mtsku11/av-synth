@@ -121,6 +121,12 @@ export interface OperatorDef {
     readonly neutralDefault: boolean;
     readonly qaCaseIds: readonly string[];
     readonly qaCoverage: 'dedicated' | 'shared';
+    /**
+     * Operator name expected in each case file's `audit.operator`. Defaults to
+     * `def.op`. Aliased families (e.g. r/g/b/a → "channel") set this once so
+     * the registry validator catches case-id copy-paste defects.
+     */
+    readonly caseOperator?: string;
   };
   createVideoStage(gl: WebGL2RenderingContext): VideoStage;
 }
@@ -584,6 +590,12 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'use one branch as a shaped matte for the other',
     intents: ['matte', 'composite'],
     coreParams: ['amount', 'threshold', 'tolerance', 'invert'],
+  },
+  sourceBlend: {
+    family: 'Blend/Composite',
+    blurb: 'composite Source B (second loaded video) over the chain — over, add, multiply, or screen',
+    intents: ['composite', 'multi-source', 'blend'],
+    coreParams: ['mix', 'mode'],
   },
 };
 

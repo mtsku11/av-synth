@@ -6,6 +6,7 @@ import { buildParamLfoAssignmentView } from './mod-bank';
 import {
   BUS_INDICES,
   SOURCE_NODE_ID,
+  SOURCE_B_NODE_ID,
   busReturnId,
   parseBusReturnId,
   type BusIndex,
@@ -87,6 +88,7 @@ function buildBusReturnOptions(): PatchInputOption[] {
 
 function labelInput(inputId: string, nodeById: ReadonlyMap<string, PatchNode>): string {
   if (inputId === SOURCE_NODE_ID) return 'source';
+  if (inputId === SOURCE_B_NODE_ID) return 'sourceB';
   const bus = parseBusReturnId(inputId);
   if (bus !== null) return `src(o${bus})`;
   const node = nodeById.get(inputId);
@@ -162,6 +164,7 @@ export function compileGraphExecution(
   nodes: readonly PatchNode[],
   instances: readonly OperatorInstance[],
   monitorBus: BusIndex = 0,
+  sourceBPresent: boolean = false,
 ): GraphExecutionPlan {
   const diagnostics: GraphDiagnostic[] = [];
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
@@ -193,11 +196,18 @@ export function compileGraphExecution(
   }
 
   const seen = new Set<string>();
+  // Bus 1 defaults its chain-start input to Source B when a second clip is loaded,
+  // so monitor o0 shows Source A and monitor o1 shows Source B without extra wiring.
+  // Other buses keep defaulting to Source A. The fallback is per-node, not global —
+  // explicit input picks (including `source` itself) win.
+  const defaultSourceFor = (bus: BusIndex): string =>
+    sourceBPresent && bus === 1 ? SOURCE_B_NODE_ID : SOURCE_NODE_ID;
   const resolveInputIds = (node: PatchNode): string[] => {
     const instance = instanceById.get(node.id);
     const inputArity = instance?.def.inputArity ?? 1;
-    const resolved = node.inputs.length > 0 ? [...node.inputs] : [SOURCE_NODE_ID];
-    while (resolved.length < inputArity) resolved.push(SOURCE_NODE_ID);
+    const fallback = defaultSourceFor(node.bus);
+    const resolved = node.inputs.length > 0 ? [...node.inputs] : [fallback];
+    while (resolved.length < inputArity) resolved.push(fallback);
     return resolved.slice(0, inputArity);
   };
   const walk = (nodeId: string): void => {
@@ -219,7 +229,7 @@ export function compileGraphExecution(
     }
     const inputIds = resolveInputIds(node);
     for (const inputId of inputIds) {
-      if (!inputId || inputId === SOURCE_NODE_ID) continue;
+      if (!inputId || inputId === SOURCE_NODE_ID || inputId === SOURCE_B_NODE_ID) continue;
       const bus = parseBusReturnId(inputId);
       if (bus !== null) {
         if (!busOutputIds[bus]) {
@@ -274,6 +284,7 @@ export function buildPatchNodeViews(
   nodes: readonly PatchNode[],
   instances: readonly OperatorInstance[],
   plan: GraphExecutionPlan,
+  sourceBPresent: boolean = false,
 ): PatchNodeView[] {
   const instanceById = new Map(instances.map((instance) => [instance.id, instance]));
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
@@ -299,8 +310,10 @@ export function buildPatchNodeViews(
     const previousNodes = nodes.slice(0, index);
     const selectableNodes = previousNodes.filter((candidate) => candidate.id !== node.id);
     const currentPrimary = node.inputs[0] ? nodeById.get(node.inputs[0]) : null;
+    const sourceOptions: PatchInputOption[] = [{ id: SOURCE_NODE_ID, label: 'source' }];
+    if (sourceBPresent) sourceOptions.push({ id: SOURCE_B_NODE_ID, label: 'sourceB' });
     const primaryInputOptions: PatchInputOption[] = [
-      { id: SOURCE_NODE_ID, label: 'source' },
+      ...sourceOptions,
       ...busReturnOptions,
     ];
     if (
@@ -320,7 +333,7 @@ export function buildPatchNodeViews(
     );
     const currentSecondary = node.inputs[1] ?? SOURCE_NODE_ID;
     const secondaryInputOptions: PatchInputOption[] = [
-      { id: SOURCE_NODE_ID, label: 'source' },
+      ...sourceOptions.filter((option) => option.id !== node.inputs[0]),
       ...busReturnOptions.filter((option) => option.id !== node.inputs[0]),
     ];
     if (

@@ -111,7 +111,11 @@ export const slitScanDef: OperatorDef = {
           default: 0,
           curve: 'lin',
           unit: 'norm',
-          hint: '0 = vertical slit (scan across X), 1 = horizontal slit (scan across Y)',
+          hint: 'vertical slit scans across X; horizontal slit scans across Y',
+          choices: [
+            { value: 0, label: 'vertical' },
+            { value: 1, label: 'horizontal' },
+          ],
         },
         toVideo: (raw) => raw,
       },

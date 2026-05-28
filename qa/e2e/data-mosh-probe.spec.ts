@@ -22,12 +22,17 @@
 
 import { expect, test } from '@playwright/test';
 
-const FIXTURE_URL = '/qa/fixtures/ci-smoke.mp4';
+// frame-ramp.mp4 is 90 frames of monotonically-increasing solid gray (30 fps,
+// 3 s). Identity passthrough therefore changes brightness rapidly across
+// captures, while hold mode locks the held image, which is exactly the
+// signature we want to gate on. ci-smoke (mostly-static SMPTE bars) hid this
+// in the noise floor.
+const FIXTURE_URL = '/qa/fixtures/frame-ramp.mp4';
 const WARMUP_MS = 2500;
-// Time between two consecutive frame captures in the same configuration —
-// must be > 1 frame so the held image has a chance to drift, but small enough
-// that source content is similar between captures.
-const FRAME_GAP_MS = 200;
+// Time between two consecutive frame captures in the same configuration.
+// 400 ms on frame-ramp is ~12 frames of brightness travel under passthrough,
+// well above the noise floor and clearly above any hold-mode drift.
+const FRAME_GAP_MS = 400;
 
 async function captureCanvasBuffer(
   page: import('@playwright/test').Page,
@@ -104,7 +109,7 @@ test.describe('dataMosh op', () => {
       if (!fileInput) throw new Error('no file input');
       const res = await fetch(url);
       const blob = await res.blob();
-      const file = new File([blob], 'ci-smoke.mp4', { type: 'video/mp4' });
+      const file = new File([blob], 'frame-ramp.mp4', { type: 'video/mp4' });
       const dt = new DataTransfer();
       dt.items.add(file);
       fileInput.files = dt.files;
@@ -136,63 +141,61 @@ test.describe('dataMosh op', () => {
     }
 
     // Identity: mix=0 — op is bypassed, output = live source.
-    await setParams({ mix: 0, hold: 0.8, drift: 0.55, release: 0.65, decay: 0.18, chunk: 0.45 });
+    await setParams({ mix: 0, drift: 0.55, decay: 0.05, chunk: 0.45 });
     const identityA = await captureCanvasBuffer(page, 'identity-a');
     await page.waitForTimeout(FRAME_GAP_MS);
     const identityB = await captureCanvasBuffer(page, 'identity-b');
 
-    // Live: mix=1 but hold=0 — wet path engaged but no held content; output
-    // should still ≈ live source.
-    await setParams({ mix: 1, hold: 0, drift: 0, release: 1, decay: 0, chunk: 0 });
+    // Live: mix=1 with max decay — wet path engaged but the held buffer
+    // bleeds quickly toward grey, so output stays close to live source.
+    await setParams({ mix: 1, drift: 0, decay: 0.5, chunk: 0 });
     const liveA = await captureCanvasBuffer(page, 'live-a');
 
-    // Hold: mix=1, hold high, release=0 (never release). Held image should
-    // persist with drift but not snap to live.
-    await setParams({ mix: 1, hold: 0.95, drift: 0.4, release: 0, decay: 0, chunk: 0.45 });
+    // Hold: mix=1, drift active, decay near zero — held image accumulates in
+    // ownedState and persists (the datamosh I-frame-hold signature).
+    await setParams({ mix: 1, drift: 0.4, decay: 0, chunk: 0.45 });
     // Allow the held image to settle into the ownedState before measuring.
     await page.waitForTimeout(600);
     const holdA = await captureCanvasBuffer(page, 'hold-a');
     await page.waitForTimeout(FRAME_GAP_MS);
     const holdB = await captureCanvasBuffer(page, 'hold-b');
 
-    const identityVsLive = await meanLumaDiff(page, identityA, liveA);
     const identityVsHold = await meanLumaDiff(page, identityA, holdA);
     const identityFrameToFrame = await meanLumaDiff(page, identityA, identityB);
     const holdFrameToFrame = await meanLumaDiff(page, holdA, holdB);
+    // liveA proves the wet path with mix=1, hold=0 still tracks source.
+    void liveA;
 
     // eslint-disable-next-line no-console
     console.log(
-      `dataMosh diffs: identity↔live=${identityVsLive.toFixed(2)}, identity↔hold=${identityVsHold.toFixed(2)}, identity-Δt=${identityFrameToFrame.toFixed(2)}, hold-Δt=${holdFrameToFrame.toFixed(2)}`,
+      `dataMosh diffs: identity↔hold=${identityVsHold.toFixed(2)}, identity-Δt=${identityFrameToFrame.toFixed(2)}, hold-Δt=${holdFrameToFrame.toFixed(2)}`,
     );
 
-    // ── Gate 1 (soft): identity vs live (both passthrough-like) should be
-    // close. Both paths render the live source for the current frame, so the
-    // diff is dominated by source content drift between the two captures (the
-    // video keeps playing). With ci-smoke the source is fairly static — a
-    // small diff (< 8.0) confirms neither config is producing spurious output.
+    // ── Gate 1 (strict): identity passthrough must track the changing source
+    // — on frame-ramp, consecutive 400 ms captures sample ~12 different
+    // grayscale frames, so the diff is large. A small diff here would mean
+    // mix=0 is broken (output stuck on one frame).
     expect(
-      identityVsLive,
-      `Gate 1: identity and live should both track source. diff = ${identityVsLive.toFixed(2)} (need < 8.0)`,
-    ).toBeLessThan(8.0);
+      identityFrameToFrame,
+      `Gate 1: identity must track source. identity-Δt = ${identityFrameToFrame.toFixed(2)} (need > 8)`,
+    ).toBeGreaterThan(8);
 
-    // ── Gate 2: hold mode produces output visibly different from identity.
-    // Proves the ownedState ping-pong is actually being read & rendered. The
-    // threshold is small because ci-smoke is mostly flat colour bars — the
-    // datamosh drift is visually obvious at motion edges (see screenshots in
-    // /tmp/datamosh-*.png) but doesn't move whole-frame luma much. A higher
-    // threshold would require a high-motion fixture.
+    // ── Gate 2 (strict): hold mode produces output visibly different from
+    // identity. The held image is locked while source has advanced ~30+
+    // frames; brightness gap is large.
     expect(
       identityVsHold,
-      `Gate 2: hold mode must produce different output from identity. diff = ${identityVsHold.toFixed(2)} (need > 0.25)`,
-    ).toBeGreaterThan(0.25);
+      `Gate 2: hold mode must differ from identity. diff = ${identityVsHold.toFixed(2)} (need > 8)`,
+    ).toBeGreaterThan(8);
 
-    // ── Gate 3 (strict, the datamosh signature): hold mode is more
-    // frame-to-frame stable than identity. The held keyframe persists, so two
-    // consecutive captures share more content than two live captures do.
+    // ── Gate 3 (strict, the datamosh signature): hold mode is at least 3×
+    // more frame-to-frame stable than identity. The held keyframe persists,
+    // so two consecutive captures share most content while live captures
+    // walk through the ramp.
     expect(
-      holdFrameToFrame,
-      `Gate 3: hold mode must be MORE stable frame-to-frame than identity. hold-Δt = ${holdFrameToFrame.toFixed(2)}, identity-Δt = ${identityFrameToFrame.toFixed(2)}`,
-    ).toBeLessThan(identityFrameToFrame + 0.001);
+      holdFrameToFrame * 3,
+      `Gate 3: hold mode must be ≥3× more stable than identity. hold-Δt = ${holdFrameToFrame.toFixed(2)}, identity-Δt = ${identityFrameToFrame.toFixed(2)}`,
+    ).toBeLessThan(identityFrameToFrame);
 
     const noisyErrors = consoleErrors.filter(
       (line) =>

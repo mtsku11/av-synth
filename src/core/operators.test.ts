@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { getDef, getOperatorUiMeta, isNeutralInstance, listOperatorFamilies, listOps } from './operators';
@@ -79,6 +79,7 @@ const EXPECTED_OPERATOR_IDS = [
   'layer',
   'blend',
   'mask',
+  'sourceBlend',
 ] as const;
 
 describe('operator UI metadata', () => {
@@ -170,8 +171,17 @@ describe('operator UI metadata', () => {
 
     for (const { op, audit } of auditedOps) {
       expect(existsSync(resolve(process.cwd(), audit.shaderPath))).toBe(true);
+      const expectedCaseOperator = audit.caseOperator ?? op;
       for (const caseId of audit.qaCaseIds) {
-        expect(existsSync(resolve(process.cwd(), `qa/cases/${caseId}.json`))).toBe(true);
+        const casePath = resolve(process.cwd(), `qa/cases/${caseId}.json`);
+        expect(existsSync(casePath), `missing case file qa/cases/${caseId}.json for op '${op}'`).toBe(true);
+        const caseDoc = JSON.parse(readFileSync(casePath, 'utf8')) as {
+          audit?: { operator?: string };
+        };
+        expect(
+          caseDoc.audit?.operator,
+          `qa/cases/${caseId}.json must declare audit.operator='${expectedCaseOperator}' (op '${op}' references it)`,
+        ).toBe(expectedCaseOperator);
       }
 
       const def = getDef(op);

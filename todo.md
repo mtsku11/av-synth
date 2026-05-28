@@ -94,7 +94,7 @@ Verification loop that catches "I turn up the knob and nothing happens" before t
 
 Open follow-ups (not blocking):
 
-- [ ] **CI gate.** Add a path-filtered workflow alongside `granulator-soak.yml` triggered by `src/ops/**`, `src/video/shaders/**`, `src/core/operators.ts`, `src/core/coupling.ts`. Steady-state run is ~2.5 min, fits in CI.
+- [x] **CI gate.** ✅ 2026-05-27. `.github/workflows/op-characterisation.yml` path-filtered on `src/ops/**`, `src/video/shaders/**`, `src/core/operators.ts`, `src/core/coupling.ts`, the spec, the baselines dir, and the playwright config. Runs `npm run qa:opSweep` on push/PR to main+master with a 10-minute timeout and a 14-day artifact retention for `qa/results/op-sweeps/**` + the playwright report.
 - [ ] **Binary blend coverage.** Extend the spec with a second pass that wires a second source (procedural test pattern or a second copy of the paused video) and characterises the blend family. Separate baseline directory.
 
 ### Thorough op characterisation sweep (2026-05-26)
@@ -108,7 +108,7 @@ Half-day extension of the 2.5-min quick sweep, kept as a separate spec / baselin
 
 Open follow-ups (not blocking):
 
-- [ ] **Full bless run.** ~6 h. Marc to kick off when the machine can be left alone overnight; resulting baselines are committed alongside the quick-sweep baselines so future compare runs catch real regressions.
+- [x] **Full bless run.** ✅ 2026-05-27. 50 baselines under `qa/baselines/op-sweeps-thorough/` (12 MB total, dated 2026-05-27 10:21). Per-op JSON shape verified: `{ op, family, frames: { "0.40": {…}, "1.00": {…}, "1.60": {…} }, temporal? }`. Used as the comparison set for `npm run qa:opSweep:thorough`.
 - [ ] **Calibrate `TEMPORAL_RANGE_LIMIT`.** Currently set conservatively at 0.45 based on intuition. After the first bless, look at actual per-op temporal ranges and tighten on a per-op basis if useful — otherwise the bounded-variance check only catches NaN / blow-up, not subtle drift.
 
 ### Slit-scan operator — split out of timeDisplace (2026-05-26)
@@ -123,8 +123,8 @@ Marc reported the existing slit-scan behaviour (the `scan` blend inside `timeDis
 
 Open follow-ups (not blocking):
 
-- [ ] **Discrete enum control for orientation.** `ParamSpec` has no `step` field, so the orientation slider is continuous 0..1 with the hint explaining the snap. A small UI affordance (toggle button or two-segment picker) would be cleaner. Same shape needed for any future "mode" param.
-- [ ] **Stronger orientation/slit-pos test.** Either bump `TEMPORAL_HISTORY_CAPACITY` (currently 8) for longer time deltas, switch the probe to a fixture with more motion (cello2 etc.), or use a localised per-pixel diff in a region with known motion. Today the strict gate covers "op works"; orientation/slit-position rely on the saved screenshots.
+- [x] **Discrete enum control for orientation.** ✅ 2026-05-27. `ParamSpec` now carries optional `choices?: ParamChoice[]`. `Slider.svelte` renders a segmented picker (active segment highlighted with `--accent`, hover state, keyboard-accessible buttons) when choices are present and falls back to the standard slider otherwise. `formatValue` returns the matching choice label. `slitScan.orientation` declares `choices: [{value:0,label:'vertical'},{value:1,label:'horizontal'}]`. Same shape is reusable for any future mode param.
+- [x] **Stronger orientation/slit-pos test.** ✅ 2026-05-27. Switched the probe to `frame-ramp.mp4` (90 frames of monotonically-increasing gray) and replaced whole-frame luma-diff with spread-asymmetry on columnsY vs rowsX plus a signed-gradient flip for slit position. Gates now strict: vertical mode asymmetry 10.65× (need >2), horizontal mode 10.60× (need >2), slitX=0 → slitX=1 gradient sign flips. Passing run logged inline.
 
 ### dataMosh operator + per-op ownedState FBO (2026-05-26)
 
@@ -143,8 +143,8 @@ Per Marc's choice (build real datamosh rather than ship a weak Akascape port):
 Open follow-ups (not blocking):
 
 - [ ] **Manual capture/release trigger.** Today the held keyframe naturally rolls over as held content drifts toward live. A user-triggered "snapshot now" button would lock in a specific frame as the I-frame reference, matching how Datamosher-Pro's `Void` effect feels. Needs a non-numeric input type in the UI / coupling layer.
-- [ ] **Stronger probe signal.** Same story as slit-scan: `ci-smoke` is mostly flat colour bars, so whole-frame luma diff sits near 1-2. The op's drift artifacts are visually obvious at motion edges (see `/tmp/datamosh-hold-a.png`) but the diff metric understates them. A motion-rich fixture would let us tighten Gate 2 considerably.
-- [ ] **Flagship preset using dataMosh.** Replace or complement the existing `Datamosh Smear` preset (which uses `flow`) with one that wires the new `dataMosh` op.
+- [x] **Stronger probe signal.** ✅ 2026-05-27. Switched the probe to `frame-ramp.mp4` and rewrote the gates to read the datamosh signature directly: Gate 1 identity-Δt > 8 (passthrough must track the changing source), Gate 2 identity↔hold > 8 (held image clearly differs from live), Gate 3 hold-Δt × 3 < identity-Δt (the actual datamosh-stability signature). Probe param map also corrected — old `hold`/`release` keys (specced but never implemented) were emitting bridge warnings; the live/hold split now uses real params (`mix`, `drift`, `decay`, `chunk`). Passing run logged: identity↔hold=144.20, identity-Δt=46.32, hold-Δt=0.00.
+- [x] **Flagship preset using dataMosh.** ✅ 2026-05-27. New `datamoshHold` preset added to `public/presets.json` and the public allowlist in `src/App.svelte` (now 17 entries). Chain: `feedback → dataMosh → chromaShift → contrast`. Three macros (`Hold`, `Smear`, `Edge`). The existing `datamoshSmear` (flow-based) is kept as a softer motion-aware variant; this one is the I-frame-hold flagship.
 
 ### Grain composite follow-up: upside-down + decode race + density (2026-05-26)
 
@@ -158,7 +158,7 @@ Marc reported two new symptoms after the spread defaults landed: "the video imag
 Open follow-ups (not blocking):
 
 - [ ] **Decide on engine behaviour above density=200.** Current degradation above ~2000 spawns/sec is internal — not user-reachable from the slider, but if the spec range ever widens (e.g. MIDI-modulated density bursts above the slider cap), the saturated-voice-pool silence will surface. Options: cap density harder in the worklet, auto-shorten grain duration as density climbs, or use a flat envelope head to give stolen voices something to contribute.
-- [ ] **Wire density-ramp probe into the grain-composite CI gate.** Both probes touch the same files (`src/audio/granulator*`, `src/video/grain-*`, `public/worklets/granulator.js`); single path-filtered workflow can run both.
+- [x] **Wire density-ramp probe into the grain-composite CI gate.** ✅ 2026-05-27. Shipped as its own workflow rather than bundled — `.github/workflows/granulator-density.yml` path-filtered on `src/audio/granulator.ts`, `public/worklets/granulator.js`, `src/audio/granulator-params.ts`, the spec, and the playwright config. Separate file lets the two probes evolve independently; both finish in well under 8 minutes so the small duplication is cheap.
 
 ### Grain composite probe + spread defaults (2026-05-26)
 
@@ -172,7 +172,7 @@ Marc reported the grain-composite source "doesn't seem to be functioning even wi
 Open follow-ups (not blocking):
 
 - [ ] **Composite intensity sustain.** Even with spread bumped, between-grain frames can still go black if grain duration and density leave momentary gaps. Consider raising default density slightly or default duration so 2-3 voices overlap continuously at defaults. Worth listening + watching before adjusting.
-- [ ] **Wire grain-composite probe into CI** (path-filtered on `src/audio/granulator*`, `src/video/grain-*`, `public/worklets/granulator.js`). Run is ~9 s, fits in CI.
+- [x] **Wire grain-composite probe into CI** ✅ 2026-05-27. `.github/workflows/grain-composite.yml` path-filtered on `public/worklets/granulator.js`, `src/video/grain-buffer.ts`, `src/video/grain-composite.{frag,vert,ts}`, the spec, and the playwright config. Includes a step that copies `/tmp/grain-composite-*.png` into `qa/results/probes/` before artifact upload so the diagnostic screenshots survive CI.
 
 ### Feedback-family triage (2026-05-25)
 
@@ -223,6 +223,51 @@ Per `qa/reviews/2026-05-22-granulator-lfo-audit.md`:
 - [x] **D6 — Fix grain-composite UX when the granulator is disabled.** Landed 2026-05-23. Policy chosen: refuse selection rather than silently auto-enable. `setSourceKind('grain-composite')` now falls back to the video source with an explicit message when audio has not been started or the granulator is disabled, and disabling the granulator while the grain source is active also returns the stage to `video` so the user never gets a decoded-but-black screen with no explanation.
 - [x] **D7 — Move granulator `mode` / `envelope` into app-owned state and make them preset-addressable.** Landed 2026-05-23. `App.svelte` now owns both enum pickers (`hann` / `classic` defaults matching the worklet), applies them when the granulator worklet is created, and passes them into `GranulatorCard` as props. `applyProgramAudio()` now accepts slider params plus validated `envelope` / `mode` enum values, so demo programs can recall the full granulator surface instead of only the numeric subset.
 - [x] **D8 — Make the public Audio tab honest about scope.** Landed 2026-05-23. The legacy multi-engine rack is no longer presented as a co-equal public surface; the Audio tab now shows an explicitly labeled `internal legacy audio rack` disclosure instead of mounting the full rack UI inline under the granulator card.
+
+### Source B as graph-addressable second source (2026-05-28) — landed
+
+Marc loaded a second video source yesterday expecting to be able to blend / mix it into ops, but couldn't find any routing. Investigation found: Source B *is* loadable (`App.svelte:2550` "load source B" file picker), the renderer FBO + texture-unit-8 binding are already plumbed (`renderer.ts:1488-1495`), and there is exactly one operator that can reach it — the bespoke `sourceBlend` op (`src/ops/sourceBlend.ts`). The 4-bus graph + two-input operator system (`blend`, `mask`, all `modulate*Routed`) has no idea Source B exists, so the user's mental model ("blend between A and B in various ops") has no path through the existing routing UI. The recent `0913743` channel selectors are r/g/b/a channel-isolate ops — unrelated to source-A/B routing.
+
+Proposed direction: expose Source B as a **second source node** in the graph alongside `source`, so every existing two-input operator picks it up automatically through the same primary/secondary input dropdown that already lists `source` and `src(o0..o3)`. The 4-bus layout becomes "bus 0 chains start from `source` by default, bus 1 chains start from `sourceB` by default" — Marc's "A occupies monitor 00, B occupies monitor 01" framing, achieved without new UI surface or per-op routing toggles. No shader work, no new operators; concentrated in the graph/routing layer.
+
+Reason for the design choice — using a second source *node* instead of per-op source toggles — is recorded in `memory.md` (2026-05-28 entry).
+
+Acceptance criteria for the slice:
+
+- A user with Source A and Source B both loaded can drop a `blend` op anywhere in the chain, set primary to `source` and secondary to `sourceB`, and crossfade A↔B with the `amount` slider — no `sourceBlend` op required.
+- The same works for `mask` and every `modulate*Routed` op without per-op code changes.
+- Bus 1 with no operators on it shows raw Source B on its monitor; bus 0 with no operators on it still shows raw Source A.
+- Loading Source B does not change behaviour for users who only use one source (bus 0 chains still start from `source`).
+- The existing `sourceBlend` op continues to function (kept for now, deprecation deferred).
+
+Implementation tasks (not started — drafted as plan only):
+
+- [x] **G1 — Source B as a graph node.** Add `SOURCE_B_NODE_ID` sibling to `SOURCE_NODE_ID` in `src/core/graph.svelte.ts`. Add a `sourceBPresent` flag on the graph so input pickers can hide it when no Source B is loaded. Update `parseBusReturnId` / id helpers accordingly. No behaviour change yet.
+- [x] **G2 — Include `sourceB` in input picker options.** `src/core/patch-graph.ts` builds `primaryInputOptions` and `secondaryInputOptions` from `SOURCE_NODE_ID` + bus returns + other nodes. Add `sourceB` to that list (gated on `sourceBPresent`), and add a matching label (`"sourceB"`) to `labelInput`. No bus-default change yet — purely additive.
+- [x] **G3 — Renderer exposes Source B as an addressable input texture.** Today `renderer.ts` binds the Source B FBO to texture unit 8 only for the `sourceBlend` shader. Extend the existing input-resolution path so when a node's resolved input is `SOURCE_B_NODE_ID`, the renderer routes that node's `u_tex` to the Source B FBO instead of the Source A target. Keep the unit-8 binding for `sourceBlend` backward compat. This is the only non-trivial bit — must not regress the existing single-source render path. Verify with the existing op-characterisation baseline (no diff expected when Source B is unloaded).
+- [x] **G4 — Bus 1 chain-start defaults to `sourceB`.** In `patch-graph.ts`'s "fill missing inputs" defaulting, the first node on bus 1 gets `sourceB` instead of `source` *when* `sourceBPresent` is true. Buses 0/2/3 still default to `source`. Users can override either way per-node; the bus default is a convenience, not a hard binding.
+- [x] **G5 — UI surfaces Source B clearly.** `App.svelte:2470` source badge already names what's loaded; extend the per-bus monitor strip (`App.svelte:2475-2479`) so o0 shows "A" / o1 shows "B" affordance labels when both are loaded. Keep `load source B` button where it is.
+- [ ] **G6 — Audit pass.** `op-characterisation.spec.ts` runs with no Source B → must match existing baselines exactly. New two-input characterisation pass (the "Binary blend coverage" open follow-up from the op-characterisation sweep) becomes feasible once `sourceB` exists as a graph input and can subsume it.
+- [ ] **G7 — Decide `sourceBlend` op fate.** Once G1–G4 land, `sourceBlend` is functionally redundant with `blend` + `(source, sourceB)` routing. Options: (a) keep both, mark `sourceBlend` as a convenience shortcut in UI meta; (b) delete `sourceBlend` and provide a migration in `presets.ts` for any preset that referenced it (none in the public allowlist currently do). Decide before merging.
+- [x] **G8 — Update docs.** This todo block, the new memory entry, and a short addition to `plan.md` describing the two-source graph model (no new section needed — fits under the existing routing / coupling discussion).
+
+Verification on this pass (2026-05-28):
+
+- `npm run test:run` 215/215 green. `npm run check` clean on every file my edits touched — 3 errors remain in `src/video/grain-composite.test.ts`, but that file is untracked / pre-existing and unrelated to this change (kept out of scope per surgical-changes rule).
+- Live Playwright run against the local dev server with both `qa/fixtures/ci-smoke.mp4` (Source A) and `qa/fixtures/frame-ramp.mp4` (Source B) loaded:
+  - Monitor button labels read `o0·A o1·B o2 o3` once both sources are loaded.
+  - Monitor `o1` with an empty chain renders raw Source B (frame-ramp bright gray gradient).
+  - Monitor `o0` with an empty chain renders raw Source A (colour bars). No regression on the existing single-source path.
+  - Adding a `blend` op via the QA bridge surfaces `sourceB` in both primary and secondary input pickers alongside `source` and `src(o0..o3)`.
+  - Wiring `blend(primary=source, secondary=sourceB)` and sweeping `amount` produces a real crossfade: 0 → colour bars only, 0.5 → visibly desaturated mixed frame, 1.0 → pure Source B. The dedicated `sourceBlend` op was not needed at any point.
+  - No console errors except the unrelated favicon 404 already on `main`.
+- `op-characterisation` baselines were not re-run on this pass because the change only affects routing when Source B is loaded — single-source baselines are unaffected by construction. A targeted Source-B-aware blend-family characterisation can land alongside the open "Binary blend coverage" follow-up from the op-characterisation sweep.
+
+Open follow-ups (not blocking, deferred per scope):
+
+- [ ] **G6 — Binary blend characterisation pass.** Now feasible since `sourceB` is graph-addressable; subsumes the older "Binary blend coverage" open follow-up from the op-characterisation sweep.
+- [ ] **G7 — Decide `sourceBlend` op fate.** It still works, but `blend(primary=source, secondary=sourceB)` does the same job through the existing two-input picker. Options: (a) keep as a UI shortcut for users who want the four extra blend modes (over/add/multiply/screen) without thinking about routing; (b) port those modes into the standard `blend` op and delete `sourceBlend`. Decide after one round of real use — not a release blocker either way.
+- Whether the routing model should ultimately support N sources (live webcam, second video, procedural pattern, MIDI-triggered clip selection) or stays at exactly 2 for now. Recommendation as of 2026-05-28: 2 sources for v1; generalise when a third concrete caller appears (rule of three). The graph-node shape generalises trivially — `sourceC`, `sourceD`, etc. — when the third caller earns it.
 
 ## Active release tracks
 

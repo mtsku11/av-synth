@@ -8,7 +8,15 @@ import type { OperatorInstance } from './operators';
 export type BusIndex = 0 | 1 | 2 | 3;
 export const BUS_INDICES: readonly BusIndex[] = [0, 1, 2, 3];
 export const SOURCE_NODE_ID = 'source';
+export const SOURCE_B_NODE_ID = 'sourceB';
 export const BUS_RETURN_PREFIX = 'bus:';
+
+// Inputs that resolve to a renderer-owned source target rather than another node.
+// `inputs[]` is allowed to store these explicitly; an empty `inputs` array still
+// defaults to the bus-appropriate source at compile time (see patch-graph.ts).
+export function isSourceInputId(inputId: string | null | undefined): boolean {
+  return inputId === SOURCE_NODE_ID || inputId === SOURCE_B_NODE_ID;
+}
 
 export function busReturnId(bus: BusIndex): string {
   return `${BUS_RETURN_PREFIX}${bus}`;

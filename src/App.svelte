@@ -101,11 +101,15 @@
 
   let canvasEl: HTMLCanvasElement | undefined = $state();
   let videoEl: HTMLVideoElement | undefined = $state();
+  let videoElB: HTMLVideoElement | undefined = $state();
   let renderer: VideoRenderer | null = null;
   let initError = $state<string | null>(null);
   let instances = $state<OperatorInstance[]>([]);
   let sourceLoaded = $state(false);
   let loadedVideoName = $state<string | null>(null);
+  let sourceBLoaded = $state(false);
+  let loadedVideoBName = $state<string | null>(null);
+  let sourceBObjectUrl = $state<string | null>(null);
   let programs = $state<VideoEffectProgramBank>({});
   let activeProgram = $state<string | null>(null);
   let activeProgramMacros = $state<Record<string, number>>({});
@@ -210,6 +214,7 @@
     'edgeFeedback',
     'contourBloom',
     'datamoshSmear',
+    'datamoshHold',
     'flowMelt',
     'motionBloomGhost',
     'kaleidoFeedbackTunnel',
@@ -257,9 +262,13 @@
 
   const orderedInstances = $derived(orderInstancesByGraph(instances, graphNodes));
 
-  const graphPlan = $derived(compileGraphExecution(graphNodes, orderedInstances, monitorBus));
+  const graphPlan = $derived(
+    compileGraphExecution(graphNodes, orderedInstances, monitorBus, sourceBLoaded),
+  );
 
-  const patchNodes = $derived(buildPatchNodeViews(graphNodes, orderedInstances, graphPlan));
+  const patchNodes = $derived(
+    buildPatchNodeViews(graphNodes, orderedInstances, graphPlan, sourceBLoaded),
+  );
   const visiblePrograms = $derived(
     Object.entries(programs).filter(([name]) => PUBLIC_PROGRAM_KEYS.has(name)),
   );
@@ -2249,10 +2258,17 @@
   function onSetPatchNodeSecondaryInput(id: string, inputId: string | null): void {
     const node = graph.get(id);
     if (!node) return;
-    const primary = node.inputs[0];
-    const nextInputs = [primary, inputId].filter((input): input is string =>
-      Boolean(input && input !== SOURCE_NODE_ID),
-    );
+    const primary = node.inputs[0] ?? SOURCE_NODE_ID;
+    const secondary = inputId ?? SOURCE_NODE_ID;
+    // Preserve primary explicitly whenever a secondary is set, so source+sourceB
+    // (and source+src(oN)) round-trip correctly. Without the explicit primary,
+    // the secondary would slide into the primary slot at write time.
+    let nextInputs: string[];
+    if (secondary === SOURCE_NODE_ID) {
+      nextInputs = primary === SOURCE_NODE_ID ? [] : [primary];
+    } else {
+      nextInputs = [primary, secondary];
+    }
     graph.setInputs(id, nextInputs);
     resetRendererTemporalState();
     activeProgram = null;
@@ -2402,6 +2418,37 @@
     await playActiveVideoSource();
   }
 
+  async function onSourceBChange(e: Event): Promise<void> {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !renderer || !videoElB) return;
+    if (sourceBObjectUrl) URL.revokeObjectURL(sourceBObjectUrl);
+    const url = URL.createObjectURL(file);
+    sourceBObjectUrl = url;
+    loadedVideoBName = file.name;
+    videoElB.src = url;
+    videoElB.loop = true;
+    videoElB.muted = true;
+    videoElB.preload = 'auto';
+    await new Promise<void>((resolve) => {
+      const onReady = () => { videoElB!.removeEventListener('loadeddata', onReady); resolve(); };
+      if (videoElB!.readyState >= 2) { resolve(); return; }
+      videoElB!.addEventListener('loadeddata', onReady);
+    });
+    void videoElB.play().catch(() => {});
+    renderer.setSourceB(new VideoElementSource(renderer.gl, videoElB));
+    sourceBLoaded = true;
+  }
+
+  function clearSourceB(): void {
+    if (!renderer) return;
+    renderer.setSourceB(null);
+    if (videoElB) { videoElB.src = ''; }
+    if (sourceBObjectUrl) { URL.revokeObjectURL(sourceBObjectUrl); sourceBObjectUrl = null; }
+    sourceBLoaded = false;
+    loadedVideoBName = null;
+  }
+
   function onKeyDown(e: KeyboardEvent): void {
     if (e.repeat) return;
     const t = e.target;
@@ -2425,6 +2472,7 @@
 
 <svelte:window onkeydown={onKeyDown} onkeyup={onKeyUp} />
 <video bind:this={videoEl} style="display:none" playsinline></video>
+<video bind:this={videoElB} style="display:none" playsinline muted></video>
 
 <main class="shell">
   <header class="topbar">
@@ -2442,8 +2490,15 @@
               class:active={monitorBus === bus}
               type="button"
               onclick={() => onSetMonitorBus(bus)}
+              title={sourceBLoaded && bus === 0
+                ? 'monitor bus 0 — defaults to Source A'
+                : sourceBLoaded && bus === 1
+                  ? 'monitor bus 1 — defaults to Source B'
+                  : `monitor bus ${bus}`}
             >
-              o{bus}
+              o{bus}{#if sourceBLoaded && bus === 0}<span class="bus-source">·A</span
+                >{:else if sourceBLoaded && bus === 1}<span class="bus-source">·B</span
+                >{/if}
             </button>
           {/each}
         </div>
@@ -2502,6 +2557,24 @@
           video
         </button>
       </div>
+      <div class="source-actions source-b-actions">
+        <span class="source-status">
+          {#if sourceBLoaded && loadedVideoBName}
+            B: {loadedVideoBName}
+          {:else}
+            source B: none
+          {/if}
+        </span>
+        <label class="file source-file">
+          load source B
+          <input data-qa="source-b-file-input" type="file" accept="video/*" onchange={onSourceBChange} />
+        </label>
+        {#if sourceBLoaded}
+          <button class="source-kind-button" type="button" onclick={clearSourceB}>
+            clear B
+          </button>
+        {/if}
+      </div>
       {#if grainSourceMessage}
         <p class="source-message" role="status" data-qa="grain-source-message">
           {grainSourceMessage}
@@ -2559,7 +2632,11 @@
                 class:empty={!graphPlan.busOutputIds[bus]}
                 class="quad-label"
               >
-                <strong>o{bus}</strong>
+                <strong
+                  >o{bus}{#if sourceBLoaded && bus === 0}<span class="bus-source">·A</span
+                    >{:else if sourceBLoaded && bus === 1}<span class="bus-source">·B</span
+                    >{/if}</strong
+                >
                 <span>{graphPlan.busOutputIds[bus] ? 'live' : 'empty'}</span>
               </div>
             {/each}
@@ -2954,6 +3031,12 @@
     border-color: var(--accent);
     color: var(--accent);
     background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  .bus-source {
+    margin-left: 0.18em;
+    opacity: 0.65;
+    font-size: 0.85em;
   }
 
   .file {

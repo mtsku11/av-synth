@@ -20,7 +20,13 @@ import type { OperatorInstance } from '../core/operators';
 import { isNeutralInstance } from '../core/operators';
 import { evaluateVideoParams, type CouplingContext, type OperatorCoupling } from '../core/coupling';
 import { applyGlobalLfoAssignments } from '../core/mod-bank';
-import { BUS_INDICES, SOURCE_NODE_ID, parseBusReturnId, type BusIndex } from '../core/graph.svelte';
+import {
+  BUS_INDICES,
+  SOURCE_NODE_ID,
+  SOURCE_B_NODE_ID,
+  parseBusReturnId,
+  type BusIndex,
+} from '../core/graph.svelte';
 import type { GraphExecutionPlan } from '../core/patch-graph';
 import { PlaceholderSource, type VideoSourceStage } from './sources';
 import bloomPrefilterFs from './shaders/bloom-prefilter.frag?raw';
@@ -837,6 +843,8 @@ export class VideoRenderer {
   #source: VideoSourceStage;
   #sourceParams: Readonly<Record<string, number>> = {};
   #sourceCoupling: OperatorCoupling | null = null;
+  #sourceBStage: VideoSourceStage | null = null;
+  #sourceBTarget: OffscreenTarget | null = null;
   #instances: readonly OperatorInstance[] = [];
   #plan: GraphExecutionPlan = {
     monitorBus: 0 as BusIndex,
@@ -1260,6 +1268,26 @@ export class VideoRenderer {
     old.dispose(this.gl);
   }
 
+  setSourceB(source: VideoSourceStage | null): void {
+    if (this.#sourceBStage) this.#sourceBStage.dispose(this.gl);
+    this.#sourceBStage = source;
+    if (!source) {
+      if (this.#sourceBTarget) {
+        this.#deleteTarget(this.#sourceBTarget);
+        this.#sourceBTarget = null;
+      }
+      return;
+    }
+    if (!this.#sourceBTarget) {
+      this.#sourceBTarget = createTarget(
+        this.gl,
+        this.canvas.width,
+        this.canvas.height,
+        this.#internalFormat,
+      );
+    }
+  }
+
   /** Procedural sources mutate their own params object; this exposes it. */
   setSourceParams(params: Readonly<Record<string, number>>): void {
     this.#sourceParams = params;
@@ -1413,6 +1441,8 @@ export class VideoRenderer {
     this.#deleteTarget(this.#structureAnalysisTarget);
     this.#deleteTarget(this.#motionFieldTarget);
     this.#deleteTarget(this.#prevMotionFieldTarget);
+    if (this.#sourceBStage) { this.#sourceBStage.dispose(gl); this.#sourceBStage = null; }
+    if (this.#sourceBTarget) { this.#deleteTarget(this.#sourceBTarget); this.#sourceBTarget = null; }
     this.#deleteTemporalHistory();
     this.#deleteBloomPyramid();
     for (const asset of this.#lutTextures.values()) gl.deleteTexture(asset.texture);
@@ -1460,6 +1490,15 @@ export class VideoRenderer {
     this.#source.render(gl, sourceParams, ctx);
     this.#updateStructureAnalysis();
     this.#updateMotionField();
+
+    // Render Source B into its target (if loaded) and bind to TEXTURE8 for sourceBlend.
+    if (this.#sourceBStage && this.#sourceBTarget) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.#sourceBTarget.fbo);
+      gl.viewport(0, 0, this.#sourceBTarget.width, this.#sourceBTarget.height);
+      this.#sourceBStage.render(gl, {}, ctx);
+    }
+    gl.activeTexture(gl.TEXTURE8);
+    gl.bindTexture(gl.TEXTURE_2D, (this.#sourceBTarget ?? this.#emptyTarget).tex);
 
     // 2. Walk the reachable graph in topological order, preserving every
     // node output so later Blend stages can converge multiple branches.
@@ -1707,12 +1746,18 @@ export class VideoRenderer {
   #resolveInputTarget(inputId: string | undefined): OffscreenTarget {
     const bus = parseBusReturnId(inputId);
     if (bus !== null) return this.#busHistory.get(bus) ?? this.#emptyTarget;
+    if (inputId === SOURCE_B_NODE_ID) return this.#sourceBTarget ?? this.#sourceTarget;
     if (!inputId || inputId === SOURCE_NODE_ID) return this.#sourceTarget;
     return this.#nodeTargets.get(inputId) ?? this.#sourceTarget;
   }
 
   #resolveFinalTarget(): OffscreenTarget {
-    if (!this.#plan.monitorNodeId) return this.#sourceTarget;
+    if (!this.#plan.monitorNodeId) {
+      // Bus 1 with no nodes shows raw Source B when a second clip is loaded,
+      // matching the bus-1 chain-start default in compileGraphExecution.
+      if (this.#plan.monitorBus === 1 && this.#sourceBTarget) return this.#sourceBTarget;
+      return this.#sourceTarget;
+    }
     return this.#nodeTargets.get(this.#plan.monitorNodeId) ?? this.#sourceTarget;
   }
 
@@ -2145,6 +2190,10 @@ export class VideoRenderer {
     this.#deleteTarget(this.#structureAnalysisTarget);
     this.#deleteTarget(this.#motionFieldTarget);
     this.#deleteTarget(this.#prevMotionFieldTarget);
+    if (this.#sourceBTarget) {
+      this.#deleteTarget(this.#sourceBTarget);
+      this.#sourceBTarget = createTarget(this.gl, width, height, this.#internalFormat);
+    }
     this.#deleteTemporalHistory();
     this.#deleteBloomPyramid();
     this.#sourceTarget = createTarget(this.gl, width, height, this.#internalFormat);

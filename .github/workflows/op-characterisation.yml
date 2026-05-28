@@ -1,0 +1,73 @@
+name: 'Op characterisation sweep'
+
+# Runs the quick op-characterisation sweep (~2.5 min) against the checked-in
+# baselines on every push/PR that touches an op, shader, registry, or coupling
+# entry. The thorough 6h sweep stays local (qa:opSweep:thorough:bless).
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'src/ops/**'
+      - 'src/video/shaders/**'
+      - 'src/core/operators.ts'
+      - 'src/core/coupling.ts'
+      - 'qa/e2e/op-characterisation.spec.ts'
+      - 'qa/baselines/op-sweeps/**'
+      - 'qa/playwright.config.ts'
+      - '.github/workflows/op-characterisation.yml'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'src/ops/**'
+      - 'src/video/shaders/**'
+      - 'src/core/operators.ts'
+      - 'src/core/coupling.ts'
+      - 'qa/e2e/op-characterisation.spec.ts'
+      - 'qa/baselines/op-sweeps/**'
+      - 'qa/playwright.config.ts'
+      - '.github/workflows/op-characterisation.yml'
+
+jobs:
+  op-sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run op characterisation sweep
+        env:
+          PLAYWRIGHT_SERVER_MODE: preview
+          CI: 'true'
+        run: npm run qa:opSweep
+
+      - name: Upload sweep artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: op-characterisation-sweep
+          path: |
+            qa/results/op-sweeps/**
+            qa/results/playwright/**
+          retention-days: 14
