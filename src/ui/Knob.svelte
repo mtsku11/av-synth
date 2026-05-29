@@ -109,19 +109,28 @@
   .knob {
     display: grid;
     justify-items: center;
-    gap: 0.15rem;
+    gap: 1px;
     font-family: var(--font-mono);
-    font-size: 0.7rem;
+    font-size: 0.62rem;
     user-select: none;
+    min-width: 0;
   }
   .label {
     color: var(--fg);
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
     text-transform: lowercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(var(--size) + 0.5rem);
+    text-align: center;
+    line-height: 1.1;
   }
   .value {
     color: var(--accent);
     font-variant-numeric: tabular-nums;
+    font-size: 0.58rem;
+    line-height: 1.1;
   }
   svg {
     cursor: ns-resize;

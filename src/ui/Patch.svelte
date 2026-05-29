@@ -99,13 +99,24 @@
       <span class="eyebrow">input</span>
       <strong>{sourceLabel}</strong>
       {#if sourceControls.length > 0}
-        <div class="slider-stack">
+        <div class="source-knobs">
           {#each sourceControls as control (control.id)}
-            <Slider
-              spec={control.spec}
-              value={control.value}
-              onValueChange={(value) => onSetSourceControl?.(control.id, value)}
-            />
+            {#if control.spec.choices}
+              <div class="source-choice">
+                <Slider
+                  spec={control.spec}
+                  value={control.value}
+                  onValueChange={(value) => onSetSourceControl?.(control.id, value)}
+                />
+              </div>
+            {:else}
+              <Knob
+                spec={control.spec}
+                value={control.value}
+                size={32}
+                onValueChange={(value) => onSetSourceControl?.(control.id, value)}
+              />
+            {/if}
           {/each}
         </div>
       {:else}
@@ -142,22 +153,12 @@
     {:else}
       <div class="node-list">
         {#each nodes as node (node.id)}
-          {@const meta = getOperatorUiMeta(node.op)}
           <article class:inactive={!node.active} class="node-card">
             <div class="node-head">
               <div class="node-copy">
-                <span class="eyebrow">step {node.order + 1} · {meta.family}</span>
                 <h3>{node.op}</h3>
-                <p class="meta node-blurb">{meta.blurb}</p>
               </div>
               <span class:active-pill={node.status === 'live'} class="pill">{node.status}</span>
-            </div>
-
-            <div class="signal-flow">
-              <span>{node.order === 0 ? sourceLabel : (nodes[node.order - 1]?.op ?? 'source')}</span
-              >
-              <span class="arrow">→</span>
-              <span>{node.op}</span>
             </div>
 
             <div class="knob-grid">
@@ -175,7 +176,7 @@
                     <Knob
                       spec={{ ...param.spec, label: param.label }}
                       value={param.value}
-                      size={44}
+                      size={32}
                       onValueChange={(value) => onSetNodeParam?.(node.id, param.id, value)}
                     />
                     <select
@@ -257,10 +258,6 @@
               </div>
             {/if}
 
-            {#if node.summary.length === 0}
-              <p class="muted">identity defaults</p>
-            {/if}
-
             {#if node.warnings.length > 0}
               <div class="node-warnings">
                 {#each node.warnings as warning (warning)}
@@ -302,12 +299,12 @@
   }
 
   header {
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--line);
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
 
   h2,
@@ -325,7 +322,7 @@
   }
 
   h3 {
-    font-size: 0.95rem;
+    font-size: 0.8rem;
     font-weight: 600;
     text-transform: lowercase;
   }
@@ -334,14 +331,12 @@
   .counts,
   .meta,
   .eyebrow,
-  .muted,
   .actions button {
     font-family: var(--font-mono);
   }
 
   .subhead,
   .counts,
-  .muted,
   .meta {
     color: var(--muted);
     font-size: 0.72rem;
@@ -361,9 +356,9 @@
   }
 
   .chain {
-    padding: 1rem;
+    padding: 0.4rem 0.5rem;
     display: grid;
-    gap: 0.9rem;
+    gap: 0.3rem;
     align-content: start;
     overflow: auto;
   }
@@ -379,12 +374,24 @@
 
   .stack-card,
   .node-card {
-    padding: 0.9rem;
+    padding: 0.35rem 0.5rem;
   }
 
   .source-card {
     display: grid;
-    gap: 0.35rem;
+    gap: 0.25rem;
+  }
+
+  .source-knobs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.3rem;
+    align-items: flex-start;
+  }
+
+  .source-choice {
+    flex: 0 0 100%;
   }
 
   .routing-grid {
@@ -416,34 +423,28 @@
     border-color: var(--accent);
   }
 
-  .slider-stack {
-    display: grid;
-    gap: 0.2rem;
-    margin-top: 0.55rem;
-  }
-
   .knob-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.6rem;
-    margin-top: 0.55rem;
+    gap: 0.25rem;
+    margin-top: 0.2rem;
     align-items: flex-start;
   }
 
   .knob-control {
     display: grid;
     justify-items: center;
-    gap: 0.15rem;
+    gap: 1px;
   }
 
   .knob-mod {
     width: 100%;
-    font-size: 0.6rem;
+    font-size: 0.52rem;
     font-family: var(--font-mono);
     background: var(--bg);
     color: var(--muted);
     border: 1px solid var(--line);
-    padding: 0.1rem 0.15rem;
+    padding: 1px 2px;
     text-transform: lowercase;
     cursor: pointer;
   }
@@ -458,8 +459,8 @@
   }
 
   .routing-panel {
-    margin-top: 0.75rem;
-    padding-top: 0.7rem;
+    margin-top: 0.4rem;
+    padding-top: 0.35rem;
     border-top: 1px solid var(--line);
   }
 
@@ -494,7 +495,7 @@
 
   .node-list {
     display: grid;
-    gap: 0.85rem;
+    gap: 0.3rem;
   }
 
   .node-card.inactive {
@@ -516,10 +517,6 @@
   .node-copy {
     display: grid;
     gap: 0.15rem;
-  }
-
-  .node-blurb {
-    max-width: 28rem;
   }
 
   .mod-control {
@@ -549,22 +546,6 @@
     background: color-mix(in srgb, var(--accent) 10%, transparent);
   }
 
-  .signal-flow {
-    margin: 0.7rem 0 0.15rem;
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    color: var(--muted);
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-family: var(--font-mono);
-  }
-
-  .arrow {
-    color: var(--accent);
-  }
-
   .actions button {
     background: var(--bg);
     color: var(--fg);
@@ -572,7 +553,7 @@
   }
 
   .actions {
-    margin-top: 0.85rem;
+    margin-top: 0.2rem;
   }
 
   .node-warnings {
@@ -596,8 +577,8 @@
   }
 
   .actions button {
-    padding: 0.28rem 0.5rem;
-    font-size: 0.68rem;
+    padding: 0.18rem 0.4rem;
+    font-size: 0.62rem;
   }
 
   .actions button.danger {

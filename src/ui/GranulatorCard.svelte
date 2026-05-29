@@ -12,7 +12,10 @@
     GRANULATOR_MODES,
     GRANULATOR_QUALITIES,
   } from '../audio/granulator';
-  import { GRANULATOR_SLIDER_ORDER, type GranulatorSliderParam } from '../audio/granulator-params';
+  import {
+    GRANULATOR_PARAM_SPECS,
+    type GranulatorSliderParam,
+  } from '../audio/granulator-params';
   import type { MidiBinding, MidiRouter } from '../core/midi';
   import { listGlobalLfoOptions, type GlobalLfo, type ParamLfoAssignments } from '../core/mod-bank';
   import type { ParamSpec } from '../core/params';
@@ -60,91 +63,20 @@
     onSetParamLfo,
   }: Props = $props();
 
-  interface ControlSpec {
-    readonly name: GranulatorSliderParam;
-    readonly label: string;
-    readonly min: number;
-    readonly max: number;
-    readonly step: number;
-    readonly unit: string;
-  }
-
-  // Slider display metadata — kept here rather than in granulator-params.ts because the
-  // unit strings and step sizes are UI concerns, not modulation-fabric concerns. The
-  // ordering and parameter names are sourced from the canonical GRANULATOR_SLIDER_ORDER
-  // in granulator-params.ts.
-  const SLIDER_DISPLAY: Readonly<Record<GranulatorSliderParam, Omit<ControlSpec, 'name'>>> = {
-    position: { label: 'position', min: 0, max: 1, step: 0.001, unit: '0–1' },
-    positionJitter: { label: 'pos jitter', min: 0, max: 1, step: 0.001, unit: '0–1' },
-    pitch: { label: 'pitch', min: -48, max: 48, step: 0.01, unit: 'st' },
-    pitchJitter: { label: 'pitch jitter', min: 0, max: 24, step: 0.01, unit: 'st' },
-    duration: { label: 'duration', min: 5, max: 2000, step: 1, unit: 'ms' },
-    durationJitter: { label: 'dur jitter', min: 0, max: 1, step: 0.001, unit: '0–1' },
-    density: { label: 'density', min: 0.1, max: 200, step: 0.1, unit: 'Hz' },
-    distribution: { label: 'distribution', min: 0, max: 1, step: 0.001, unit: '0–1' },
-    panSpread: { label: 'pan spread', min: 0, max: 1, step: 0.001, unit: '0–1' },
-    ySpread: { label: 'width', min: 0, max: 1, step: 0.001, unit: 'M/S' },
-    reverseProbability: { label: 'reverse p', min: 0, max: 1, step: 0.001, unit: '0–1' },
-    voiceCount: { label: 'voices', min: 1, max: 64, step: 1, unit: '' },
-    gain: { label: 'gain', min: 0, max: 1, step: 0.001, unit: '0–1' },
-    mix: { label: 'mix', min: 0, max: 1, step: 0.001, unit: '0–1' },
-    fmAmount: { label: 'fm amount', min: 0, max: 48, step: 0.01, unit: 'st' },
-    fmFreq: { label: 'fm freq', min: 0.1, max: 500, step: 0.1, unit: 'Hz' },
-    envAttack: { label: 'attack', min: 1, max: 10000, step: 1, unit: 'ms' },
-    envDecay: { label: 'decay', min: 1, max: 10000, step: 1, unit: 'ms' },
-    envSustain: { label: 'sustain', min: 0, max: 1, step: 0.001, unit: '0–1' },
-    envRelease: { label: 'release', min: 1, max: 20000, step: 1, unit: 'ms' },
-  };
-
-  const SLIDERS: readonly ControlSpec[] = GRANULATOR_SLIDER_ORDER.map((name) => ({
-    name,
-    ...SLIDER_DISPLAY[name],
-  }));
-
-  const CTRL_MAP = Object.fromEntries(SLIDERS.map((s) => [s.name, s])) as Record<
-    GranulatorSliderParam,
-    ControlSpec
-  >;
-
-  // Knob params are any with 0–1 range.
-  function isKnobParam(ctrl: ControlSpec): boolean {
-    return ctrl.min === 0 && ctrl.max === 1;
-  }
-
-  const KNOB_DEFAULTS: Partial<Record<GranulatorSliderParam, number>> = {
-    position: 0.5,
-    positionJitter: 0,
-    durationJitter: 0,
-    distribution: 0.5,
-    panSpread: 0,
-    ySpread: 0,
-    reverseProbability: 0,
-    gain: 0.8,
-    mix: 1.0,
-    envSustain: 1.0,
-  };
-
-  function toKnobSpec(ctrl: ControlSpec): ParamSpec {
-    return {
-      id: ctrl.name,
-      label: ctrl.label,
-      range: [0, 1],
-      default: KNOB_DEFAULTS[ctrl.name] ?? 0.5,
-      curve: 'lin',
-      unit: 'norm',
-    };
+  function specFor(name: GranulatorSliderParam): ParamSpec {
+    return GRANULATOR_PARAM_SPECS[name]!.spec;
   }
 
   const GROUPS: readonly { readonly label: string; readonly params: readonly GranulatorSliderParam[] }[] =
     [
       {
-        label: 'grain shape',
+        label: 'grain',
         params: ['position', 'positionJitter', 'duration', 'durationJitter', 'density', 'distribution', 'reverseProbability'],
       },
       { label: 'pitch', params: ['pitch', 'pitchJitter', 'fmAmount', 'fmFreq'] },
       { label: 'space', params: ['panSpread', 'ySpread'] },
-      { label: 'envelope', params: ['envAttack', 'envDecay', 'envSustain', 'envRelease'] },
-      { label: 'output', params: ['voiceCount', 'gain', 'mix'] },
+      { label: 'env', params: ['envAttack', 'envDecay', 'envSustain', 'envRelease'] },
+      { label: 'out', params: ['voiceCount', 'gain', 'mix'] },
     ];
 
   // MIDI-learn state. learningParam is the name of the slider awaiting a MIDI surface
@@ -290,74 +222,40 @@
     </label>
   </section>
 
-  <section class="diagnostics" data-qa="granulator-diagnostics">
-    <div class="diag-row">
-      <span class="diag-label">voices</span>
-      <span class="diag-value">{formatVoiceSummary(runtimeSnapshot)}</span>
-    </div>
-    <div class="diag-row">
-      <span class="diag-label">interp</span>
-      <span class="diag-value">{runtimeSnapshot?.interpMode ?? 'n/a'}</span>
-    </div>
-    <div class="diag-row">
-      <span class="diag-label">quality</span>
-      <span class="diag-value">
-        {#if runtimeSnapshot}
-          {runtimeSnapshot.requestedQuality}
-          {#if runtimeSnapshot.effectiveQuality !== runtimeSnapshot.requestedQuality}
-            → {runtimeSnapshot.effectiveQuality}
-          {/if}
-        {:else}
-          n/a
-        {/if}
-      </span>
-    </div>
-    <div class="diag-row">
-      <span class="diag-label">budget</span>
-      <span class="diag-value">
-        {#if !runtimeSnapshot}
-          n/a
-        {:else if runtimeSnapshot.budgetLimited}
-          limited
-        {:else}
-          clear
-        {/if}
-      </span>
-    </div>
-    <div class="diag-row">
-      <span class="diag-label">pitch load</span>
-      <span class="diag-value"
-        >{runtimeSnapshot ? runtimeSnapshot.pitchLoad.toFixed(1) : 'n/a'}</span
-      >
-    </div>
-  </section>
+  <div class="diagnostics" data-qa="granulator-diagnostics">
+    <span class="diag-label">voices</span><span class="diag-value">{formatVoiceSummary(runtimeSnapshot)}</span>
+    <span class="diag-sep">·</span>
+    <span class="diag-label">interp</span><span class="diag-value">{runtimeSnapshot?.interpMode ?? 'n/a'}</span>
+    <span class="diag-sep">·</span>
+    <span class="diag-label">budget</span><span class="diag-value">{!runtimeSnapshot ? 'n/a' : runtimeSnapshot.budgetLimited ? 'lim' : 'ok'}</span>
+  </div>
 
   <section class="param-sections">
     {#each GROUPS as group (group.label)}
       <div class="param-group">
         <span class="group-label">{group.label}</span>
-        <div class="group-params">
+        <div class="group-knobs">
           {#each group.params as name (name)}
-            {@const ctrl = CTRL_MAP[name]}
-            {#if isKnobParam(ctrl)}
-              <div class="knob-item">
-                <Knob
-                  spec={toKnobSpec(ctrl)}
-                  value={values[ctrl.name]}
-                  size={42}
-                  onValueChange={(v) => onSetParam(ctrl.name, v)}
-                />
+            {@const spec = specFor(name)}
+            <div class="knob-item">
+              <Knob
+                {spec}
+                value={values[name]}
+                size={32}
+                onValueChange={(v) => onSetParam(name, v)}
+              />
+              <div class="knob-aux">
                 <select
                   class="param-mod"
-                  value={lfoAssignments[ctrl.name]?.videoFeature != null
-                    ? `v:${lfoAssignments[ctrl.name]?.videoFeature}`
-                    : lfoAssignments[ctrl.name]?.lfoIndex == null
+                  value={lfoAssignments[name]?.videoFeature != null
+                    ? `v:${lfoAssignments[name]?.videoFeature}`
+                    : lfoAssignments[name]?.lfoIndex == null
                       ? ''
-                      : String(lfoAssignments[ctrl.name]?.lfoIndex)}
+                      : String(lfoAssignments[name]?.lfoIndex)}
                   onchange={(event) =>
-                    onSetParamLfo(ctrl.name, (event.currentTarget as HTMLSelectElement).value)}
+                    onSetParamLfo(name, (event.currentTarget as HTMLSelectElement).value)}
                   disabled={!granulator}
-                  data-qa={`gran-lfo-${ctrl.name}`}
+                  data-qa={`gran-lfo-${name}`}
                 >
                   {#each lfoOptions as option (option.id)}
                     <option value={option.value}>{option.label}</option>
@@ -366,70 +264,19 @@
                 <button
                   type="button"
                   class="learn"
-                  class:learning={learningParam === ctrl.name}
-                  class:bound={!!bindingsByParam[ctrl.name]}
+                  class:learning={learningParam === name}
+                  class:bound={!!bindingsByParam[name]}
                   disabled={!midiRouter}
                   onclick={() =>
-                    bindingsByParam[ctrl.name]
-                      ? clearBinding(ctrl.name)
-                      : startLearn(ctrl.name, { min: ctrl.min, max: ctrl.max })}
-                  data-qa={`gran-learn-${ctrl.name}`}
+                    bindingsByParam[name]
+                      ? clearBinding(name)
+                      : startLearn(name, { min: spec.range[0], max: spec.range[1] })}
+                  data-qa={`gran-learn-${name}`}
                 >
-                  {learningParam === ctrl.name ? '…' : bindingLabel(bindingsByParam[ctrl.name] ?? null)}
+                  {learningParam === name ? '…' : bindingLabel(bindingsByParam[name] ?? null)}
                 </button>
               </div>
-            {:else}
-              <div class="slider-item">
-                <label class="slider-label" for={`gran-${ctrl.name}`}>{ctrl.label}</label>
-                <input
-                  id={`gran-${ctrl.name}`}
-                  type="range"
-                  min={ctrl.min}
-                  max={ctrl.max}
-                  step={ctrl.step}
-                  value={values[ctrl.name]}
-                  oninput={(e) =>
-                    onSetParam(ctrl.name, Number((e.currentTarget as HTMLInputElement).value))}
-                  disabled={!granulator}
-                  data-qa={`gran-${ctrl.name}`}
-                />
-                <span class="slider-value"
-                  >{(values[ctrl.name] ?? 0).toFixed(ctrl.step < 1 ? 3 : 0)}{ctrl.unit
-                    ? ` ${ctrl.unit}`
-                    : ''}</span
-                >
-                <select
-                  class="param-mod"
-                  value={lfoAssignments[ctrl.name]?.videoFeature != null
-                    ? `v:${lfoAssignments[ctrl.name]?.videoFeature}`
-                    : lfoAssignments[ctrl.name]?.lfoIndex == null
-                      ? ''
-                      : String(lfoAssignments[ctrl.name]?.lfoIndex)}
-                  onchange={(event) =>
-                    onSetParamLfo(ctrl.name, (event.currentTarget as HTMLSelectElement).value)}
-                  disabled={!granulator}
-                  data-qa={`gran-lfo-${ctrl.name}`}
-                >
-                  {#each lfoOptions as option (option.id)}
-                    <option value={option.value}>{option.label}</option>
-                  {/each}
-                </select>
-                <button
-                  type="button"
-                  class="learn"
-                  class:learning={learningParam === ctrl.name}
-                  class:bound={!!bindingsByParam[ctrl.name]}
-                  disabled={!midiRouter}
-                  onclick={() =>
-                    bindingsByParam[ctrl.name]
-                      ? clearBinding(ctrl.name)
-                      : startLearn(ctrl.name, { min: ctrl.min, max: ctrl.max })}
-                  data-qa={`gran-learn-${ctrl.name}`}
-                >
-                  {learningParam === ctrl.name ? '…' : bindingLabel(bindingsByParam[ctrl.name] ?? null)}
-                </button>
-              </div>
-            {/if}
+            </div>
           {/each}
         </div>
       </div>
@@ -441,17 +288,15 @@
   .granulator-card {
     background: var(--bg);
     border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 16px;
+    padding: 6px 8px;
     font-family: var(--font-mono);
     color: var(--fg);
   }
   .granulator-card header {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    margin-bottom: 12px;
+    gap: 1px;
+    margin-bottom: 5px;
   }
   .title-row {
     display: flex;
@@ -459,7 +304,7 @@
     justify-content: space-between;
   }
   .title-row h2 {
-    font-size: 14px;
+    font-size: 0.8rem;
     font-weight: 600;
     text-transform: lowercase;
     letter-spacing: 0.04em;
@@ -468,51 +313,50 @@
   .enable {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 11px;
+    gap: 5px;
+    font-size: 0.65rem;
     color: var(--muted);
   }
   .status {
-    font-size: 11px;
+    font-size: 0.65rem;
     color: var(--muted);
     margin: 0;
   }
   .mode-row {
     display: flex;
-    gap: 16px;
-    margin-bottom: 12px;
+    gap: 6px;
+    margin-bottom: 5px;
     flex-wrap: wrap;
+    align-items: center;
   }
   .picker {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
   }
   .adaptive-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 11px;
+    gap: 4px;
+    font-size: 0.62rem;
     color: var(--muted);
   }
   .picker-label {
-    font-size: 11px;
+    font-size: 0.62rem;
     color: var(--muted);
-    min-width: 60px;
   }
   .picker-buttons {
     display: flex;
-    gap: 2px;
+    gap: 1px;
   }
   .picker-buttons button {
     background: var(--bg);
     border: 1px solid var(--line);
     color: var(--fg);
-    padding: 4px 8px;
-    font-size: 11px;
+    padding: 2px 6px;
+    font-size: 0.62rem;
     font-family: inherit;
     cursor: pointer;
-    border-radius: 3px;
   }
   .picker-buttons button.active {
     background: color-mix(in srgb, var(--accent) 25%, var(--bg));
@@ -524,89 +368,73 @@
     cursor: not-allowed;
   }
   .diagnostics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 8px 12px;
-    margin-bottom: 12px;
-    padding: 10px 12px;
+    display: flex;
+    gap: 4px;
+    align-items: baseline;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+    padding: 3px 6px;
     border: 1px solid var(--line);
-    border-radius: 6px;
     background: color-mix(in srgb, var(--bg) 85%, black);
   }
-  .diag-row {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
   .diag-label {
-    font-size: 10px;
+    font-size: 0.55rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--muted);
   }
   .diag-value {
-    font-size: 12px;
+    font-size: 0.6rem;
     color: var(--fg);
+    margin-right: 2px;
   }
-  /* grouped param sections */
+  .diag-sep {
+    font-size: 0.55rem;
+    color: var(--line);
+    margin: 0 1px;
+  }
   .param-sections {
     display: grid;
-    gap: 10px;
+    gap: 4px;
   }
   .param-group {
     display: grid;
-    gap: 6px;
+    gap: 2px;
   }
   .group-label {
-    font-size: 10px;
+    font-size: 0.52rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--muted);
     border-bottom: 1px solid var(--line);
-    padding-bottom: 3px;
+    padding-bottom: 1px;
   }
-  .group-params {
+  .group-knobs {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 3px;
     align-items: flex-start;
   }
-  /* knob params */
   .knob-item {
     display: grid;
     justify-items: center;
-    gap: 3px;
+    gap: 1px;
+    min-width: 0;
   }
-  /* slider params (full width within group) */
-  .slider-item {
-    flex: 0 0 100%;
-    display: grid;
-    grid-template-columns: 90px 1fr 70px 78px 70px;
+  .knob-aux {
+    display: flex;
+    gap: 2px;
     align-items: center;
-    gap: 8px;
-    font-size: 11px;
   }
-  .slider-label {
-    color: var(--muted);
-  }
-  .slider-item input[type='range'] {
-    width: 100%;
-  }
-  .slider-value {
-    text-align: right;
-    color: var(--fg);
-    font-variant-numeric: tabular-nums;
-  }
-  /* shared mod/lfo select for both knob and slider params */
   .param-mod {
-    width: 100%;
     background: var(--bg);
     border: 1px solid var(--line);
     color: var(--muted);
-    padding: 2px 3px;
-    font-size: 9px;
+    padding: 1px 2px;
+    font-size: 0.52rem;
     font-family: var(--font-mono);
     cursor: pointer;
+    max-width: 3.5rem;
   }
   .param-mod:disabled {
     opacity: 0.4;
@@ -616,11 +444,11 @@
     background: var(--bg);
     border: 1px solid var(--line);
     color: var(--muted);
-    padding: 3px 6px;
-    font-size: 10px;
+    padding: 1px 3px;
+    font-size: 0.52rem;
     font-family: inherit;
     cursor: pointer;
-    border-radius: 3px;
+    white-space: nowrap;
   }
   .learn:disabled {
     opacity: 0.4;

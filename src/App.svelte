@@ -95,7 +95,7 @@
   import LfoBank from './ui/LfoBank.svelte';
   import Patch from './ui/Patch.svelte';
   import ProgramMacros from './ui/ProgramMacros.svelte';
-  import Slider from './ui/Slider.svelte';
+  import Knob from './ui/Knob.svelte';
   import type { ParamSpec } from './core/params';
   import {
     applyGlobalLfoAssignments,
@@ -2602,8 +2602,6 @@
   <header class="topbar">
     <div class="brand">
       <h1>av-synth</h1>
-      <span class="boot">M5.7 · {instances.length} ops · source: {sourceBadge}</span>
-      <span class="cursor" aria-hidden="true">█</span>
     </div>
     <div class="stage-controls">
       <label class="stage-group">
@@ -2774,33 +2772,37 @@
       </div>
       {#if sourceKind === 'grain-composite' && !grainFullFrame}
         <div class="grain-size-row">
-          <Slider
+          <Knob
             spec={GRAIN_SIZE_SPEC}
             value={grainHalfSize}
+            size={34}
             onValueChange={(v) => {
               grainHalfSize = v;
               if (grainCompositeSource) grainCompositeSource.halfSize = v;
             }}
           />
-          <Slider
+          <Knob
             spec={GRAIN_UV_SCALE_SPEC}
             value={grainUvScale}
+            size={34}
             onValueChange={(v) => {
               grainUvScale = v;
               if (grainCompositeSource) grainCompositeSource.uvScale = v;
             }}
           />
-          <Slider
+          <Knob
             spec={GRAIN_SOFTNESS_SPEC}
             value={grainSoftness}
+            size={34}
             onValueChange={(v) => {
               grainSoftness = v;
               if (grainCompositeSource) grainCompositeSource.softness = v;
             }}
           />
-          <Slider
+          <Knob
             spec={GRAIN_DEPTH_SPEC}
             value={grainDepth}
+            size={34}
             onValueChange={(v) => {
               grainDepth = v;
               if (grainCompositeSource) grainCompositeSource.depth = v;
@@ -3200,7 +3202,11 @@
   }
 
   .grain-size-row {
-    padding: 0 0.1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: flex-start;
+    padding: 0.2rem 0;
   }
 
   .source-file {
@@ -3229,24 +3235,6 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--accent);
-  }
-
-  .boot {
-    color: var(--muted);
-    font-size: 0.75rem;
-  }
-
-  .cursor {
-    color: var(--accent);
-    font-size: 0.75rem;
-    margin-left: -0.4rem;
-    animation: blink 1s steps(2, start) infinite;
-  }
-
-  @keyframes blink {
-    to {
-      visibility: hidden;
-    }
   }
 
   .stage-controls {
