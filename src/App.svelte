@@ -95,6 +95,7 @@
   import LfoBank from './ui/LfoBank.svelte';
   import Patch from './ui/Patch.svelte';
   import ProgramMacros from './ui/ProgramMacros.svelte';
+  import Slider from './ui/Slider.svelte';
   import type { ParamSpec } from './core/params';
   import {
     applyGlobalLfoAssignments,
@@ -176,9 +177,42 @@
     l: 74,
   };
   const heldKeys = new Set<string>();
+  const GRAIN_SIZE_SPEC: ParamSpec = {
+    id: 'grain-size',
+    label: 'grain size',
+    range: [0.05, 1.0],
+    default: 0.35,
+    curve: 'lin',
+    unit: 'pct',
+  };
+
+  const GRAIN_UV_SCALE_SPEC: ParamSpec = {
+    id: 'grain-uv-scale',
+    label: 'uv window',
+    range: [0.05, 1.0],
+    default: 1.0,
+    curve: 'lin',
+    unit: 'pct',
+  };
+
+  const GRAIN_SOFTNESS_SPEC: ParamSpec = {
+    id: 'grain-softness',
+    label: 'soft edge',
+    range: [0, 1],
+    default: 0,
+    curve: 'lin',
+    unit: 'norm',
+  };
+
   let grainBuffer: GrainBuffer | null = null;
   let grainScheduler: GrainScheduler | null = null;
   let grainCompositeSource: GrainCompositeSource | null = null;
+  let grainFullFrame = $state(false);
+  let grainHalfSize = $state(0.35);
+  let grainUvScale = $state(1.0);
+  let grainAspectCorrect = $state(false);
+  let grainSoftness = $state(0.0);
+  let grainAdditive = $state(false);
   let grainSourceMessage = $state<string | null>(null);
   // Decode-progress channel, kept distinct from grainSourceMessage (which is refusal-only).
   // grainDecodedSrc remembers which videoEl.src has already been uploaded into the texture
@@ -1976,7 +2010,13 @@
     if (!grainCompositeSource) {
       grainCompositeSource = new GrainCompositeSource(renderer.gl, grainBuffer, grainScheduler, {
         clock: () => (audio.isInitialised ? audio.ctx.currentTime : performance.now() / 1000),
+        halfSize: grainHalfSize,
       });
+      grainCompositeSource.fullFrame = grainFullFrame;
+      grainCompositeSource.uvScale = grainUvScale;
+      grainCompositeSource.aspectCorrect = grainAspectCorrect;
+      grainCompositeSource.softness = grainSoftness;
+      grainCompositeSource.additive = grainAdditive;
     }
     grainCompositeSource.setPlan(planResult.plan);
     return grainCompositeSource;
@@ -2620,6 +2660,44 @@
         >
           grain composite
         </button>
+        {#if sourceKind === 'grain-composite'}
+          <button
+            class="source-kind-button"
+            type="button"
+            data-qa="grain-full-frame"
+            aria-pressed={grainFullFrame}
+            onclick={() => {
+              grainFullFrame = !grainFullFrame;
+              if (grainCompositeSource) grainCompositeSource.fullFrame = grainFullFrame;
+            }}
+          >
+            full frame
+          </button>
+          <button
+            class="source-kind-button"
+            type="button"
+            data-qa="grain-aspect-correct"
+            aria-pressed={grainAspectCorrect}
+            onclick={() => {
+              grainAspectCorrect = !grainAspectCorrect;
+              if (grainCompositeSource) grainCompositeSource.aspectCorrect = grainAspectCorrect;
+            }}
+          >
+            aspect
+          </button>
+          <button
+            class="source-kind-button"
+            type="button"
+            data-qa="grain-additive"
+            aria-pressed={grainAdditive}
+            onclick={() => {
+              grainAdditive = !grainAdditive;
+              if (grainCompositeSource) grainCompositeSource.additive = grainAdditive;
+            }}
+          >
+            additive
+          </button>
+        {/if}
         <button
           class="source-kind-button"
           type="button"
@@ -2650,6 +2728,34 @@
           <button class="source-kind-button" type="button" onclick={clearSourceB}> clear B </button>
         {/if}
       </div>
+      {#if sourceKind === 'grain-composite' && !grainFullFrame}
+        <div class="grain-size-row">
+          <Slider
+            spec={GRAIN_SIZE_SPEC}
+            value={grainHalfSize}
+            onValueChange={(v) => {
+              grainHalfSize = v;
+              if (grainCompositeSource) grainCompositeSource.halfSize = v;
+            }}
+          />
+          <Slider
+            spec={GRAIN_UV_SCALE_SPEC}
+            value={grainUvScale}
+            onValueChange={(v) => {
+              grainUvScale = v;
+              if (grainCompositeSource) grainCompositeSource.uvScale = v;
+            }}
+          />
+          <Slider
+            spec={GRAIN_SOFTNESS_SPEC}
+            value={grainSoftness}
+            onValueChange={(v) => {
+              grainSoftness = v;
+              if (grainCompositeSource) grainCompositeSource.softness = v;
+            }}
+          />
+        </div>
+      {/if}
       {#if grainSourceMessage}
         <p class="source-message" role="status" data-qa="grain-source-message">
           {grainSourceMessage}
@@ -3069,6 +3175,10 @@
     gap: 0.5rem;
     align-items: center;
     flex-wrap: wrap;
+  }
+
+  .grain-size-row {
+    padding: 0 0.1rem;
   }
 
   .source-file {
