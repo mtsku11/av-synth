@@ -11,18 +11,18 @@
 import type { GrainBufferPlan } from '../video/grain-buffer';
 
 export const ENV_TABLE_LEN = 2048;
-const GRAIN_EVENT_RING_FIELDS = 10;
-const GRAIN_EVENT_WRITE_SEQ_IDX = 0;
-const GRAIN_EVENT_F_VOICE_ID = 0;
-const GRAIN_EVENT_F_SEED = 1;
-const GRAIN_EVENT_F_SPAWN_TIME = 2;
-const GRAIN_EVENT_F_DURATION_SEC = 3;
-const GRAIN_EVENT_F_POSITION_SEC = 4;
-const GRAIN_EVENT_F_PITCH_RATIO = 5;
-const GRAIN_EVENT_F_PAN_X = 6;
-const GRAIN_EVENT_F_PAN_Y = 7;
-const GRAIN_EVENT_F_REVERSE = 8;
-const GRAIN_EVENT_F_ENVELOPE_INDEX = 9;
+export const GRAIN_EVENT_RING_FIELDS = 10;
+export const GRAIN_EVENT_WRITE_SEQ_IDX = 0;
+export const GRAIN_EVENT_F_VOICE_ID = 0;
+export const GRAIN_EVENT_F_SEED = 1;
+export const GRAIN_EVENT_F_SPAWN_TIME = 2;
+export const GRAIN_EVENT_F_DURATION_SEC = 3;
+export const GRAIN_EVENT_F_POSITION_SEC = 4;
+export const GRAIN_EVENT_F_PITCH_RATIO = 5;
+export const GRAIN_EVENT_F_PAN_X = 6;
+export const GRAIN_EVENT_F_PAN_Y = 7;
+export const GRAIN_EVENT_F_REVERSE = 8;
+export const GRAIN_EVENT_F_ENVELOPE_INDEX = 9;
 export const ENV_HANN = 0;
 export const ENV_TUKEY25 = 1;
 export const ENV_GAUSSIAN = 2;
@@ -51,6 +51,24 @@ export interface RenderedVoice {
   readonly panX: number;
   readonly panY: number;
 }
+
+/** Return shape for {@link GrainScheduler.getActiveVoices}. The `voices` array is reused
+ * across calls — callers must not hold a reference to it past the next `getActiveVoices`
+ * call. Read `count` voices from index 0. */
+export interface ActiveVoiceView {
+  readonly voices: readonly RenderedVoice[];
+  readonly count: number;
+}
+
+/** Maximum simultaneous voices the pre-allocated pool supports. */
+export const MAX_RENDERED_VOICES = 64;
+
+type MutableVoice = { -readonly [K in keyof RenderedVoice]: RenderedVoice[K] };
+
+// Must match GRAIN_EVENT_RING_CAPACITY in public/worklets/granulator.js and granulator.ts.
+// The pool ceiling is the ring capacity so a full-ring drain can never overflow the pool.
+const MAX_GRAIN_EVENTS = 2048;
+type MutableGrainEvent = { -readonly [K in keyof GrainEvent]: GrainEvent[K] };
 
 // Envelope LUTs — formulas copied 1:1 from public/worklets/granulator.js buildEnvelopeLuts.
 // Keep these in sync if the worklet shapes change; the spec §7 identical-statistics rule
@@ -186,7 +204,13 @@ export interface GrainEventRingTransport {
 }
 
 export class GrainScheduler {
-  #events: GrainEvent[] = [];
+  // Pre-allocated grain-event pool — drained from the ring directly into slots, never allocated
+  // per-event. Pool is large enough to hold a full ring drain without overflow.
+  #eventPool: MutableGrainEvent[] = Array.from({ length: MAX_GRAIN_EVENTS }, () => ({
+    voiceId: 0, seed: 0, spawnTime: 0, durationSec: 0, positionSec: 0,
+    pitchRatio: 1, panX: 0, panY: 0, reverse: 0, envelopeIndex: 0,
+  }));
+  #eventCount = 0;
   #node: WorkletNodeLike;
   #prevHandler: ((ev: MessageEvent) => void) | null;
   #disposed = false;
@@ -194,6 +218,11 @@ export class GrainScheduler {
   #ringData: Float64Array | null = null;
   #ringCapacity = 0;
   #ringReadSeq = 0;
+  // Pre-allocated voice pool — filled in place by getActiveVoices, never reallocated.
+  #voicePool: MutableVoice[] = Array.from({ length: MAX_RENDERED_VOICES }, () => ({
+    voiceId: 0, frameIndex: 0, envelopePhase: 0, envelopeAlpha: 0, panX: 0, panY: 0,
+  }));
+  #activeVoiceViewData: { voices: readonly RenderedVoice[]; count: number } = { voices: this.#voicePool, count: 0 };
 
   constructor(node: WorkletNodeLike, ringTransport?: GrainEventRingTransport | null) {
     this.#node = node;
@@ -211,7 +240,7 @@ export class GrainScheduler {
       if (data && data.type === 'grainRing') {
         this.#attachRing(data.capacity, data.header, data.data);
       } else if (data && data.type === 'grain') {
-        this.#events.push(data as unknown as GrainEvent);
+        this.ingest(data as unknown as GrainEvent);
       }
       this.#prevHandler?.(ev);
     };
@@ -255,61 +284,98 @@ export class GrainScheduler {
       readSeq = writeSeq - capacity;
     }
     for (; readSeq < writeSeq; readSeq++) {
+      if (this.#eventCount >= MAX_GRAIN_EVENTS) break;
       const off = (readSeq % capacity) * GRAIN_EVENT_RING_FIELDS;
-      this.#events.push({
-        voiceId: ring[off + GRAIN_EVENT_F_VOICE_ID]! | 0,
-        seed: ring[off + GRAIN_EVENT_F_SEED]! >>> 0,
-        spawnTime: ring[off + GRAIN_EVENT_F_SPAWN_TIME]!,
-        durationSec: ring[off + GRAIN_EVENT_F_DURATION_SEC]!,
-        positionSec: ring[off + GRAIN_EVENT_F_POSITION_SEC]!,
-        pitchRatio: ring[off + GRAIN_EVENT_F_PITCH_RATIO]!,
-        panX: ring[off + GRAIN_EVENT_F_PAN_X]!,
-        panY: ring[off + GRAIN_EVENT_F_PAN_Y]!,
-        reverse: ring[off + GRAIN_EVENT_F_REVERSE]! | 0,
-        envelopeIndex: ring[off + GRAIN_EVENT_F_ENVELOPE_INDEX]! | 0,
-      });
+      const slot = this.#eventPool[this.#eventCount]!;
+      slot.voiceId = ring[off + GRAIN_EVENT_F_VOICE_ID]! | 0;
+      slot.seed = ring[off + GRAIN_EVENT_F_SEED]! >>> 0;
+      slot.spawnTime = ring[off + GRAIN_EVENT_F_SPAWN_TIME]!;
+      slot.durationSec = ring[off + GRAIN_EVENT_F_DURATION_SEC]!;
+      slot.positionSec = ring[off + GRAIN_EVENT_F_POSITION_SEC]!;
+      slot.pitchRatio = ring[off + GRAIN_EVENT_F_PITCH_RATIO]!;
+      slot.panX = ring[off + GRAIN_EVENT_F_PAN_X]!;
+      slot.panY = ring[off + GRAIN_EVENT_F_PAN_Y]!;
+      slot.reverse = ring[off + GRAIN_EVENT_F_REVERSE]! | 0;
+      slot.envelopeIndex = ring[off + GRAIN_EVENT_F_ENVELOPE_INDEX]! | 0;
+      this.#eventCount++;
     }
     this.#ringReadSeq = writeSeq;
   }
 
   ingest(event: GrainEvent): void {
-    this.#events.push(event);
+    if (this.#eventCount >= MAX_GRAIN_EVENTS) return;
+    const slot = this.#eventPool[this.#eventCount]!;
+    slot.voiceId = event.voiceId;
+    slot.seed = event.seed;
+    slot.spawnTime = event.spawnTime;
+    slot.durationSec = event.durationSec;
+    slot.positionSec = event.positionSec;
+    slot.pitchRatio = event.pitchRatio;
+    slot.panX = event.panX;
+    slot.panY = event.panY;
+    slot.reverse = event.reverse;
+    slot.envelopeIndex = event.envelopeIndex;
+    this.#eventCount++;
   }
 
   prune(now: number): void {
     this.#drainRing();
     let w = 0;
-    for (let r = 0; r < this.#events.length; r++) {
-      const e = this.#events[r]!;
+    for (let r = 0; r < this.#eventCount; r++) {
+      const e = this.#eventPool[r]!;
       if (!isExpired(e, now)) {
-        if (w !== r) this.#events[w] = e;
+        if (w !== r) {
+          // Compact by field-copy: pool slots stay at their fixed positions.
+          const dst = this.#eventPool[w]!;
+          dst.voiceId = e.voiceId;
+          dst.seed = e.seed;
+          dst.spawnTime = e.spawnTime;
+          dst.durationSec = e.durationSec;
+          dst.positionSec = e.positionSec;
+          dst.pitchRatio = e.pitchRatio;
+          dst.panX = e.panX;
+          dst.panY = e.panY;
+          dst.reverse = e.reverse;
+          dst.envelopeIndex = e.envelopeIndex;
+        }
         w++;
       }
     }
-    this.#events.length = w;
+    this.#eventCount = w;
   }
 
-  getActiveVoices(now: number, plan: GrainBufferPlan, maxVoices = 64): readonly RenderedVoice[] {
+  getActiveVoices(now: number, plan: GrainBufferPlan, maxVoices = MAX_RENDERED_VOICES): ActiveVoiceView {
     this.prune(now);
-    const out: RenderedVoice[] = [];
-    const n = Math.min(this.#events.length, maxVoices);
+    const pool = this.#voicePool;
+    let count = 0;
+    const n = Math.min(this.#eventCount, maxVoices);
     for (let i = 0; i < n; i++) {
-      const ev = this.#events[i]!;
+      const ev = this.#eventPool[i]!;
       if (now < ev.spawnTime) continue;
-      out.push(resolveVoice(ev, now, plan));
+      const slot = pool[count]!;
+      const elapsedSec = now - ev.spawnTime;
+      const phase = computeEnvelopePhase(elapsedSec, ev.durationSec);
+      slot.voiceId = ev.voiceId;
+      slot.frameIndex = computeFrameIndex(ev.positionSec, ev.pitchRatio, elapsedSec, plan.fps, plan.frameCount);
+      slot.envelopePhase = phase;
+      slot.envelopeAlpha = computeEnvelopeAlpha(phase, ev.envelopeIndex);
+      slot.panX = ev.panX;
+      slot.panY = ev.panY;
+      count++;
     }
-    return out;
+    this.#activeVoiceViewData.count = count;
+    return this.#activeVoiceViewData;
   }
 
   get activeCount(): number {
     this.#drainRing();
-    return this.#events.length;
+    return this.#eventCount;
   }
 
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
     this.#node.port.onmessage = this.#prevHandler;
-    this.#events.length = 0;
+    this.#eventCount = 0;
   }
 }

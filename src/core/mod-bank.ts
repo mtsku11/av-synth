@@ -110,11 +110,12 @@ export function applyGlobalLfoAssignments(
   let next: Record<string, number>;
   if (scratch) {
     next = scratch;
-    for (const key of Object.keys(rawParams)) next[key] = rawParams[key]!;
+    for (const key in rawParams) next[key] = rawParams[key]!;
   } else {
     next = { ...rawParams };
   }
-  for (const [paramId, assignment] of Object.entries(assignments)) {
+  for (const paramId in assignments) {
+    const assignment = assignments[paramId];
     const coupling = specs[paramId];
     if (!coupling) continue;
     const [min, max] = coupling.spec.range;

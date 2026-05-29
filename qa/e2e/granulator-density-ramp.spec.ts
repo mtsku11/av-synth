@@ -127,14 +127,14 @@ test.describe('Granulator density ramp', () => {
       });
     }
 
-    // eslint-disable-next-line no-console
+     
     console.log('=== density ramp readings ===');
-    // eslint-disable-next-line no-console
+     
     console.table(readings);
-    // eslint-disable-next-line no-console
+     
     console.log('=== console events captured (' + consoleEvents.length + ') ===');
     for (const e of consoleEvents.slice(-30)) {
-      // eslint-disable-next-line no-console
+       
       console.log(`[${e.type}] ${e.text}`);
     }
   });

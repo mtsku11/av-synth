@@ -39,6 +39,10 @@ function link(gl: WebGL2RenderingContext, vs: WebGLShader, fs: WebGLShader): Web
   return p;
 }
 
+// Per-instance VBO layout: [panX, panY, frameIndex, envelopeAlpha] — 4 floats, 16 bytes/voice.
+const INSTANCE_FLOATS = 4;
+const INSTANCE_STRIDE = INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT; // 16
+
 export interface GrainCompositeOptions {
   readonly clock: () => number;
   readonly halfSize?: number;
@@ -49,11 +53,13 @@ export class GrainCompositeSource implements VideoSourceStage {
   readonly kind = 'grain-composite';
 
   #program: WebGLProgram;
-  #uCenter: WebGLUniformLocation;
   #uHalfSize: WebGLUniformLocation;
   #uGrain: WebGLUniformLocation;
-  #uLayer: WebGLUniformLocation;
-  #uAlpha: WebGLUniformLocation;
+
+  #vao: WebGLVertexArrayObject;
+  #instanceVBO: WebGLBuffer;
+  // Pre-allocated instance data buffer — written each frame, never reallocated.
+  #instanceData: Float32Array;
 
   #buffer: GrainBuffer;
   #scheduler: GrainScheduler;
@@ -81,19 +87,40 @@ export class GrainCompositeSource implements VideoSourceStage {
     gl.deleteShader(vs);
     gl.deleteShader(fs);
 
-    const center = gl.getUniformLocation(this.#program, 'u_center');
     const half = gl.getUniformLocation(this.#program, 'u_halfSize');
     const grain = gl.getUniformLocation(this.#program, 'u_grain');
-    const layer = gl.getUniformLocation(this.#program, 'u_layer');
-    const alpha = gl.getUniformLocation(this.#program, 'u_alpha');
-    if (!center || !half || !grain || !layer || !alpha) {
+    if (!half || !grain) {
       throw new Error('grain-composite: missing uniform locations');
     }
-    this.#uCenter = center;
     this.#uHalfSize = half;
     this.#uGrain = grain;
-    this.#uLayer = layer;
-    this.#uAlpha = alpha;
+
+    this.#instanceData = new Float32Array(this.#maxVoices * INSTANCE_FLOATS);
+
+    const vbo = gl.createBuffer();
+    const vao = gl.createVertexArray();
+    if (!vbo || !vao) throw new Error('grain-composite: failed to create VAO/VBO');
+    this.#instanceVBO = vbo;
+    this.#vao = vao;
+
+    // Set up the instance attribute layout inside the VAO.
+    // layout(location=0): a_center vec2  — offset  0, stride 16
+    // layout(location=1): a_layer  float — offset  8, stride 16
+    // layout(location=2): a_alpha  float — offset 12, stride 16
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, this.#instanceData.byteLength, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, INSTANCE_STRIDE, 0);
+    gl.vertexAttribDivisor(0, 1);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 1, gl.FLOAT, false, INSTANCE_STRIDE, 8);
+    gl.vertexAttribDivisor(1, 1);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 1, gl.FLOAT, false, INSTANCE_STRIDE, 12);
+    gl.vertexAttribDivisor(2, 1);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.bindVertexArray(null);
   }
 
   setPlan(plan: GrainBufferPlan | null): void {
@@ -115,8 +142,19 @@ export class GrainCompositeSource implements VideoSourceStage {
     const plan = this.#plan;
     if (!plan || !this.#buffer.isAllocated) return;
 
-    const voices = this.#scheduler.getActiveVoices(this.#clock(), plan, this.#maxVoices);
-    if (voices.length === 0) return;
+    const { voices, count } = this.#scheduler.getActiveVoices(this.#clock(), plan, this.#maxVoices);
+    if (count === 0) return;
+
+    // Fill instance data — zero-alloc write into pre-allocated Float32Array.
+    const data = this.#instanceData;
+    for (let i = 0; i < count; i++) {
+      const v = voices[i]!;
+      const base = i * INSTANCE_FLOATS;
+      data[base] = v.panX;
+      data[base + 1] = v.panY;
+      data[base + 2] = v.frameIndex;
+      data[base + 3] = v.envelopeAlpha;
+    }
 
     gl.useProgram(this.#program);
     gl.activeTexture(gl.TEXTURE0);
@@ -124,16 +162,16 @@ export class GrainCompositeSource implements VideoSourceStage {
     gl.uniform1i(this.#uGrain, 0);
     gl.uniform2f(this.#uHalfSize, this.#halfSize, this.#halfSize);
 
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.#instanceVBO);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, count * INSTANCE_FLOATS);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
     gl.enable(gl.BLEND);
     gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-    for (let i = 0; i < voices.length; i++) {
-      const v = voices[i]!;
-      gl.uniform2f(this.#uCenter, v.panX, v.panY);
-      gl.uniform1f(this.#uLayer, v.frameIndex);
-      gl.uniform1f(this.#uAlpha, v.envelopeAlpha);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    }
+    gl.bindVertexArray(this.#vao);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, count);
+    gl.bindVertexArray(null);
 
     gl.disable(gl.BLEND);
   }
@@ -141,6 +179,8 @@ export class GrainCompositeSource implements VideoSourceStage {
   dispose(gl: WebGL2RenderingContext): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    gl.deleteVertexArray(this.#vao);
+    gl.deleteBuffer(this.#instanceVBO);
     gl.deleteProgram(this.#program);
   }
 }

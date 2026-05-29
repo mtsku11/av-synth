@@ -148,8 +148,8 @@ describe('GrainScheduler', () => {
     const node = makeStubNode();
     const sched = new GrainScheduler(node);
     sched.ingest(makeEvent({ voiceId: 7, spawnTime: 1.0, durationSec: 0.1 }));
-    const active = sched.getActiveVoices(1.05, PLAN);
-    expect(active.length).toBe(1);
+    const { voices: active, count } = sched.getActiveVoices(1.05, PLAN);
+    expect(count).toBe(1);
     expect(active[0]!.voiceId).toBe(7);
     sched.dispose();
   });
@@ -168,7 +168,7 @@ describe('GrainScheduler', () => {
     const node = makeStubNode();
     const sched = new GrainScheduler(node);
     sched.ingest(makeEvent({ voiceId: 99, spawnTime: 5.0, durationSec: 0.1 }));
-    expect(sched.getActiveVoices(1.0, PLAN).length).toBe(0);
+    expect(sched.getActiveVoices(1.0, PLAN).count).toBe(0);
     sched.dispose();
   });
 
@@ -178,7 +178,7 @@ describe('GrainScheduler', () => {
     node.port.onmessage?.({
       data: { type: 'grain', ...makeEvent({ voiceId: 42 }) },
     } as MessageEvent);
-    const active = sched.getActiveVoices(1.05, PLAN);
+    const { voices: active } = sched.getActiveVoices(1.05, PLAN);
     expect(active[0]!.voiceId).toBe(42);
     sched.dispose();
   });
@@ -215,8 +215,8 @@ describe('GrainScheduler', () => {
     dataView[9] = ENV_HANN;
     Atomics.store(headerView, 0, 1);
 
-    const active = sched.getActiveVoices(1.05, PLAN);
-    expect(active.length).toBe(1);
+    const { voices: active, count } = sched.getActiveVoices(1.05, PLAN);
+    expect(count).toBe(1);
     expect(active[0]!.voiceId).toBe(77);
     expect(active[0]!.panX).toBe(0.25);
     expect(active[0]!.panY).toBe(-0.5);
@@ -246,8 +246,8 @@ describe('GrainScheduler', () => {
     dataView[9] = ENV_HANN;
     Atomics.store(headerView, 0, 1);
 
-    const active = sched.getActiveVoices(1.05, PLAN);
-    expect(active.length).toBe(1);
+    const { voices: active, count } = sched.getActiveVoices(1.05, PLAN);
+    expect(count).toBe(1);
     expect(active[0]!.voiceId).toBe(55);
     sched.dispose();
   });

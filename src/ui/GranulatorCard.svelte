@@ -81,7 +81,7 @@
     density: { label: 'density', min: 0.1, max: 200, step: 0.1, unit: 'Hz' },
     distribution: { label: 'distribution', min: 0, max: 1, step: 0.001, unit: '0–1' },
     panSpread: { label: 'pan spread', min: 0, max: 1, step: 0.001, unit: '0–1' },
-    ySpread: { label: 'y spread', min: 0, max: 1, step: 0.001, unit: '0–1' },
+    ySpread: { label: 'width', min: 0, max: 1, step: 0.001, unit: 'M/S' },
     reverseProbability: { label: 'reverse p', min: 0, max: 1, step: 0.001, unit: '0–1' },
     voiceCount: { label: 'voices', min: 1, max: 64, step: 1, unit: '' },
     gain: { label: 'gain', min: 0, max: 1, step: 0.001, unit: '0–1' },

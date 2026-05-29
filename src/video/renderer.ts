@@ -16,7 +16,7 @@
 // step blits it. The prev-frame texture is always allocated so feedback can
 // be inserted anywhere in the chain.
 
-import type { OperatorInstance } from '../core/operators';
+import type { OperatorInstance, VideoStageRendererResources } from '../core/operators';
 import { isNeutralInstance } from '../core/operators';
 import { evaluateVideoParams, type CouplingContext, type OperatorCoupling } from '../core/coupling';
 import {
@@ -852,7 +852,12 @@ export class VideoRenderer {
   #instances: readonly OperatorInstance[] = [];
   #instanceScratch = new Map<
     string,
-    { raw: Record<string, number>; eval: Record<string, number> }
+    {
+      raw: Record<string, number>;
+      eval: Record<string, number>;
+      resources: VideoStageRendererResources;
+      ownedStateScratch: NonNullable<VideoStageRendererResources['ownedState']>;
+    }
   >();
   #sourceScratch: Record<string, number> = {};
   #plan: GraphExecutionPlan = {
@@ -1343,7 +1348,19 @@ export class VideoRenderer {
         raw[k] = 0;
         ev[k] = 0;
       }
-      this.#instanceScratch.set(step.id, { raw, eval: ev });
+      const ownedStateScratch: NonNullable<VideoStageRendererResources['ownedState']> = {
+        textureUnit: 6,
+        width: 0,
+        height: 0,
+        initialized: false,
+      };
+      const resources: VideoStageRendererResources = {
+        temporalHistory: { textureUnit: 3, capacity: 0, validCount: 0, writeIndex: 0, width: 0, height: 0 },
+        structureAnalysis: { textureUnit: 4, width: 0, height: 0 },
+        motionField: { textureUnit: 5, width: 0, height: 0, scale: MOTION_FIELD_SCALE },
+        ownedState: null,
+      };
+      this.#instanceScratch.set(step.id, { raw, eval: ev, resources, ownedStateScratch });
     }
     this.#syncNodeTargets();
   }
@@ -1626,35 +1643,31 @@ export class VideoRenderer {
         stepScratch?.raw,
       );
       const params = evaluateVideoParams(instance.def.coupling, rawParams, ctx, stepScratch?.eval);
-      instance.videoStage.bindRendererResources?.(gl, {
-        temporalHistory: {
-          textureUnit: 3,
-          capacity: this.#temporalHistory.capacity,
-          validCount: this.#temporalHistory.validCount,
-          writeIndex: this.#temporalHistory.writeIndex,
-          width: this.#temporalHistory.width,
-          height: this.#temporalHistory.height,
-        },
-        structureAnalysis: {
-          textureUnit: 4,
-          width: this.#structureAnalysisTarget.width,
-          height: this.#structureAnalysisTarget.height,
-        },
-        motionField: {
-          textureUnit: 5,
-          width: this.#motionFieldTarget.width,
-          height: this.#motionFieldTarget.height,
-          scale: MOTION_FIELD_SCALE,
-        },
-        ownedState: ownedState
-          ? {
-              textureUnit: 6,
-              width: ownedState.width,
-              height: ownedState.height,
-              initialized: ownedState.framesWritten > 0,
-            }
-          : null,
-      });
+      if (instance.videoStage.bindRendererResources && stepScratch) {
+        const res = stepScratch.resources;
+        const th = res.temporalHistory!;
+        th.capacity = this.#temporalHistory.capacity;
+        th.validCount = this.#temporalHistory.validCount;
+        th.writeIndex = this.#temporalHistory.writeIndex;
+        th.width = this.#temporalHistory.width;
+        th.height = this.#temporalHistory.height;
+        const sa = res.structureAnalysis!;
+        sa.width = this.#structureAnalysisTarget.width;
+        sa.height = this.#structureAnalysisTarget.height;
+        const mf = res.motionField!;
+        mf.width = this.#motionFieldTarget.width;
+        mf.height = this.#motionFieldTarget.height;
+        if (ownedState) {
+          const os = stepScratch.ownedStateScratch;
+          os.width = ownedState.width;
+          os.height = ownedState.height;
+          os.initialized = ownedState.framesWritten > 0;
+          res.ownedState = os;
+        } else {
+          res.ownedState = null;
+        }
+        instance.videoStage.bindRendererResources(gl, res);
+      }
       instance.videoStage.setUniforms(gl, params, ctx);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 

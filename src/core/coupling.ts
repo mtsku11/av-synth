@@ -92,7 +92,8 @@ export function evaluateVideoParams(
   scratch?: Record<string, number>,
 ): Record<string, number> {
   const out = scratch ?? ({} as Record<string, number>);
-  for (const [paramId, coupling] of Object.entries(spec.params)) {
+  for (const paramId in spec.params) {
+    const coupling = spec.params[paramId]!;
     const raw = rawParams[paramId] ?? coupling.spec.default;
     out[paramId] = coupling.toVideo(raw, ctx);
   }

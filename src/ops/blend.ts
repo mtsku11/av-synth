@@ -11,6 +11,9 @@ import { compileProgram, reqUniform } from '../video/glsl';
 
 export const BLEND_OPS = ['add', 'sub', 'mult', 'diff', 'layer', 'blend', 'mask'] as const;
 
+// All BinaryVideoStage shaders hard-code output alpha to 1.0 (premultiplied-alpha pipeline
+// invariant). If a future op needs to preserve source alpha (e.g. after a luma key), every
+// binary shader below must be updated to pass alpha through rather than clamping to 1.0.
 class BinaryVideoStage implements VideoStage {
   readonly op: string;
   readonly program: WebGLProgram;

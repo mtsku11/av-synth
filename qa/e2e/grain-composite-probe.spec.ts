@@ -251,7 +251,7 @@ test.describe('Grain composite probe', () => {
       if (diag) diagSamples.push({ ts: Date.now() - start, ...diag });
       await page.waitForTimeout(COMPOSITE_SAMPLE_INTERVAL_MS);
     }
-    // eslint-disable-next-line no-console
+     
     console.log(
       `[grain-composite-probe] granulator diag: ${diagSamples.length > 0 ? `first=${JSON.stringify(diagSamples[0])} last=${JSON.stringify(diagSamples[diagSamples.length - 1])}` : 'none'}`,
     );
@@ -274,7 +274,7 @@ test.describe('Grain composite probe', () => {
         `Console tail: ${consoleErrors.slice(-10).join(' | ')}`,
     ).toBeGreaterThan(0);
 
-    // eslint-disable-next-line no-console
+     
     console.log(
       `[grain-composite-probe] PASS — lit canvas samples ${litSamples2.length}/${samples.length}, ` +
         `max ${maxChannel}, mean ${meanAcrossSamples.toFixed(2)}. Screenshots: qa/results/grain-composite-probe{,-full}.png`,

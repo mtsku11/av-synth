@@ -204,7 +204,7 @@ test.describe('Op characterisation sweeps — thorough', () => {
     const totalParamSweeps =
       sweepable.reduce((acc, op) => acc + op.paramOrder.length, 0) * effectiveFrames.length;
     let completedParamSweeps = 0;
-    // eslint-disable-next-line no-console
+     
     console.log(
       `[op-sweeps-thorough] ${sweepable.length} ops × ${effectiveFrames.length} frames, ` +
         `${effectiveSteps} steps × ${SETTLE_MS}ms settle = ~${totalParamSweeps} param sweeps`,
@@ -221,7 +221,7 @@ test.describe('Op characterisation sweeps — thorough', () => {
 
     for (const frameTs of effectiveFrames) {
       const frameKey = frameTs.toFixed(2);
-      // eslint-disable-next-line no-console
+       
       console.log(`[op-sweeps-thorough] === frame t=${frameKey}s ===`);
 
       await page.evaluate(async (ts) => {
@@ -311,7 +311,7 @@ test.describe('Op characterisation sweeps — thorough', () => {
             const elapsedMin = (Date.now() - startTime) / 60_000;
             const rate = completedParamSweeps / elapsedMin;
             const remainingMin = (totalParamSweeps - completedParamSweeps) / rate;
-            // eslint-disable-next-line no-console
+             
             console.log(
               `[op-sweeps-thorough] ${completedParamSweeps}/${totalParamSweeps} sweeps ` +
                 `(elapsed ${elapsedMin.toFixed(1)}m, eta ${remainingMin.toFixed(1)}m)`,
@@ -382,7 +382,7 @@ test.describe('Op characterisation sweeps — thorough', () => {
       }, firstFrame);
 
       const noisyOpsInScope = sweepable.filter((op) => NOISY_OPS.has(op.op));
-      // eslint-disable-next-line no-console
+       
       console.log(
         `[op-sweeps-thorough] === temporal sweep: ${noisyOpsInScope.length} noisy ops ===`,
       );
@@ -500,7 +500,7 @@ test.describe('Op characterisation sweeps — thorough', () => {
     }
 
     if (BLESS) {
-      // eslint-disable-next-line no-console
+       
       console.log(
         `[op-sweeps-thorough] BLESS mode: wrote ${opResults.size} baselines under ${BASELINE_DIR}`,
       );
@@ -511,7 +511,7 @@ test.describe('Op characterisation sweeps — thorough', () => {
       .map((op) => op.op)
       .filter((op) => !existsSync(resolve(BASELINE_DIR, `${op}.json`)));
     if (missingBaselines.length > 0) {
-      // eslint-disable-next-line no-console
+       
       console.log(
         `[op-sweeps-thorough] new ops without baselines: ${missingBaselines.join(', ')} — run with BLESS=1 to add them`,
       );

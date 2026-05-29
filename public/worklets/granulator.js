@@ -1207,7 +1207,6 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     for (let v = 0; v < POOL_SIZE; v++) {
       if (this.vActive[v] === 0) continue;
 
-      const start = this.vStart[v];
       const ratio = this.vRatio[v];
       const dur = this.vDur[v];
       const vG = this.vGain[v];
@@ -1223,8 +1222,13 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       let aaL = this.vAaL[v];
       let aaR = this.vAaR[v];
       let fadeRem = this.vFadeRem[v];
-      const fmActive = fmAmount > 0.001;
-      const fmPhaseInc = fmActive ? (TWO_PI * fmFreq) / sampleRate : 0;
+      // Always use fmAccPos as the read position to avoid a discontinuity when fmAmount
+      // crosses any threshold. At fmAmount = 0, exp(LN2_12 * 0 * sin) = 1, so fmAccPos
+      // advances exactly as a linear read — the two formulas are identical. Below 1e-4 st
+      // the exp deviation is ~5.78e-8 per sample (inaudible), so we skip the Math.exp()
+      // call for performance but the position path stays continuous.
+      const useFmExp = fmAmount > 1e-4;
+      const fmPhaseInc = (TWO_PI * fmFreq) / sampleRate;
       let fmPhase = this.vFmPhase[v];
       let fmAccPos = this.vFmAccPos[v];
 
@@ -1244,16 +1248,14 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
           fadeRem--;
         }
 
-        let rp;
-        if (fmActive) {
-          rp = fmAccPos;
+        const rp = fmAccPos;
+        if (useFmExp) {
           fmAccPos += ratio * Math.exp(LN2_12 * fmAmount * Math.sin(fmPhase));
-          fmPhase += fmPhaseInc;
-          if (fmPhase > TWO_PI) fmPhase -= TWO_PI;
         } else {
-          rp = start + elapsed * ratio;
-          fmAccPos = rp;
+          fmAccPos += ratio;
         }
+        fmPhase += fmPhaseInc;
+        if (fmPhase > TWO_PI) fmPhase -= TWO_PI;
         if (rp < srcMinIdx || rp > srcMaxIdx) {
           elapsed++;
           continue;

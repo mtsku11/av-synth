@@ -166,7 +166,7 @@ test.describe('dataMosh op', () => {
     // liveA proves the wet path with mix=1, hold=0 still tracks source.
     void liveA;
 
-    // eslint-disable-next-line no-console
+     
     console.log(
       `dataMosh diffs: identity↔hold=${identityVsHold.toFixed(2)}, identity-Δt=${identityFrameToFrame.toFixed(2)}, hold-Δt=${holdFrameToFrame.toFixed(2)}`,
     );

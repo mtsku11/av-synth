@@ -267,7 +267,7 @@ test.describe('Slit-scan op', () => {
       verticalRightStats.columnsY[0]! -
       verticalRightStats.columnsY[verticalRightStats.columnsY.length - 1]!;
 
-    // eslint-disable-next-line no-console
+     
     console.log(
       `slit-scan: identity-spread=${identitySpread.toFixed(2)}, vertical col/row=${verticalColSpread.toFixed(2)}/${verticalRowSpread.toFixed(2)} (asym ${verticalAsymmetry.toFixed(2)}), horizontal col/row=${horizontalColSpread.toFixed(2)}/${horizontalRowSpread.toFixed(2)} (asym ${horizontalAsymmetry.toFixed(2)}), slitX=0 grad=${verticalGradient.toFixed(2)}, slitX=1 grad=${verticalRightGradient.toFixed(2)}`,
     );

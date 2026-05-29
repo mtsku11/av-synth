@@ -422,61 +422,9 @@ For honesty: the prototype has `feedback` as a top-level parameter (frame-blend 
 
 ---
 
-## 10. Summary status table
+## 10.4 Product correction plan: video-first pivot
 
-| Family | Total ops | `present` | `partial` | `todo` |
-|---|---:|---:|---:|---:|
-| Sources | 8 | 1 | 2 | 5 |
-| Geometry | 7 | 0 | 3 | 4 |
-| Color | 13 | 10 | 0 | 3 |
-| Blend | 7 | 7 | 0 | 0 |
-| Modulate | 8 | 0 | 1 | 7 |
-| Output/buses | 2 | 2 | 0 | 0 |
-| Array modifiers | 5 | 0 | 0 | 5 |
-| Audio I/O | 5 | 0 | 0 | 5 |
-| **Total** | **55** | **20** | **6** | **29** |
-
-A meaningful slice of the Hydra surface area is wired up now. The current code evaluates implemented source/operator params through `src/core/coupling.ts`, shares `AudioContext` time across domains when audio is live, bypasses neutral operators in the default chain, now ships the full release-track Hydra Color surface (`posterize`, `brightness`, `contrast`, `color`, `saturate`, `invert`, `luma`, `thresh`, `hue`, `colorama`, `sum`, plus `.r .g .b .a`), upgrades `scale` / `pixelate` / `modulate` to AudioWorklet-backed DSP, executes the full Blend family as true dual-input graph nodes rather than as a primary-wire approximation, and supports real `src(oN)` bus returns plus a compact `render(o0..o3)` monitor. The work ahead is no longer primarily "finish more Hydra." The active release-shaping priority is a quality sprint: make the video finish feel closer to TouchDesigner-style post work, make the audio effects musically convincing when stacked, and keep the public surface legible as a curated operator instrument rather than a half-exposed graph IDE. Staging/private deploy remains useful for evaluation, but public v1 should wait for the video look engine, audio DSP palette, and product-surface cleanup described below, or for an explicit written decision to narrow that scope.
-
-### 10.4 Product correction plan: video-first pivot
-
-The intended shipped product is:
-
-- uploaded video is the primary image signal
-- the audio attached to that video is the primary audio signal
-- Hydra-inspired operators manipulate the video field itself
-- audio effects are coupled to those same operator controls
-- video-derived features such as luminance, motion, and edge density can drive later coupling/program logic
-
-The intended shipped product is **not**:
-
-- a general procedural visual synth with video as one source among many
-- a product whose main UX opens on generated visuals instead of footage
-- a fixed giant chain whose presets are merely parameter snapshots with no program-level semantics
-
-Concrete correction steps before deploy:
-
-1. **UI/product reset**: make video the default path in `src/App.svelte`, demote procedural sources from the main UX, and rewrite product-facing copy/docs accordingly.
-2. **Program model reset**: treat presets as named video effect programs built around uploaded footage, not just snapshots over the always-on chain.
-3. **Video-derived feature pass**: implement the first `v.luma`, `v.flux`, and `v.edge` extraction path so future coupling can respond to actual video content, not only to user knob motion.
-4. **Composition architecture**: land Blend-family convergence and a real multi-input graph path so Hydra-style video manipulations can be built from the uploaded signal itself rather than approximated with procedural sources.
-5. **QA reset**: make video-input cases the primary smoke/audit path and treat procedural-source cases as secondary/internal coverage.
-
-Current implementation status for step 1: the shell no longer boots into a visible procedural generator path. `src/App.svelte` now cold-boots on the internal placeholder, leads the user toward loading footage, and surfaces the loaded clip as the primary source action. Procedural generators remain in-repo for QA/internal work, but the public exploratory toggle has now been removed again as part of the simplification pass. This is still a product-facing reset rather than a full architecture completion; the deeper items in steps 3-5 remain open.
-
-Current implementation status for step 2: the shipped `public/presets.json` bank is now metadata-backed and the UI presents it as **video effect programs** rather than raw preset buttons. Each entry carries video/audio intent plus operator focus, and selecting one from `src/App.svelte` reads as applying a named treatment to uploaded footage. The architecture has also widened beyond flat snapshots: built-in programs may now specify explicit chain order with repeated operator instances, internal bus/merge routing, and narrow time/FFT/video automation. The public patch UI is still intentionally serial; the richer graph remains an internal program/runtime capability rather than the default editing surface.
-
-Current implementation status for step 3: the first shipped video-derived feature path is now live. `src/App.svelte` samples low-rate `v.luma`, `v.flux`, and `v.edge` signals from the loaded clip itself and injects them into the shared `CouplingContext` so both audio and video domains can read the same feature state. The first pass is intentionally runtime signal plumbing plus observability, not the final per-param automation system: the feature values are now real and QA-backed, but the public shell no longer shows the raw monitor chips because the product simplification pass favored a cleaner surface over standalone diagnostics.
-
-Current implementation status for the patch surface: the runtime still supports the richer graph/bus model internally, but the shipped right-hand panel in `src/App.svelte` now behaves much closer to the intended public product. The old separate `Controls` panel is gone, the user still starts with an empty chain, and the add-effect surface in `src/ui/Patch.svelte` has been tightened again from the earlier searchable browser into compact family dropdowns. Unary operators are still grouped by intent (`Motion`, `Color`, `Texture`, `Feedback`, `Blend/Composite`, `Finish`, `Audio Character`), but the public composition gesture is now smaller and simpler: choose a family, add one node, tune it, then reorder it. Core controls still live inline on node cards while secondary sliders sit behind an advanced disclosure. The graph runtime remains in-repo because Blend-family convergence, `src(oN)` returns, and QA/program infrastructure still depend on it, but those advanced routing concepts are now internal/advanced rather than the primary UX. The first split-surface slice is now live as well: `src/App.svelte` exposes `Video` / `Audio` workspace tabs, the current chain editor remains under `Video`, and `src/ui/AudioRack.svelte` now exists as the shell that will collapse to the granulator-first audio surface described in §14 rather than continuing as a many-engine product. The first shared public modulation slice is live too: `src/ui/LfoBank.svelte` exposes six global LFOs with waveform/rate/depth, and both the video-node and audio control rows can bind params to `mod off / lfo 1..6` without growing bespoke automation UI.
-
-Current product-direction recommendation for the patch surface: keep iterating on the serial video model rather than reopening the graph editor, but stop making that same surface responsible for all audio design. The next public-surface gains should come from stronger family descriptions, better preset/program discovery, and a clean split between `Video` and `Audio`. The first composition slice is now live: the public patch surface still reads as a serial chain, but it also exposes a narrow routing/bus UI for composite nodes and explicit primary/secondary input picks where an operator truly needs them. Monitor-bus selection and quad-preview toggling have now been promoted into the top shell itself, replacing the more renderer-technical finish controls as the only always-visible stage controls. That keeps `layer`, `mask`, and other two-input nodes usable without reopening the old free-form graph editor or cluttering the panel with extra global cards. The public shell also no longer exposes transport controls or renderer-look controls as primary top-level surfaces; uploads/programs remain the main on-ramp while transport and look-engine ownership stay internal for runtime, programs, and QA. Richer routing should still stay in built-in programs and the internal runtime unless a later explicit advanced mode proves necessary; the audio side should now collapse toward one excellent granulator plus feedback delay rather than continue accreting separate engine families.
-
-Current product-direction recommendation for scope: do not continue porting Hydra operators indiscriminately. The remaining high-value Hydra-style additions on the video side are the ones that deepen composition and abstraction in a video-effects product: stronger `layer`/`mask` workflows, channel routing/swizzles, and better keyed `luma`/matte utilities. The first useful slice of that set is now shipped: `layer` / `mask` have threshold/tolerance/invert matte shaping, `luma` can key bright-or-dark regions against alpha-or-luma, `.r .g .b .a` can be used as product-surface swizzle/matte isolates, and `sum` now exists as the matching weighted channel-collapse finish op. The finish-forward looks (`Finish / Halo Key`, `Finish / RGB Spill`, `Finish / Shadow Matte`) remain available in the internal program bank and QA paths, but they are no longer part of the visible preset strip because the public surface is being narrowed toward the stronger routed-port looks. Lower-value parity work such as every small syntax feature, universal live-code import, or reopening the public graph editor should remain behind the release-track quality work unless a concrete product requirement changes that ordering. On the audio side, the new priority is not more Hydra-style one-to-one mappings but a dedicated rack of serious synthesis/effect families.
-
-Current implementation status for video quality: the app is already GPU-backed through WebGL2/FBOs, and the operator chain plus bloom/history/presentation passes run as shader passes inside `src/video/renderer.ts`. The weakness is effect vocabulary and authored looks, not lack of GPU use. The presentation stack is already strong enough to act as support: bloom pyramid, threshold/pre-black, look-driven bloom/halation tint, public `performance` / `standard` / `cinema` quality selection, embedded/imported LUTs, procedural lens dirt, and renderer-side post presets are all in place. That surface should now stay mostly stable while the release track moves toward stateful video systems. The first three slices of that pivot are now live: `VideoRenderer` owns a bounded 8-frame temporal-history ring (`TEXTURE_2D_ARRAY`) for `timeDisplace`, it derives a reusable structure-analysis texture from the raw clip each frame (`luma`, `edge`, `flux`, contour emphasis) for structure-aware looks, and it now also derives a reusable half-resolution motion field from consecutive raw frames for the new `flow` operator and motion-aware presets. One important implementation correction is now explicit: structure-led looks still stay source-anchored at the renderer-analysis layer, but the `structure` operator itself re-analyzes its current stage input so upstream warps do not misregister the contour mask. Stay on the current WebGL2/FBO renderer for this sprint. Revisit `three.js` `EffectComposer` only if the current renderer becomes awkward to extend; keep WebGPU experimental/future because it is a larger architecture migration, not a polish shortcut.
-
-Current implementation status for flagship programs: the older `tunnel`, `bloom`, and `kaleido` looks are still valid audit-backed references, but they are no longer the full aesthetic target. The public Presets tab is now explicitly allowlisted to a 12-program authored bank, not a small scatter of demo looks and not a catch-all dump of every reference patch in `public/presets.json`: the temporal trio (`Temporal Bloom Ghost`, `Slit-Scan Echo`, `Luma Time Smear`), the structure-aware pair (`Edge Feedback`, `Contour Bloom`), the first motion-aware pair (`Datamosh Smear`, `Flow Melt`), and the newer cross-family looks (`Motion Bloom Ghost`, `Kaleido Feedback Tunnel`, `Freeze Feedback`, `Granular Video Cloud`, plus `Grain Field` as the granulator-first anchor patch). Older ports and internal reference looks remain in the bank for QA/program reuse, but they no longer expand the public shell accidentally. The Presets tab also owns a small per-program macro layer, with curated fan-out into video, clock, granulator, and shared-delay values, so users can stay inside an authored look longer before dropping into raw node editing. Important renderer-state note remains unchanged: program activation owns look/quality/LUT/post-preset selection, so QA does not depend on whichever shell finish the previous user happened to leave selected. Exported-audio sides for program cases remain MANUAL REVIEW ONLY because program-level audio gates are not yet hardened enough to trust as release blockers.
+✅ **Completed 2026-05-25.** Uploaded video is the default path, procedural sources are demoted to QA/internal fixtures, `v.luma`/`v.flux`/`v.edge` extraction is live, public `Video`/`Audio` tab split is in place, and the program model treats presets as named video-effect programs over footage. See `memory.md` for the decision log and architectural rationale.
 
 ### 10.5 Quality sprint: professional video and audio effects
 
@@ -501,9 +449,6 @@ Audio goals:
 - focused worklet tests for interpolation quality, zero-allocation behavior, gain bounds, NaN/denormal avoidance, and note-on latency
 - a quality bar defined by listening parity and timing/performance gates, not by how many separate audio engines exist
 
-Current implementation status for that audio direction: the repo is in transition, not finished. The shell already has an `Audio` tab and a shared six-LFO bank, but the older multi-engine rack work still exists in code and docs as superseded context. The active direction is now narrower: collapse the public audio surface to the granulator + feedback delay described in §14, keep older worklets only as internal building blocks where useful, and stop treating the presence of multiple audio engine cards as progress toward release. The public uploaded-video path also no longer feeds the patch graph's legacy operator-audio stages through `AudioEngine`; for release-track use it now routes clip audio directly plus the parallel granulator/feedback branch, which keeps the public chain honest and avoids contaminating granulator QA with hidden operator worklets.
-The granulator's k-rate control surface also no longer relies on the worklet `AudioParam` lane. `src/audio/granulator.ts` now writes controls into a preallocated shared snapshot, `public/worklets/granulator.js` caches that snapshot per block, and non-isolated sessions fall back to explicit control messages. That change is specifically in service of §13 gate #4.
-
 Coupling policy for this sprint:
 
 - do not force every video operator to remain a public audio effect if the result is musically weak or confusing
@@ -520,22 +465,9 @@ Release policy:
 - Additional post/presentation-stack expansion is now explicitly late/optional. New finish presets, extra bloom/halation variants, and similar polish-only work should stay behind renderer-system work, flagship-program authoring, and release-gate sign-off unless a concrete launch bug promotes them.
 - Staging deploy can be used to evaluate these effects on real machines; public v1 should wait for quality sign-off or a written scope reduction.
 
-### 10.5.3 Full-project audit recommendations (2026-05-28)
+### 10.5.3 Audit recommendations (2026-05-28 + 2026-05-29)
 
-A read-only audit (gates green: `svelte-check` clean, 215/215 unit tests, granulator `process()` zero-alloc, master softclip→limiter present) surfaced four engineering items and four product-shaping items. Tracked as `R1`–`R8` in `todo.md`; summarised here for release-policy context.
-
-- **R1 — CI lint blocker.** `npm run lint` exits 1 (34 errors, all in `qa/e2e/*.spec.ts`; `src/` is clean) and short-circuits the `qa:ci` chain. Highest-priority hygiene fix.
-- **R2 — Render-loop allocations.** `renderer.ts:1479` + `coupling.ts evaluateVideoParams` (per op/frame) violate the "render loop never allocates" rule; pre-allocate reusable scratch records.
-- **R3 — Synchronous motion readback.** `readMotionEnergy()` does a blocking `gl.readPixels` on the 120 ms feature-sample interval; move to async PBO or document the trade.
-- **R4 — True-peak limiter.** The `DynamicsCompressor`-based limiter has no lookahead; confirm <0 dBTP on loud presets before sign-off (gate #6), add an oversampled limiter if it overshoots.
-- **R5 — Video-feature → video-param modulation.** `v.luma/flux/edge/motion` feed audio but no video op reads them; closing this loop makes the AV coupling bidirectional and is the strongest identity win.
-- **R6 — `sourceBlend` dedup (= §14.7a G7).** Redundant with `blend(source, sourceB)` now that Source B is graph-addressable; decide keep-as-shortcut vs fold-and-delete.
-- **R7 — Modulatable finish.** Expose at least one presentation-stack param to the LFO/feature bus so the look is performable, not just globally switched.
-- **R8 — Opportunistic real-device metrics.** Capture partial latency/CPU data during the Remote-Desktop staging test to chip away at the D4 / gate #5 hardware blockers.
-
-Release-policy note: `R1`–`R4` are quality/stability defects that fall under the deploy-gate requirement to fix or consciously defer discovered defects in writing. `R5` materially strengthens the "video-derived feature extraction in the shipped path" gate.
-
-> The dated change-log subsections that previously sat here (§10.4.9 audio strip, §10.5.0/0a/0b authored fields + characterisation sweep, §10.5.1 feedback triage, §10.5.2 ownedState/dataMosh) were moved to [docs/archive/build-log.md](docs/archive/build-log.md) on 2026-05-28. Their rationale lives in `memory.md`; full verbose text is in git. The still-open design tensions they recorded (`timeDisplace` source-anchored history, the `flow` motion-estimator ceiling) are tracked in `todo.md` "Deferred / open follow-ups".
+✅ All audit items R1–R7 and S1–S8 closed 2026-05-29. Full item-by-item status in `todo.md`. R8 (real-device latency/CPU measurement) remains open — requires physical hardware access at staging time. Dated change-log subsections moved to `docs/archive/build-log.md` 2026-05-28; open design tensions (`timeDisplace` source-anchored history, `flow` motion-estimator ceiling) tracked in `todo.md` "Deferred / open follow-ups".
 
 ### 10.6 Role of procedural sources after the pivot
 
@@ -925,8 +857,7 @@ If the routing model ever needs to scale to N sources (live webcam, procedural p
 
 ### 14.8 Status
 
-- `in-progress` (2026-05-24): the reference stack is in-repo, the spec is written, and the granulator implementation is materially underway.
-- Landed already: grain-buffer decode path, clip-derived fps plumbing, app-owned `mode` / `envelope`, preset recall, LFO-bank targeting, per-channel MIDI pitch routing, Hermite auto-dispatch, listening-pack generation, latency-proxy harness, true-peak gate fix, the public feedback-delay card, the shared-feedback app wiring, and the final removal of the legacy rack from the mounted Audio tab.
-- Remaining release-track work is no longer "start implementation." It is the narrower closure set captured in `todo.md`: the 4-hour soak confirmation, reference-hardware CPU re-measurement, D3 listening verdicts, D4 real loopback latency run, and final staging/public sign-off.
+- `implementation-complete` (2026-05-29): grain-buffer decode path, clip-derived fps plumbing, app-owned `mode` / `envelope`, preset recall, LFO-bank targeting, per-channel MIDI pitch routing, Hermite auto-dispatch, listening-pack generation, latency-proxy harness, true-peak gate fix, public feedback-delay card, shared-feedback app wiring, legacy rack removed, zero-alloc render loop and grain-event pool, instanced grain composite draw (S1–S8 all closed).
+- Remaining release-track work: 4-hour soak confirmation, reference-hardware CPU re-measurement, D3 listening verdicts, D4 real loopback latency run, and final staging/public sign-off. All tracked in `todo.md`.
 
 ---
