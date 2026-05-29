@@ -7,9 +7,10 @@
     spec: ParamSpec;
     value: number;
     size?: number;
+    onValueChange?: (value: number) => void;
   }
 
-  let { spec, value = $bindable(), size = 48 }: Props = $props();
+  let { spec, value = $bindable(), size = 48, onValueChange }: Props = $props();
 
   const c01 = $derived(mapFromCurve(value, spec.range, spec.curve));
 
@@ -41,6 +42,12 @@
     const sensitivity = e.shiftKey ? 0.0005 : 0.005;
     const next = clamp01(c01 + dy * sensitivity);
     value = mapToCurve(next, spec.range, spec.curve);
+    onValueChange?.(value);
+  }
+
+  function onDblClick() {
+    value = spec.default;
+    onValueChange?.(value);
   }
 
   // Arc path: full sweep background + filled arc up to current value.
@@ -79,6 +86,7 @@
     onpointerdown={onPointerDown}
     onpointerup={onPointerUp}
     onpointermove={onPointerMove}
+    ondblclick={onDblClick}
   >
     <circle {cx} {cy} r={r + 4} fill="var(--bg)" stroke="var(--line)" stroke-width="1" />
     <path d={bgArc} stroke="var(--line)" stroke-width="2" fill="none" stroke-linecap="round" />

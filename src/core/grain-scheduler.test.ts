@@ -40,6 +40,7 @@ function makeEvent(overrides: Partial<GrainEvent> = {}): GrainEvent {
     panY: 0,
     reverse: 0,
     envelopeIndex: ENV_HANN,
+    amplitude: 1.0,
     ...overrides,
   };
 }

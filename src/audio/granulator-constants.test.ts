@@ -30,6 +30,7 @@ import {
   GRAIN_EVENT_F_PAN_Y,
   GRAIN_EVENT_F_REVERSE,
   GRAIN_EVENT_F_ENVELOPE_INDEX,
+  GRAIN_EVENT_F_AMPLITUDE,
 } from '../core/grain-scheduler';
 
 import {
@@ -103,6 +104,7 @@ describe('worklet/main-thread constant sync', () => {
       expect(GRAIN_EVENT_F_PAN_Y).toBe(wk('GRAIN_EVENT_F_PAN_Y'));
       expect(GRAIN_EVENT_F_REVERSE).toBe(wk('GRAIN_EVENT_F_REVERSE'));
       expect(GRAIN_EVENT_F_ENVELOPE_INDEX).toBe(wk('GRAIN_EVENT_F_ENVELOPE_INDEX'));
+      expect(GRAIN_EVENT_F_AMPLITUDE).toBe(wk('GRAIN_EVENT_F_AMPLITUDE'));
     });
   });
 

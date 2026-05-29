@@ -204,6 +204,15 @@
     unit: 'norm',
   };
 
+  const GRAIN_DEPTH_SPEC: ParamSpec = {
+    id: 'grain-depth',
+    label: 'depth',
+    range: [0, 1],
+    default: 0,
+    curve: 'lin',
+    unit: 'norm',
+  };
+
   let grainBuffer: GrainBuffer | null = null;
   let grainScheduler: GrainScheduler | null = null;
   let grainCompositeSource: GrainCompositeSource | null = null;
@@ -213,6 +222,7 @@
   let grainAspectCorrect = $state(false);
   let grainSoftness = $state(0.0);
   let grainAdditive = $state(false);
+  let grainDepth = $state(0.0);
   let grainSourceMessage = $state<string | null>(null);
   // Decode-progress channel, kept distinct from grainSourceMessage (which is refusal-only).
   // grainDecodedSrc remembers which videoEl.src has already been uploaded into the texture
@@ -2017,6 +2027,7 @@
       grainCompositeSource.aspectCorrect = grainAspectCorrect;
       grainCompositeSource.softness = grainSoftness;
       grainCompositeSource.additive = grainAdditive;
+      grainCompositeSource.depth = grainDepth;
     }
     grainCompositeSource.setPlan(planResult.plan);
     return grainCompositeSource;
@@ -2634,6 +2645,39 @@
           </button>
         </div>
       </label>
+      <label class="stage-group">
+        <span class="rl">── midi ──</span>
+        <div class="midi-row">
+          <span class="midi-status" data-qa="midi-status">
+            {#if midiUnavailableReason}
+              {midiUnavailableReason}
+            {:else if selectedMidiSource === 'keyboard'}
+              keyboard
+            {:else if midiDevices.length === 0}
+              no devices
+            {:else if selectedMidiSource === 'all'}
+              {midiDevices.map((d) => d.name).join(', ')}
+            {:else}
+              {selectedMidiSource}
+            {/if}
+          </span>
+          <select
+            class="midi-source-select"
+            data-qa="midi-source-select"
+            value={selectedMidiSource}
+            onchange={(e) => {
+              selectedMidiSource = (e.currentTarget as HTMLSelectElement).value;
+            }}
+            disabled={!!midiUnavailableReason}
+          >
+            <option value="all">all devices</option>
+            <option value="keyboard">keyboard</option>
+            {#each midiDevices as device (device.id)}
+              <option value={device.name}>{device.name}</option>
+            {/each}
+          </select>
+        </div>
+      </label>
     </div>
   </header>
 
@@ -2754,6 +2798,14 @@
               if (grainCompositeSource) grainCompositeSource.softness = v;
             }}
           />
+          <Slider
+            spec={GRAIN_DEPTH_SPEC}
+            value={grainDepth}
+            onValueChange={(v) => {
+              grainDepth = v;
+              if (grainCompositeSource) grainCompositeSource.depth = v;
+            }}
+          />
         </div>
       {/if}
       {#if grainSourceMessage}
@@ -2767,36 +2819,6 @@
             1}/{grainDecodeStatus.frameCount}
         </p>
       {/if}
-      <div class="midi-row">
-        <span class="midi-status" data-qa="midi-status">
-          {#if midiUnavailableReason}
-            MIDI: {midiUnavailableReason}
-          {:else if selectedMidiSource === 'keyboard'}
-            MIDI: computer keyboard
-          {:else if midiDevices.length === 0}
-            MIDI: no devices
-          {:else if selectedMidiSource === 'all'}
-            MIDI: {midiDevices.map((d) => d.name).join(', ')}
-          {:else}
-            MIDI: {selectedMidiSource}
-          {/if}
-        </span>
-        <select
-          class="midi-source-select"
-          data-qa="midi-source-select"
-          value={selectedMidiSource}
-          onchange={(e) => {
-            selectedMidiSource = (e.currentTarget as HTMLSelectElement).value;
-          }}
-          disabled={!!midiUnavailableReason}
-        >
-          <option value="all">all devices</option>
-          <option value="keyboard">computer keyboard</option>
-          {#each midiDevices as device (device.id)}
-            <option value={device.name}>{device.name}</option>
-          {/each}
-        </select>
-      </div>
     </div>
   </section>
 
@@ -3129,9 +3151,9 @@
   }
 
   .midi-source-select {
-    background: #1d1f25;
-    border: 1px solid #2a2d36;
-    color: #c8ccd4;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--fg);
     padding: 2px 4px;
     font-size: 0.7rem;
     font-family: inherit;
@@ -3155,9 +3177,9 @@
   }
 
   .mod-select {
-    background: #1d1f25;
-    border: 1px solid #2a2d36;
-    color: #c8ccd4;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--fg);
     padding: 2px 4px;
     font-size: 0.7rem;
     font-family: inherit;

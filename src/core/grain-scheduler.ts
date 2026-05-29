@@ -11,7 +11,7 @@
 import type { GrainBufferPlan } from '../video/grain-buffer';
 
 export const ENV_TABLE_LEN = 2048;
-export const GRAIN_EVENT_RING_FIELDS = 10;
+export const GRAIN_EVENT_RING_FIELDS = 11;
 export const GRAIN_EVENT_WRITE_SEQ_IDX = 0;
 export const GRAIN_EVENT_F_VOICE_ID = 0;
 export const GRAIN_EVENT_F_SEED = 1;
@@ -23,6 +23,7 @@ export const GRAIN_EVENT_F_PAN_X = 6;
 export const GRAIN_EVENT_F_PAN_Y = 7;
 export const GRAIN_EVENT_F_REVERSE = 8;
 export const GRAIN_EVENT_F_ENVELOPE_INDEX = 9;
+export const GRAIN_EVENT_F_AMPLITUDE = 10;
 export const ENV_HANN = 0;
 export const ENV_TUKEY25 = 1;
 export const ENV_GAUSSIAN = 2;
@@ -41,6 +42,7 @@ export interface GrainEvent {
   readonly panY: number;
   readonly reverse: number;
   readonly envelopeIndex: number;
+  readonly amplitude: number;
 }
 
 export interface RenderedVoice {
@@ -50,6 +52,7 @@ export interface RenderedVoice {
   readonly envelopeAlpha: number;
   readonly panX: number;
   readonly panY: number;
+  readonly amplitude: number;
 }
 
 /** Return shape for {@link GrainScheduler.getActiveVoices}. The `voices` array is reused
@@ -182,6 +185,7 @@ export function resolveVoice(event: GrainEvent, now: number, plan: GrainBufferPl
     envelopeAlpha: computeEnvelopeAlpha(phase, event.envelopeIndex),
     panX: event.panX,
     panY: event.panY,
+    amplitude: event.amplitude,
   };
 }
 
@@ -208,7 +212,7 @@ export class GrainScheduler {
   // per-event. Pool is large enough to hold a full ring drain without overflow.
   #eventPool: MutableGrainEvent[] = Array.from({ length: MAX_GRAIN_EVENTS }, () => ({
     voiceId: 0, seed: 0, spawnTime: 0, durationSec: 0, positionSec: 0,
-    pitchRatio: 1, panX: 0, panY: 0, reverse: 0, envelopeIndex: 0,
+    pitchRatio: 1, panX: 0, panY: 0, reverse: 0, envelopeIndex: 0, amplitude: 1,
   }));
   #eventCount = 0;
   #node: WorkletNodeLike;
@@ -220,7 +224,7 @@ export class GrainScheduler {
   #ringReadSeq = 0;
   // Pre-allocated voice pool — filled in place by getActiveVoices, never reallocated.
   #voicePool: MutableVoice[] = Array.from({ length: MAX_RENDERED_VOICES }, () => ({
-    voiceId: 0, frameIndex: 0, envelopePhase: 0, envelopeAlpha: 0, panX: 0, panY: 0,
+    voiceId: 0, frameIndex: 0, envelopePhase: 0, envelopeAlpha: 0, panX: 0, panY: 0, amplitude: 1,
   }));
   #activeVoiceViewData: { voices: readonly RenderedVoice[]; count: number } = { voices: this.#voicePool, count: 0 };
 
@@ -297,6 +301,7 @@ export class GrainScheduler {
       slot.panY = ring[off + GRAIN_EVENT_F_PAN_Y]!;
       slot.reverse = ring[off + GRAIN_EVENT_F_REVERSE]! | 0;
       slot.envelopeIndex = ring[off + GRAIN_EVENT_F_ENVELOPE_INDEX]! | 0;
+      slot.amplitude = ring[off + GRAIN_EVENT_F_AMPLITUDE]!;
       this.#eventCount++;
     }
     this.#ringReadSeq = writeSeq;
@@ -315,6 +320,7 @@ export class GrainScheduler {
     slot.panY = event.panY;
     slot.reverse = event.reverse;
     slot.envelopeIndex = event.envelopeIndex;
+    slot.amplitude = event.amplitude;
     this.#eventCount++;
   }
 
@@ -337,6 +343,7 @@ export class GrainScheduler {
           dst.panY = e.panY;
           dst.reverse = e.reverse;
           dst.envelopeIndex = e.envelopeIndex;
+          dst.amplitude = e.amplitude;
         }
         w++;
       }
@@ -361,6 +368,7 @@ export class GrainScheduler {
       slot.envelopeAlpha = computeEnvelopeAlpha(phase, ev.envelopeIndex);
       slot.panX = ev.panX;
       slot.panY = ev.panY;
+      slot.amplitude = ev.amplitude;
       count++;
     }
     this.#activeVoiceViewData.count = count;

@@ -5,6 +5,7 @@
   import type { ParamSpec } from '../core/params';
   import type { GraphDiagnostic, PatchNodeView } from '../core/patch-graph';
   import Slider from './Slider.svelte';
+  import Knob from './Knob.svelte';
 
   interface ControlView {
     id: string;
@@ -50,7 +51,6 @@
 
   const activeCount = $derived(nodes.filter((node) => node.active).length);
   const lfoOptions = $derived(listGlobalLfoOptions(lfoBank));
-  let advancedOpen = $state<Record<string, boolean>>({});
   let familySelections = $state<Record<string, string>>({});
   const familyOrder = listOperatorFamilies();
   const operatorChoices = $derived(
@@ -64,30 +64,12 @@
     return operatorChoices.filter((choice) => choice.family === family);
   }
 
-  function setAdvancedOpen(id: string, open: boolean) {
-    advancedOpen = { ...advancedOpen, [id]: open };
-  }
-
   function handleFamilySelection(family: OperatorFamily, value: string) {
     const nextSelections = { ...familySelections, [family]: value };
     familySelections = nextSelections;
     if (!value) return;
     onAddNode?.(value);
     familySelections = { ...nextSelections, [family]: '' };
-  }
-
-  function getControlSections(node: PatchNodeView) {
-    const coreIds = getOperatorUiMeta(node.op).coreParams ?? [];
-    const coreSet = new Set(coreIds);
-    const primary =
-      coreSet.size > 0
-        ? node.params.filter((param) => coreSet.has(param.id))
-        : node.params.slice(0, Math.min(4, node.params.length));
-    const fallbackPrimary =
-      primary.length > 0 ? primary : node.params.slice(0, Math.min(4, node.params.length));
-    const primaryIds = new Set(fallbackPrimary.map((param) => param.id));
-    const secondary = node.params.filter((param) => !primaryIds.has(param.id));
-    return { primary: fallbackPrimary, secondary };
   }
 
   function usesRouting(node: PatchNodeView): boolean {
@@ -161,7 +143,6 @@
       <div class="node-list">
         {#each nodes as node (node.id)}
           {@const meta = getOperatorUiMeta(node.op)}
-          {@const controls = getControlSections(node)}
           <article class:inactive={!node.active} class="node-card">
             <div class="node-head">
               <div class="node-copy">
@@ -179,17 +160,26 @@
               <span>{node.op}</span>
             </div>
 
-            <div class="slider-stack">
-              {#each controls.primary as param (param.id)}
-                <div class="mod-control">
-                  <Slider
-                    spec={{ ...param.spec, label: param.label }}
-                    value={param.value}
-                    onValueChange={(value) => onSetNodeParam?.(node.id, param.id, value)}
-                  />
-                  <label class="mod-select">
-                    <span>mod</span>
+            <div class="knob-grid">
+              {#each node.params as param (param.id)}
+                {#if param.spec.choices}
+                  <div class="mod-control slider-mode">
+                    <Slider
+                      spec={{ ...param.spec, label: param.label }}
+                      value={param.value}
+                      onValueChange={(value) => onSetNodeParam?.(node.id, param.id, value)}
+                    />
+                  </div>
+                {:else}
+                  <div class="knob-control">
+                    <Knob
+                      spec={{ ...param.spec, label: param.label }}
+                      value={param.value}
+                      size={44}
+                      onValueChange={(value) => onSetNodeParam?.(node.id, param.id, value)}
+                    />
                     <select
+                      class="knob-mod"
                       value={param.lfo.videoFeature !== null
                         ? `v:${param.lfo.videoFeature}`
                         : param.lfo.lfoIndex === null
@@ -206,8 +196,8 @@
                         <option value={option.value}>{option.label}</option>
                       {/each}
                     </select>
-                  </label>
-                </div>
+                  </div>
+                {/if}
               {/each}
             </div>
 
@@ -265,48 +255,6 @@
                   {/if}
                 </div>
               </div>
-            {/if}
-
-            {#if controls.secondary.length > 0}
-              <details
-                class="advanced"
-                open={advancedOpen[node.id] ?? false}
-                ontoggle={(event) =>
-                  setAdvancedOpen(node.id, (event.currentTarget as HTMLDetailsElement).open)}
-              >
-                <summary>advanced · {controls.secondary.length} more controls</summary>
-                <div class="slider-stack advanced-stack">
-                  {#each controls.secondary as param (param.id)}
-                    <div class="mod-control">
-                      <Slider
-                        spec={{ ...param.spec, label: param.label }}
-                        value={param.value}
-                        onValueChange={(value) => onSetNodeParam?.(node.id, param.id, value)}
-                      />
-                      <label class="mod-select">
-                        <span>mod</span>
-                        <select
-                          value={param.lfo.videoFeature !== null
-                            ? `v:${param.lfo.videoFeature}`
-                            : param.lfo.lfoIndex === null
-                              ? ''
-                              : String(param.lfo.lfoIndex)}
-                          onchange={(event) =>
-                            onSetNodeModSource?.(
-                              node.id,
-                              param.id,
-                              (event.currentTarget as HTMLSelectElement).value,
-                            )}
-                        >
-                          {#each lfoOptions as option (option.id)}
-                            <option value={option.value}>{option.label}</option>
-                          {/each}
-                        </select>
-                      </label>
-                    </div>
-                  {/each}
-                </div>
-              </details>
             {/if}
 
             {#if node.summary.length === 0}
@@ -387,8 +335,7 @@
   .meta,
   .eyebrow,
   .muted,
-  .actions button,
-  .advanced summary {
+  .actions button {
     font-family: var(--font-mono);
   }
 
@@ -475,6 +422,41 @@
     margin-top: 0.55rem;
   }
 
+  .knob-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 0.55rem;
+    align-items: flex-start;
+  }
+
+  .knob-control {
+    display: grid;
+    justify-items: center;
+    gap: 0.15rem;
+  }
+
+  .knob-mod {
+    width: 100%;
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    background: var(--bg);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    padding: 0.1rem 0.15rem;
+    text-transform: lowercase;
+    cursor: pointer;
+  }
+
+  .knob-mod:focus {
+    border-color: var(--accent);
+    outline: none;
+  }
+
+  .slider-mode {
+    flex: 0 0 100%;
+  }
+
   .routing-panel {
     margin-top: 0.75rem;
     padding-top: 0.7rem;
@@ -545,25 +527,6 @@
     gap: 0.15rem;
   }
 
-  .mod-select {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 0.45rem;
-    padding-left: 7rem;
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .mod-select select {
-    min-width: 6.2rem;
-    font-family: var(--font-mono);
-    text-transform: lowercase;
-  }
-
   .eyebrow {
     font-size: 0.68rem;
     letter-spacing: 0.08em;
@@ -602,9 +565,7 @@
     color: var(--accent);
   }
 
-  .actions button,
-  .advanced,
-  .advanced summary {
+  .actions button {
     background: var(--bg);
     color: var(--fg);
     border: 1px solid var(--line);
@@ -641,29 +602,6 @@
 
   .actions button.danger {
     color: #f4b1a8;
-  }
-
-  .advanced {
-    margin-top: 0.7rem;
-    border-radius: 0;
-  }
-
-  .advanced summary {
-    list-style: none;
-    cursor: pointer;
-    padding: 0.35rem 0.45rem;
-    font-size: 0.72rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-  }
-
-  .advanced summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .advanced-stack {
-    padding: 0 0.55rem 0.5rem;
-    margin-top: 0;
   }
 
   .actions button:disabled {

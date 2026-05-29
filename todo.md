@@ -48,6 +48,31 @@ Independent re-audit of the full codebase (Opus 4.6). Confirms R3/R4/R5/R6/R7 as
 - [x] **S8 — `drainRing` allocates new `GrainEvent` objects from the shared ring.** ✅ 2026-05-29
 - [x] **S9 — Granulator worklet crashes on non-cross-origin-isolated pages (GitHub Pages).** ✅ 2026-05-29 — The AudioWorklet constructor evaluated `undefined instanceof SharedArrayBuffer` when COOP/COEP headers are absent (e.g. GitHub Pages), throwing a `TypeError` that killed the processor. Effect: silent audio, no grain events, grain composite black screen. Fix: `const _hasSAB = typeof SharedArrayBuffer === 'function'` guard added before all three `instanceof SharedArrayBuffer` blocks in the worklet constructor, and one additional guard in the `'loadShared'` message handler. The worklet now falls back gracefully to the message-port grain-event path and AudioWorklet `parameters` for controls. Runtime diagnostics still require SAB (shows "n/a" without it, which is expected). 224 tests pass, grain-composite probe passes. — `#events: GrainEvent[]` replaced with `#eventPool: MutableGrainEvent[]` (2048 pre-allocated slots, matching ring capacity) + `#eventCount` cursor. `#drainRing` writes fields directly into the next free pool slot with no `new`. `prune()` compacts by field-copy (no reference shuffling). `ingest()` copies fields into the pool (port-message path also zero-alloc). `getActiveVoices` and `activeCount` read from `#eventPool[0..#eventCount-1]`. Pool size of 2048 = `GRAIN_EVENT_RING_CAPACITY` ensures a full-ring drain can never overflow. 224 tests pass, tsc clean.
 
+## UI/UX audit recommendations (2026-05-29)
+
+Control-surface audit of the live app and all 8 Svelte UI components. The existing `Knob.svelte` is underused (only in `ProgramMacros`), the "advanced" accordion hides params for negligible space savings, and the granulator card is a flat wall of 19 sliders. Goal: denser, more tactile controls that feel like a hardware synth panel — knobs for normalised params, sliders for meaningful numeric ranges, all params visible. Full rationale in `plan.md §10.5.4`.
+
+- [x] **U1 — Add `onValueChange` callback + double-click reset to `Knob.svelte`.** ✅ 2026-05-29
+- [x] **U2 — Replace operator core-param sliders with a knob grid in `Patch.svelte`.** ✅ 2026-05-29 — All params (including secondary) rendered as knobs in flex-wrap grid; choice params stay as Slider segmented buttons (full-width).
+- [x] **U3 — Remove the "advanced" accordion — show all operator params.** ✅ 2026-05-29 — `getControlSections`, `advancedOpen`, `setAdvancedOpen` deleted; all `node.params` shown in one knob grid.
+- [x] **U4 — Restructure `GranulatorCard` into grouped knob sections.** ✅ 2026-05-29 — 5 groups (grain shape / pitch / space / envelope / output); 0–1 range params → knobs, Hz/ms/st/voice-count params → sliders. MIDI learn, LFO select, data-qa attrs preserved.
+- [x] **U5 — Convert LFO bank rate + depth to knob pairs.** ✅ 2026-05-29 — Both sliders replaced with `Knob size=44`; row layout changed to `flex` pair.
+- [x] **U6 — Convert `FeedbackDelayCard` params to a knob row.** ✅ 2026-05-29 — All 5 params as `Knob` in flex row using existing `FEEDBACK_DELAY_PARAM_SPECS` directly.
+- [x] **U7 — Migrate hardcoded hex to CSS custom properties in audio cards.** ✅ 2026-05-29 — `GranulatorCard.svelte` and `FeedbackDelayCard.svelte` fully converted; state colours (learn/bound) retained as literals (no var mapping exists). Also fixed `.midi-source-select` and `.mod-select` hex in `App.svelte`.
+- [x] **U8 — Declutter source bar: move MIDI status to topbar.** ✅ 2026-05-29 — MIDI status + device select moved into topbar as a `── midi ──` stage-group; removed from sources section.
+
+## Grain composite depth effect (2026-05-29)
+
+Per-voice amplitude-driven depth simulation in the grain composite, making it behave like a particle system with spatial depth. Loud grains appear large, bright, and close; quiet grains appear small, dim, and far. Three depth cues from one per-voice amplitude value — no extra texture lookups or render passes.
+
+- [x] **G1 — Add per-voice amplitude to the grain event ring.** ✅ 2026-05-29 — `GRAIN_EVENT_RING_FIELDS=11`, `GRAIN_EVENT_F_AMPLITUDE=10` added to both worklet and `grain-scheduler.ts`. `amplitude` flows through `GrainEvent`, `RenderedVoice`, pool init, `#drainRing`, `ingest`, `prune`, `getActiveVoices`, `resolveVoice`. Constants sync test extended with amplitude assertion.
+- [x] **G2 — Expand the instance VBO from 4 to 5 floats per voice.** ✅ 2026-05-29 — `INSTANCE_FLOATS=5`, `INSTANCE_STRIDE=20`. `a_amplitude` at VAO location 3, byte offset 16. `render()` fills `data[base+4] = v.amplitude`.
+- [x] **G3 — Vertex shader: per-voice scale.** ✅ 2026-05-29 — `scale = mix(1.0, mix(0.15, 1.5, a_amplitude), u_depth)` multiplies `u_halfSize`. At depth=0 scale=1.0 exactly.
+- [x] **G4 — Fragment shader: per-voice brightness.** ✅ 2026-05-29 — `v_brightness = mix(1.0, a_amplitude, u_depth)` passed as varying; `fragColor = vec4(rgb * alpha * v_brightness, alpha)`.
+- [x] **G5 — Optional per-voice softness.** ✅ 2026-05-29 — `effectiveSoftness = u_softness * mix(1.0, 2.0 - v_brightness, u_depth)` biases the smoothstep threshold; quiet grains get softer edges when depth > 0. Perfect no-op when depth=0.
+- [x] **G6 — Back-to-front depth sort.** ✅ 2026-05-29 — In-place insertion sort on 5-float VBO records by amplitude ascending before upload. Zero-alloc. Skipped when depth=0.
+- [x] **G7 — User-facing "depth" parameter.** ✅ 2026-05-29 — `GRAIN_DEPTH_SPEC` + `grainDepth` state added to `App.svelte`; `depth` setter on `GrainCompositeSource`; `u_depth` uniform wired to shaders; "depth" slider in grain-size-row (hidden in full-frame mode same as other grain sliders).
+
 ## Deferred / open follow-ups (non-blocking)
 
 Carried over from completed passes (full context in git / `memory.md`). None block staging.
@@ -74,7 +99,7 @@ Must pass before any v1 release. See `plan.md §14` + `references/granulator-por
 ## Active release tracks
 
 - **Quality sprint (current implementation target)** — deepen the existing WebGL/FBO renderer and Web Audio/AudioWorklet stack, but narrow audio to the granulator-first instrument: bloom/history/displacement polish on video, benchmark-grade granulator delivery, one shared feedback delay, shared LFO/MIDI modulation, and the matching quality gates.
-- **Product-surface cleanup (parallel release track)** — keep the video chain empty by default, split the product into distinct `Video` and `Audio` panels/tabs, organize both add-effect surfaces into user-facing families, make add/remove/reorder clearer, and treat built-in programs as the main on-ramp for strong looks.
+- **Product-surface cleanup (parallel release track)** — keep the video chain empty by default, split the product into distinct `Video` and `Audio` panels/tabs, organize both add-effect surfaces into user-facing families, make add/remove/reorder clearer, and treat built-in programs as the main on-ramp for strong looks. The 2026-05-29 UI/UX audit (U1–U8) is now the actionable implementation plan for this track: knob-first controls, no hidden params, grouped granulator sections, CSS var consistency.
 - **Staging RC (private evaluation target)** — current shell/product path plus the best available quality sprint slice. Needed: audible sign-off, deploy workflow, first staging URL, post-deploy smoke.
 - **Public v1** — everything in Staging RC plus quality-sprint sign-off. The core Hydra Color surface is now functionally covered, so the main remaining risk is perceived visual/audio quality plus whether the granulator-first workflow feels coherent. Live-code, full Hydra import, and alternate external-input surfaces are post-v1 unless the launch target changes.
 

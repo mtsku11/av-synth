@@ -469,6 +469,58 @@ Release policy:
 
 ✅ All audit items R1–R7 and S1–S8 closed 2026-05-29. Full item-by-item status in `todo.md`. R8 (real-device latency/CPU measurement) remains open — requires physical hardware access at staging time. Dated change-log subsections moved to `docs/archive/build-log.md` 2026-05-28; open design tensions (`timeDisplace` source-anchored history, `flow` motion-estimator ceiling) tracked in `todo.md` "Deferred / open follow-ups".
 
+### 10.5.4 UI/UX audit recommendations (2026-05-29)
+
+Visual inspection of the live app and all 8 Svelte UI components identified structural improvements to the control surface. The current UI is slider-heavy and hides parameters behind accordion disclosures; the existing `Knob.svelte` component (used only in `ProgramMacros.svelte`) is underutilised. The goal is a denser, more tactile control surface that feels like a hardware synth panel — matching the existing visual identity (dark, monospaced, high-contrast) while reducing vertical scroll and exposing all parameters at once.
+
+**Key findings:**
+
+1. **Knob component exists but is underused.** `Knob.svelte` is well-built (SVG arc, pointer capture, shift-for-fine) but lacks an `onValueChange` callback — it only exposes `$bindable()`, which doesn't integrate with the Patch/Granulator callback patterns. Fixing this unblocks knob use across the entire UI.
+2. **"Advanced" accordion hides 1–2 params per operator.** Most operators have 5–7 total params; `coreParams` lists 4–6. The remaining 1–2 behind `<details>` create discoverability friction for negligible space savings.
+3. **GranulatorCard renders 19 sliders in a flat list.** No visual grouping by function. The most parameter-dense panel in the app and the hardest to scan.
+4. **LFO bank is vertically wasteful.** 6 rows of 2 sliders each; knob pairs would halve the vertical footprint.
+5. **GranulatorCard and FeedbackDelayCard hardcode hex colours** instead of using CSS custom properties, breaking theme consistency.
+6. **Preset selection doesn't auto-navigate.** After clicking a preset, the user must manually switch to the Video tab to see the loaded chain.
+
+**Recommended changes** (full item-by-item in `todo.md` as U1–U8):
+
+- **U1** Add `onValueChange` callback to `Knob.svelte` + double-click-to-reset-default (unblocks all downstream knob work)
+- **U2** Replace operator core-param sliders with a knob grid in `Patch.svelte` (3–6 knobs per row, ~60% vertical reduction per operator card)
+- **U3** Remove the "advanced" accordion — show all operator params inline
+- **U4** Restructure `GranulatorCard` into grouped knob sections (grain shape / pitch / space / envelope / output)
+- **U5** Convert LFO bank rate+depth to knob pairs
+- **U6** Convert `FeedbackDelayCard` to a knob row
+- **U7** Migrate hardcoded hex to CSS custom properties in `GranulatorCard.svelte` and `FeedbackDelayCard.svelte`
+- **U8** Declutter source bar (MIDI status to topbar, source B behind a "+" button)
+
+**Approach:** U1 is the prerequisite; U2–U3 are highest-leverage (video tab density); U4 is the biggest visual improvement (audio tab); U5–U8 are consistency/polish. The control type heuristic: knobs for normalised/bipolar 0–1 params (mix, strength, gain, spread); sliders for params with meaningful numeric ranges (Hz, ms, semitones, voice count).
+
+### 10.5.5 Grain composite depth effect (2026-05-29)
+
+The grain composite currently renders every voice at identical size and brightness — the only per-voice variation is position (panX/panY), frame layer, and envelope alpha. This produces a flat tiled/scattered look regardless of what the audio is doing. The proposal: drive per-voice **scale**, **brightness**, and optionally **edge softness** from each grain's amplitude, so the composite reads as a particle system with spatial depth. Loud grains appear large, bright, and close; quiet grains appear small, dim, and far away — atmospheric perspective from one per-voice value.
+
+**Why this is the right coupling:** The grain composite is the video twin of the granulator. Each grain event already crosses both domains with identical position, pitch, duration, and envelope. Adding amplitude-to-depth means the visual *weight* of each grain honestly reflects its audible *loudness* — exactly the "one honest relationship between visible motion/texture and audible motion/texture" from CLAUDE.md §3.
+
+**Three depth cues from one signal:**
+
+1. **Scale** — per-voice half-size multiplier. Loud = larger quad, quiet = smaller. Implemented in the vertex shader by multiplying `u_halfSize` by a per-instance `a_scale` attribute.
+2. **Brightness** — per-voice RGB attenuation. Loud = full colour, quiet = dimmed toward black. Implemented in the fragment shader by multiplying sampled RGB by a `v_brightness` varying.
+3. **Edge softness** (optional) — per-voice radial fade bias. Quiet grains get softer edges, simulating depth-of-field. Leverages the existing `u_softness` smoothstep path, biased per-voice.
+
+**Implementation path (G1–G7 in `todo.md`):**
+
+- G1: Add `amplitude` to the grain event ring and `RenderedVoice` (worklet already knows it; post alongside panX/panY). Update constant-sync tests.
+- G2: Expand the instance VBO from 4→5 floats per voice (new `a_scale` attribute at location 3). Zero-alloc: same pre-allocated `Float32Array` pattern, just wider.
+- G3: Vertex shader reads `a_scale`, multiplies `u_halfSize`. One extra multiply per vertex.
+- G4: Fragment shader reads `v_brightness` varying, multiplies RGB. One extra multiply per fragment.
+- G5: Optional per-voice softness bias (modulate the `inner` threshold in the smoothstep).
+- G6: Back-to-front depth sort (in-place, zero-alloc) so loud grains occlude quiet ones.
+- G7: Single user-facing `depth` parameter (0 = flat/current, 1 = full particle depth). At 0 the scale/brightness multipliers are all 1.0 — visually identical to today. Consider LFO-routability.
+
+**Performance cost:** Near zero. One extra float per instance in the VBO upload (~256 bytes at 64 voices). One extra multiply in the vertex and fragment shaders. The optional depth sort is O(n log n) on ≤64 items in a pre-allocated pool. No new texture lookups, no new render passes.
+
+**Design constraint:** `depth = 0` must be a perfect no-op — identical output to the current composite. The feature is additive only.
+
 ### 10.6 Role of procedural sources after the pivot
 
 The pivot demotes procedural sources from the public product surface but does **not** delete them. Their post-pivot roles, ranked by load-bearing weight, are:

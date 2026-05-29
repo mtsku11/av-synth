@@ -21,7 +21,7 @@ const STEAL_FADE_SAMPLES = 64;
 const INTERP_SINC = 0;
 const INTERP_HERMITE = 1;
 const GRAIN_EVENT_RING_CAPACITY = 2048;
-const GRAIN_EVENT_RING_FIELDS = 10;
+const GRAIN_EVENT_RING_FIELDS = 11;
 const GRAIN_EVENT_WRITE_SEQ_IDX = 0;
 const GRAIN_EVENT_F_VOICE_ID = 0;
 const GRAIN_EVENT_F_SEED = 1;
@@ -33,6 +33,7 @@ const GRAIN_EVENT_F_PAN_X = 6;
 const GRAIN_EVENT_F_PAN_Y = 7;
 const GRAIN_EVENT_F_REVERSE = 8;
 const GRAIN_EVENT_F_ENVELOPE_INDEX = 9;
+const GRAIN_EVENT_F_AMPLITUDE = 10;
 const RUNTIME_DIAG_RING_FIELDS = 17;
 const RUNTIME_DIAG_WRITE_SEQ_IDX = 0;
 const RUNTIME_DIAG_SAMPLE_INTERVAL_SEC = 0.125;
@@ -764,6 +765,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       rY * ySpread,
       reverseFlag,
       envelopeIdx,
+      velocityGain,
     );
   }
 
@@ -777,6 +779,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     panY,
     reverseFlag,
     envelopeIdx,
+    amplitude,
   ) {
     // Voice-event channel for the video grain twin (spec §15 step 6). Resolved per-grain
     // values are baked into the event so the video side never needs its own PRNG — the
@@ -797,6 +800,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       ring[off + GRAIN_EVENT_F_PAN_Y] = panY;
       ring[off + GRAIN_EVENT_F_REVERSE] = reverseFlag;
       ring[off + GRAIN_EVENT_F_ENVELOPE_INDEX] = envelopeIdx;
+      ring[off + GRAIN_EVENT_F_AMPLITUDE] = amplitude;
       this.grainRingWriteSeq = seq + 1;
       Atomics.store(this.grainRingHeader, GRAIN_EVENT_WRITE_SEQ_IDX, this.grainRingWriteSeq);
       return;
@@ -813,6 +817,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       panY,
       reverse: reverseFlag,
       envelopeIndex: envelopeIdx,
+      amplitude,
     });
   }
 

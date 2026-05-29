@@ -15,6 +15,8 @@
   import { GRANULATOR_SLIDER_ORDER, type GranulatorSliderParam } from '../audio/granulator-params';
   import type { MidiBinding, MidiRouter } from '../core/midi';
   import { listGlobalLfoOptions, type GlobalLfo, type ParamLfoAssignments } from '../core/mod-bank';
+  import type { ParamSpec } from '../core/params';
+  import Knob from './Knob.svelte';
 
   interface Props {
     granulator: Granulator | null;
@@ -98,6 +100,52 @@
     name,
     ...SLIDER_DISPLAY[name],
   }));
+
+  const CTRL_MAP = Object.fromEntries(SLIDERS.map((s) => [s.name, s])) as Record<
+    GranulatorSliderParam,
+    ControlSpec
+  >;
+
+  // Knob params are any with 0–1 range.
+  function isKnobParam(ctrl: ControlSpec): boolean {
+    return ctrl.min === 0 && ctrl.max === 1;
+  }
+
+  const KNOB_DEFAULTS: Partial<Record<GranulatorSliderParam, number>> = {
+    position: 0.5,
+    positionJitter: 0,
+    durationJitter: 0,
+    distribution: 0.5,
+    panSpread: 0,
+    ySpread: 0,
+    reverseProbability: 0,
+    gain: 0.8,
+    mix: 1.0,
+    envSustain: 1.0,
+  };
+
+  function toKnobSpec(ctrl: ControlSpec): ParamSpec {
+    return {
+      id: ctrl.name,
+      label: ctrl.label,
+      range: [0, 1],
+      default: KNOB_DEFAULTS[ctrl.name] ?? 0.5,
+      curve: 'lin',
+      unit: 'norm',
+    };
+  }
+
+  const GROUPS: readonly { readonly label: string; readonly params: readonly GranulatorSliderParam[] }[] =
+    [
+      {
+        label: 'grain shape',
+        params: ['position', 'positionJitter', 'duration', 'durationJitter', 'density', 'distribution', 'reverseProbability'],
+      },
+      { label: 'pitch', params: ['pitch', 'pitchJitter', 'fmAmount', 'fmFreq'] },
+      { label: 'space', params: ['panSpread', 'ySpread'] },
+      { label: 'envelope', params: ['envAttack', 'envDecay', 'envSustain', 'envRelease'] },
+      { label: 'output', params: ['voiceCount', 'gain', 'mix'] },
+    ];
 
   // MIDI-learn state. learningParam is the name of the slider awaiting a MIDI surface
   // event; bindingsByParam reflects whatever the router currently has bound. Last
@@ -284,62 +332,106 @@
     </div>
   </section>
 
-  <section class="sliders">
-    {#each SLIDERS as ctrl (ctrl.name)}
-      <div class="slider-row">
-        <label class="slider-label" for={`gran-${ctrl.name}`}>{ctrl.label}</label>
-        <input
-          id={`gran-${ctrl.name}`}
-          type="range"
-          min={ctrl.min}
-          max={ctrl.max}
-          step={ctrl.step}
-          value={values[ctrl.name]}
-          oninput={(e) =>
-            onSetParam(ctrl.name, Number((e.currentTarget as HTMLInputElement).value))}
-          disabled={!granulator}
-          data-qa={`gran-${ctrl.name}`}
-        />
-        <span class="slider-value"
-          >{(values[ctrl.name] ?? 0).toFixed(ctrl.step < 1 ? 3 : 0)}{ctrl.unit
-            ? ` ${ctrl.unit}`
-            : ''}</span
-        >
-        <label class="lfo-select">
-          <span class="visually-hidden">lfo</span>
-          <select
-            value={lfoAssignments[ctrl.name]?.videoFeature != null
-              ? `v:${lfoAssignments[ctrl.name]?.videoFeature}`
-              : lfoAssignments[ctrl.name]?.lfoIndex == null
-                ? ''
-                : String(lfoAssignments[ctrl.name]?.lfoIndex)}
-            onchange={(event) => {
-              onSetParamLfo(ctrl.name, (event.currentTarget as HTMLSelectElement).value);
-            }}
-            disabled={!granulator}
-            data-qa={`gran-lfo-${ctrl.name}`}
-          >
-            {#each lfoOptions as option (option.id)}
-              <option value={option.value}>{option.label}</option>
-            {/each}
-          </select>
-        </label>
-        <button
-          type="button"
-          class="learn"
-          class:learning={learningParam === ctrl.name}
-          class:bound={!!bindingsByParam[ctrl.name]}
-          disabled={!midiRouter}
-          onclick={() =>
-            bindingsByParam[ctrl.name]
-              ? clearBinding(ctrl.name)
-              : startLearn(ctrl.name, { min: ctrl.min, max: ctrl.max })}
-          data-qa={`gran-learn-${ctrl.name}`}
-        >
-          {learningParam === ctrl.name
-            ? 'waiting…'
-            : bindingLabel(bindingsByParam[ctrl.name] ?? null)}
-        </button>
+  <section class="param-sections">
+    {#each GROUPS as group (group.label)}
+      <div class="param-group">
+        <span class="group-label">{group.label}</span>
+        <div class="group-params">
+          {#each group.params as name (name)}
+            {@const ctrl = CTRL_MAP[name]}
+            {#if isKnobParam(ctrl)}
+              <div class="knob-item">
+                <Knob
+                  spec={toKnobSpec(ctrl)}
+                  value={values[ctrl.name]}
+                  size={42}
+                  onValueChange={(v) => onSetParam(ctrl.name, v)}
+                />
+                <select
+                  class="param-mod"
+                  value={lfoAssignments[ctrl.name]?.videoFeature != null
+                    ? `v:${lfoAssignments[ctrl.name]?.videoFeature}`
+                    : lfoAssignments[ctrl.name]?.lfoIndex == null
+                      ? ''
+                      : String(lfoAssignments[ctrl.name]?.lfoIndex)}
+                  onchange={(event) =>
+                    onSetParamLfo(ctrl.name, (event.currentTarget as HTMLSelectElement).value)}
+                  disabled={!granulator}
+                  data-qa={`gran-lfo-${ctrl.name}`}
+                >
+                  {#each lfoOptions as option (option.id)}
+                    <option value={option.value}>{option.label}</option>
+                  {/each}
+                </select>
+                <button
+                  type="button"
+                  class="learn"
+                  class:learning={learningParam === ctrl.name}
+                  class:bound={!!bindingsByParam[ctrl.name]}
+                  disabled={!midiRouter}
+                  onclick={() =>
+                    bindingsByParam[ctrl.name]
+                      ? clearBinding(ctrl.name)
+                      : startLearn(ctrl.name, { min: ctrl.min, max: ctrl.max })}
+                  data-qa={`gran-learn-${ctrl.name}`}
+                >
+                  {learningParam === ctrl.name ? '…' : bindingLabel(bindingsByParam[ctrl.name] ?? null)}
+                </button>
+              </div>
+            {:else}
+              <div class="slider-item">
+                <label class="slider-label" for={`gran-${ctrl.name}`}>{ctrl.label}</label>
+                <input
+                  id={`gran-${ctrl.name}`}
+                  type="range"
+                  min={ctrl.min}
+                  max={ctrl.max}
+                  step={ctrl.step}
+                  value={values[ctrl.name]}
+                  oninput={(e) =>
+                    onSetParam(ctrl.name, Number((e.currentTarget as HTMLInputElement).value))}
+                  disabled={!granulator}
+                  data-qa={`gran-${ctrl.name}`}
+                />
+                <span class="slider-value"
+                  >{(values[ctrl.name] ?? 0).toFixed(ctrl.step < 1 ? 3 : 0)}{ctrl.unit
+                    ? ` ${ctrl.unit}`
+                    : ''}</span
+                >
+                <select
+                  class="param-mod"
+                  value={lfoAssignments[ctrl.name]?.videoFeature != null
+                    ? `v:${lfoAssignments[ctrl.name]?.videoFeature}`
+                    : lfoAssignments[ctrl.name]?.lfoIndex == null
+                      ? ''
+                      : String(lfoAssignments[ctrl.name]?.lfoIndex)}
+                  onchange={(event) =>
+                    onSetParamLfo(ctrl.name, (event.currentTarget as HTMLSelectElement).value)}
+                  disabled={!granulator}
+                  data-qa={`gran-lfo-${ctrl.name}`}
+                >
+                  {#each lfoOptions as option (option.id)}
+                    <option value={option.value}>{option.label}</option>
+                  {/each}
+                </select>
+                <button
+                  type="button"
+                  class="learn"
+                  class:learning={learningParam === ctrl.name}
+                  class:bound={!!bindingsByParam[ctrl.name]}
+                  disabled={!midiRouter}
+                  onclick={() =>
+                    bindingsByParam[ctrl.name]
+                      ? clearBinding(ctrl.name)
+                      : startLearn(ctrl.name, { min: ctrl.min, max: ctrl.max })}
+                  data-qa={`gran-learn-${ctrl.name}`}
+                >
+                  {learningParam === ctrl.name ? '…' : bindingLabel(bindingsByParam[ctrl.name] ?? null)}
+                </button>
+              </div>
+            {/if}
+          {/each}
+        </div>
       </div>
     {/each}
   </section>
@@ -347,13 +439,13 @@
 
 <style>
   .granulator-card {
-    background: #131418;
-    border: 1px solid #23262e;
+    background: var(--bg);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 16px;
-    font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
-    color: #e8e9ed;
+    font-family: var(--font-mono);
+    color: var(--fg);
   }
   .granulator-card header {
     display: flex;
@@ -378,11 +470,11 @@
     align-items: center;
     gap: 6px;
     font-size: 11px;
-    color: #a8acb6;
+    color: var(--muted);
   }
   .status {
     font-size: 11px;
-    color: #7b7f88;
+    color: var(--muted);
     margin: 0;
   }
   .mode-row {
@@ -401,11 +493,11 @@
     align-items: center;
     gap: 6px;
     font-size: 11px;
-    color: #a8acb6;
+    color: var(--muted);
   }
   .picker-label {
     font-size: 11px;
-    color: #a8acb6;
+    color: var(--muted);
     min-width: 60px;
   }
   .picker-buttons {
@@ -413,9 +505,9 @@
     gap: 2px;
   }
   .picker-buttons button {
-    background: #1d1f25;
-    border: 1px solid #2a2d36;
-    color: #c8ccd4;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--fg);
     padding: 4px 8px;
     font-size: 11px;
     font-family: inherit;
@@ -423,9 +515,9 @@
     border-radius: 3px;
   }
   .picker-buttons button.active {
-    background: #2d4a5e;
-    border-color: #4a7390;
-    color: #e8f0f6;
+    background: color-mix(in srgb, var(--accent) 25%, var(--bg));
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--bg));
+    color: var(--fg);
   }
   .picker-buttons button:disabled {
     opacity: 0.4;
@@ -437,9 +529,9 @@
     gap: 8px 12px;
     margin-bottom: 12px;
     padding: 10px 12px;
-    border: 1px solid #23262e;
+    border: 1px solid var(--line);
     border-radius: 6px;
-    background: #0f1014;
+    background: color-mix(in srgb, var(--bg) 85%, black);
   }
   .diag-row {
     display: flex;
@@ -450,17 +542,44 @@
     font-size: 10px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: #7b7f88;
+    color: var(--muted);
   }
   .diag-value {
     font-size: 12px;
-    color: #e8e9ed;
+    color: var(--fg);
   }
-  .sliders {
+  /* grouped param sections */
+  .param-sections {
+    display: grid;
+    gap: 10px;
+  }
+  .param-group {
     display: grid;
     gap: 6px;
   }
-  .slider-row {
+  .group-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 3px;
+  }
+  .group-params {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  /* knob params */
+  .knob-item {
+    display: grid;
+    justify-items: center;
+    gap: 3px;
+  }
+  /* slider params (full width within group) */
+  .slider-item {
+    flex: 0 0 100%;
     display: grid;
     grid-template-columns: 90px 1fr 70px 78px 70px;
     align-items: center;
@@ -468,45 +587,35 @@
     font-size: 11px;
   }
   .slider-label {
-    color: #a8acb6;
+    color: var(--muted);
   }
-  .slider-row input[type='range'] {
+  .slider-item input[type='range'] {
     width: 100%;
   }
   .slider-value {
     text-align: right;
-    color: #c8ccd4;
+    color: var(--fg);
     font-variant-numeric: tabular-nums;
   }
-  .lfo-select select {
+  /* shared mod/lfo select for both knob and slider params */
+  .param-mod {
     width: 100%;
-    background: #1d1f25;
-    border: 1px solid #2a2d36;
-    color: #c8ccd4;
-    padding: 3px 4px;
-    font-size: 10px;
-    font-family: inherit;
-    border-radius: 3px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    padding: 2px 3px;
+    font-size: 9px;
+    font-family: var(--font-mono);
+    cursor: pointer;
   }
-  .lfo-select select:disabled {
+  .param-mod:disabled {
     opacity: 0.4;
     cursor: not-allowed;
   }
-  .visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
   .learn {
-    background: #1d1f25;
-    border: 1px solid #2a2d36;
-    color: #7b7f88;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--muted);
     padding: 3px 6px;
     font-size: 10px;
     font-family: inherit;

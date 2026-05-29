@@ -14,12 +14,14 @@ in vec2 v_uv;
 in vec2 v_quadPos;
 in float v_layer;
 in float v_alpha;
+in float v_brightness;
 out vec4 fragColor;
 
 uniform sampler2DArray u_grain;
 // 0 = rectangular grain; >0 applies a soft circular mask.
 // 1.0 = full radial gradient (transparent at edge, opaque at centre).
 uniform float u_softness;
+uniform float u_depth;
 
 void main() {
   // GrainBuffer uploads with UNPACK_FLIP_Y_WEBGL=false, so the image's top row
@@ -28,9 +30,12 @@ void main() {
   vec3 rgb = texture(u_grain, vec3(v_uv.x, 1.0 - v_uv.y, v_layer)).rgb;
   float alpha = v_alpha;
   // v_quadPos is in [-1,1]; length=1 is the inscribed circle edge.
+  // G5: quiet grains get softer edges when depth > 0 (depth-of-field simulation).
   if (u_softness > 0.0) {
-    float inner = max(0.0, 1.0 - u_softness);
+    float effectiveSoftness = u_softness * mix(1.0, 2.0 - v_brightness, u_depth);
+    float inner = max(0.0, 1.0 - effectiveSoftness);
     alpha *= 1.0 - smoothstep(inner, 1.0, length(v_quadPos));
   }
-  fragColor = vec4(rgb * alpha, alpha);
+  // G4: per-voice brightness — quiet grains dim toward black.
+  fragColor = vec4(rgb * alpha * v_brightness, alpha);
 }

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { GlobalLfo, GlobalLfoWaveform } from '../core/mod-bank';
   import type { ParamSpec } from '../core/params';
-  import Slider from './Slider.svelte';
+  import Knob from './Knob.svelte';
 
   interface Props {
     bank: readonly GlobalLfo[];
@@ -70,14 +70,16 @@
           </select>
         </div>
         <div class="lfo-controls">
-          <Slider
+          <Knob
             spec={rateSpec}
             value={lfo.rate}
+            size={44}
             onValueChange={(value) => onSetRate?.(index, value)}
           />
-          <Slider
+          <Knob
             spec={amountSpec}
             value={lfo.amount}
+            size={44}
             onValueChange={(value) => onSetAmount?.(index, value)}
           />
         </div>
@@ -114,7 +116,7 @@
 
   .lfo-row {
     display: grid;
-    grid-template-columns: 9rem 1fr;
+    grid-template-columns: 9rem auto;
     gap: 1rem;
     padding-top: 0.5rem;
     border-top: 1px solid color-mix(in oklab, var(--line) 72%, transparent);
@@ -136,8 +138,9 @@
   }
 
   .lfo-controls {
-    display: grid;
-    gap: 0.25rem;
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
   }
 
   .eyebrow,

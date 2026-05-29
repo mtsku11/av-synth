@@ -4,7 +4,7 @@
     FEEDBACK_DELAY_PARAM_SPECS,
     type FeedbackDelayParamName,
   } from '../audio/feedback-delay-params';
-  import Slider from './Slider.svelte';
+  import Knob from './Knob.svelte';
 
   interface Props {
     values: Readonly<Record<FeedbackDelayParamName, number>>;
@@ -23,12 +23,13 @@
     </p>
   </header>
 
-  <section class="slider-stack">
+  <section class="knob-row">
     {#each FEEDBACK_DELAY_PARAM_ORDER as param (param)}
-      <div class="slider-row" data-qa={`feedback-delay-${param}`}>
-        <Slider
+      <div data-qa={`feedback-delay-${param}`}>
+        <Knob
           spec={FEEDBACK_DELAY_PARAM_SPECS[param]}
           value={values[param]}
+          size={44}
           onValueChange={(value) => onSetParam(param, value)}
         />
       </div>
@@ -38,12 +39,13 @@
 
 <style>
   .feedback-delay-card {
-    background: #131418;
-    border: 1px solid #23262e;
+    background: var(--bg);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 16px;
-    color: #e8e9ed;
+    color: var(--fg);
+    font-family: var(--font-mono);
   }
 
   header {
@@ -63,14 +65,15 @@
 
   p {
     margin: 0;
-    color: #a3a8b7;
+    color: var(--muted);
     font-size: 0.8rem;
     line-height: 1.45;
-    font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
   }
 
-  .slider-stack {
-    display: grid;
-    gap: 0.25rem;
+  .knob-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: flex-start;
   }
 </style>
