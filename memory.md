@@ -2912,3 +2912,17 @@ The modulation fabric was unidirectional: LFOs → params, video features → au
 **UI**: A "bloom" mod picker row appears at the bottom of the video tab in the patch panel, using the same `listGlobalLfoOptions` + `v:feature` encoding as operator params.
 
 **Files changed**: `video/renderer.ts`, `App.svelte`.
+
+---
+
+### Granulator worklet crashes without COOP/COEP (2026-05-29)
+
+**Decision**: Guard all `instanceof SharedArrayBuffer` checks in `public/worklets/granulator.js` with `typeof SharedArrayBuffer === 'function'`.
+
+**Root cause**: On pages without cross-origin isolation (no COOP/COEP headers — e.g. GitHub Pages, Cloudflare without a `_headers` file), `SharedArrayBuffer` is `undefined` in the global scope, including inside AudioWorkletGlobalScope. The worklet constructor evaluated `processorOptions?.controlHeader instanceof SharedArrayBuffer` which JavaScript resolves as `x instanceof undefined` → `TypeError: Right-hand side of 'instanceof' is not callable`. This killed the processor before it could set up `port.onmessage`. Every subsequent message to the worklet was silently dropped: `loadFromArrayBuffer` never received `{type: 'loaded'}`, hung forever, granulator was effectively dead. Effect on the user: meter showed 0 active voices, grain composite rendered black (no grain events ever posted).
+
+**Fix**: Added `const _hasSAB = typeof SharedArrayBuffer === 'function'` at the top of the constructor, then prefixed each of the three `instanceof SharedArrayBuffer` blocks with `_hasSAB &&`. Also added `typeof SharedArrayBuffer !== 'function' ||` guard to the `'loadShared'` message handler. All five `instanceof SharedArrayBuffer` expressions are now only evaluated when SAB is known to exist.
+
+**Degraded mode without SAB**: The worklet falls back to (a) AudioWorklet `parameters` for control values, (b) `{type: 'grain'}` port messages for grain events, (c) no runtime diagnostics. GranulatorCard shows "n/a" for voice count (expected). Grain composite still produces output via the message-port path.
+
+**Why not caught earlier**: The local dev server always sends COOP/COEP headers (see `vite.config.ts`), so Playwright CI also runs with SAB available. The crash only manifests on deployed static sites without those headers.

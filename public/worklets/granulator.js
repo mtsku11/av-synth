@@ -342,7 +342,12 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
     this.totalStealCount = 0;
 
     const processorOptions = options?.processorOptions;
+    // Guard: SharedArrayBuffer is undefined on pages without cross-origin isolation
+    // (e.g. GitHub Pages). All instanceof SharedArrayBuffer checks require this guard
+    // to avoid a TypeError that would crash the worklet constructor.
+    const _hasSAB = typeof SharedArrayBuffer === 'function';
     if (
+      _hasSAB &&
       processorOptions?.controlHeader instanceof SharedArrayBuffer &&
       processorOptions?.controlData instanceof SharedArrayBuffer
     ) {
@@ -352,6 +357,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       this.controlCache.set(this.controlData);
     }
     if (
+      _hasSAB &&
       typeof processorOptions?.grainRingCapacity === 'number' &&
       processorOptions?.grainRingHeader instanceof SharedArrayBuffer &&
       processorOptions?.grainRingData instanceof SharedArrayBuffer
@@ -360,6 +366,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
       this.grainRingData = new Float64Array(processorOptions.grainRingData);
     }
     if (
+      _hasSAB &&
       typeof processorOptions?.runtimeDiagCapacity === 'number' &&
       processorOptions?.runtimeDiagHeader instanceof SharedArrayBuffer &&
       processorOptions?.runtimeDiagData instanceof SharedArrayBuffer
@@ -415,7 +422,7 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         const channels = msg.channels | 0;
         const leftBuffer = msg.left;
         const rightBuffer = msg.right;
-        if (!(leftBuffer instanceof SharedArrayBuffer) || samples <= 0) return;
+        if (typeof SharedArrayBuffer !== 'function' || !(leftBuffer instanceof SharedArrayBuffer) || samples <= 0) return;
         if (leftBuffer.byteLength < samples * Float32Array.BYTES_PER_ELEMENT) return;
         const left = new Float32Array(leftBuffer, 0, samples);
         let right = left;
