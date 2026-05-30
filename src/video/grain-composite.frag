@@ -36,6 +36,8 @@ void main() {
     float inner = max(0.0, 1.0 - effectiveSoftness);
     alpha *= 1.0 - smoothstep(inner, 1.0, length(v_quadPos));
   }
-  // G4: per-voice brightness — quiet grains dim toward black.
-  fragColor = vec4(rgb * alpha * v_brightness, alpha);
+  // G4: quiet grains fade and recede — blend alpha scales with brightness so they become
+  // transparent rather than dark, letting back-to-front sort produce true occlusion.
+  float blendAlpha = alpha * v_brightness;
+  fragColor = vec4(rgb * blendAlpha, blendAlpha);
 }

@@ -2459,5 +2459,503 @@
         "gain": 0.7
       }
     }
+  },
+  "kaleidResonance": {
+    "title": "Draft / Kaleid Resonance",
+    "tagline": "Geometric kaleidoscope driven by three independent LFOs — rotation sweeps, hue cycles, and modulation depth breathe in overlapping rhythms.",
+    "videoIntent": "Best on graphic shapes, architecture, or any clip with clear bilateral symmetry that the kaleid can split and re-fold into a living mandala.",
+    "audioIntent": "Granulator should shimmer in a steady mid-density cloud, the feedback delay cycling in the same slow orbital rhythm as the rotating geometry.",
+    "operatorFocus": ["kaleid", "rotate", "modulateRotate", "hue", "chromaShift"],
+    "chain": ["kaleid", "rotate", "modulateRotate", "hue", "chromaShift", "contrast", "saturate"],
+    "render": {
+      "look": "silver",
+      "quality": "standard",
+      "lut": "silvered",
+      "postPreset": "temporalEcho",
+      "lensDirt": "bloomMist"
+    },
+    "values": {
+      "clock.rate": 0.5,
+      "feedback.feedback": 0.68,
+      "kaleid.nSides": 6,
+      "kaleid.drive": 0.28,
+      "kaleid.mix": 0.9,
+      "rotate.angle": 0.04,
+      "modulateRotate.multiple": 0.18,
+      "modulateRotate.offset": 0.0,
+      "hue.amount": 0.22,
+      "chromaShift.amount": 0.007,
+      "contrast.amount": 1.22,
+      "saturate.amount": 1.16,
+      "scale.amount": 1.002,
+      "modulate.amount": 0.05
+    },
+    "automation": {
+      "rotate.angle": {
+        "kind": "lfo",
+        "rate": 0.08,
+        "depth": 0.12,
+        "phase": 0
+      },
+      "hue.amount": {
+        "kind": "lfo",
+        "rate": 0.19,
+        "depth": 0.15,
+        "phase": 1.5707963268
+      },
+      "modulateRotate.multiple": {
+        "kind": "lfo",
+        "rate": 0.05,
+        "depth": 0.14,
+        "phase": 3.1415926536
+      }
+    },
+    "macros": [
+      {
+        "id": "orbit",
+        "label": "Orbit",
+        "default": 0.5,
+        "targets": [
+          { "key": "kaleid.nSides", "min": 4, "max": 12 },
+          { "key": "modulateRotate.multiple", "min": 0.04, "max": 0.52 },
+          { "key": "feedback.feedback", "min": 0.5, "max": 0.84 }
+        ]
+      },
+      {
+        "id": "colour",
+        "label": "Colour",
+        "default": 0.44,
+        "targets": [
+          { "key": "hue.amount", "min": 0.0, "max": 0.5 },
+          { "key": "chromaShift.amount", "min": 0.001, "max": 0.016 },
+          { "key": "saturate.amount", "min": 1.0, "max": 1.5 }
+        ]
+      },
+      {
+        "id": "grain",
+        "label": "Grain",
+        "default": 0.62,
+        "targets": [
+          { "key": "audio.granulator.density", "min": 16, "max": 38 },
+          { "key": "audio.granulator.voiceCount", "min": 14, "max": 28 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.14, "max": 0.44 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.34,
+        "feedback": 0.55,
+        "damping": 5800,
+        "cross": 0.7853981634,
+        "mix": 0.26
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 26,
+        "duration": 88,
+        "durationJitter": 0.28,
+        "position": 0.5,
+        "positionJitter": 0.04,
+        "pitch": 0,
+        "pitchJitter": 4,
+        "panSpread": 0.44,
+        "ySpread": 0.22,
+        "reverseProbability": 0.1,
+        "distribution": 0.28,
+        "voiceCount": 22,
+        "gain": 0.52
+      }
+    }
+  },
+  "turbulentBloom": {
+    "title": "Draft / Turbulent Bloom",
+    "tagline": "Curl-noise vector field and vortex feed a flow smear while video motion and edge detection drive glow and chroma — the visual field breathes with the audio.",
+    "videoIntent": "Best on footage with continuous motion: water, fire, fabric, crowd — anything where the flow field can latch onto real movement and amplify it.",
+    "audioIntent": "Granulator runs dense and warm with high pitch jitter so the cloud reads as texture rather than pitched harmony — audio fog moving with the visual field.",
+    "operatorFocus": ["curlNoise", "vortex", "flow", "structure"],
+    "chain": ["curlNoise", "vortex", "flow", "structure", "saturate", "contrast"],
+    "render": {
+      "look": "cine",
+      "quality": "cinema",
+      "lut": "amber",
+      "postPreset": "radialSmear",
+      "lensDirt": "sensorDust"
+    },
+    "values": {
+      "clock.rate": 0.44,
+      "feedback.feedback": 0.7,
+      "curlNoise.mix": 1.0,
+      "curlNoise.strength": 0.24,
+      "curlNoise.scale": 2.8,
+      "curlNoise.speed": 0.38,
+      "curlNoise.warp": 0.62,
+      "vortex.mix": 1.0,
+      "vortex.strength": 0.26,
+      "vortex.drift": 0.5,
+      "vortex.softness": 0.06,
+      "flow.mix": 0.62,
+      "flow.strength": 0.44,
+      "flow.smear": 0.52,
+      "flow.memory": 0.36,
+      "flow.gate": 0.09,
+      "flow.glitch": 0.16,
+      "flow.chroma": 0.22,
+      "structure.mix": 0.52,
+      "structure.mode": 0.44,
+      "structure.threshold": 0.15,
+      "structure.softness": 0.12,
+      "structure.displace": 0.32,
+      "structure.memory": 0.38,
+      "structure.glow": 0.42,
+      "saturate.amount": 1.28,
+      "contrast.amount": 1.18,
+      "scale.amount": 1.003,
+      "rotate.angle": 0.0,
+      "kaleid.nSides": 1,
+      "modulate.amount": 0.06
+    },
+    "automation": {
+      "curlNoise.speed": {
+        "kind": "lfo",
+        "rate": 0.11,
+        "depth": 0.22,
+        "phase": 0
+      },
+      "vortex.drift": {
+        "kind": "lfo",
+        "rate": 0.07,
+        "depth": 0.2,
+        "phase": 1.5707963268
+      },
+      "flow.chroma": {
+        "kind": "video",
+        "feature": "motion",
+        "scale": 0.12,
+        "smooth": 0.68
+      },
+      "structure.glow": {
+        "kind": "video",
+        "feature": "edge",
+        "scale": 0.22,
+        "smooth": 0.74
+      }
+    },
+    "macros": [
+      {
+        "id": "storm",
+        "label": "Storm",
+        "default": 0.52,
+        "targets": [
+          { "key": "curlNoise.strength", "min": 0.08, "max": 0.48 },
+          { "key": "vortex.strength", "min": 0.1, "max": 0.44 },
+          { "key": "flow.strength", "min": 0.2, "max": 0.72 }
+        ]
+      },
+      {
+        "id": "bloom",
+        "label": "Bloom",
+        "default": 0.58,
+        "targets": [
+          { "key": "structure.glow", "min": 0.14, "max": 0.78 },
+          { "key": "flow.chroma", "min": 0.08, "max": 0.48 },
+          { "key": "saturate.amount", "min": 1.0, "max": 1.5 }
+        ]
+      },
+      {
+        "id": "grain",
+        "label": "Grain",
+        "default": 0.6,
+        "targets": [
+          { "key": "audio.granulator.density", "min": 22, "max": 50 },
+          { "key": "audio.granulator.pitchJitter", "min": 3, "max": 14 },
+          { "key": "feedback.feedback", "min": 0.52, "max": 0.84 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.18,
+        "feedback": 0.64,
+        "damping": 7200,
+        "cross": 0.5235987756,
+        "mix": 0.18
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 38,
+        "duration": 72,
+        "durationJitter": 0.38,
+        "position": 0.5,
+        "positionJitter": 0.06,
+        "pitch": 0,
+        "pitchJitter": 9,
+        "panSpread": 0.58,
+        "ySpread": 0.34,
+        "reverseProbability": 0.18,
+        "distribution": 0.42,
+        "voiceCount": 28,
+        "gain": 0.5
+      }
+    }
+  },
+  "chromaticShear": {
+    "title": "Draft / Chromatic Shear",
+    "tagline": "Two independent LFOs sweep the slit-scan position while a third slowly drags the datamosh drift — spectral tearing with a sparse, long-grained audio shadow.",
+    "videoIntent": "Best on footage with clear directional motion — the slit scan turns flow into visible time-smear while datamosh holds echo chunks between cuts.",
+    "audioIntent": "Sparse classic-mode granulator with long grain durations and high reverse probability so each audio event feels like a captured fragment rather than a continuous tone.",
+    "operatorFocus": ["slitScan", "dataMosh", "pixelSort", "chromaShift"],
+    "chain": ["slitScan", "dataMosh", "pixelSort", "chromaShift", "contrast", "posterize"],
+    "render": {
+      "look": "bleach",
+      "quality": "standard",
+      "lut": "bleachBypass",
+      "postPreset": "edgeTrails",
+      "lensDirt": "scuffedGlass"
+    },
+    "values": {
+      "clock.rate": 0.38,
+      "feedback.feedback": 0.84,
+      "slitScan.mix": 0.88,
+      "slitScan.orientation": 0.5,
+      "slitScan.slitX": 0.5,
+      "slitScan.slitY": 0.5,
+      "slitScan.scanSpeed": 0.62,
+      "slitScan.depth": 0.3,
+      "dataMosh.mix": 0.72,
+      "dataMosh.drift": 1.0,
+      "dataMosh.decay": 0.05,
+      "dataMosh.chunk": 0.52,
+      "pixelSort.mix": 0.55,
+      "pixelSort.threshold": 0.28,
+      "pixelSort.direction": 0.0,
+      "pixelSort.speed": 0.35,
+      "chromaShift.amount": 0.010,
+      "contrast.amount": 1.26,
+      "posterize.bins": 32,
+      "posterize.gamma": 0.96,
+      "scale.amount": 1.001,
+      "rotate.angle": 0.0,
+      "kaleid.nSides": 1
+    },
+    "automation": {
+      "slitScan.slitX": {
+        "kind": "lfo",
+        "rate": 0.18,
+        "depth": 0.32,
+        "phase": 0
+      },
+      "slitScan.slitY": {
+        "kind": "lfo",
+        "rate": 0.13,
+        "depth": 0.28,
+        "phase": 1.5707963268
+      },
+      "dataMosh.drift": {
+        "kind": "lfo",
+        "rate": 0.05,
+        "depth": 0.35,
+        "phase": 3.1415926536
+      },
+      "chromaShift.amount": {
+        "kind": "video",
+        "feature": "motion",
+        "scale": 0.006,
+        "smooth": 0.8
+      }
+    },
+    "macros": [
+      {
+        "id": "slice",
+        "label": "Slice",
+        "default": 0.55,
+        "targets": [
+          { "key": "slitScan.scanSpeed", "min": 0.2, "max": 1.0 },
+          { "key": "dataMosh.mix", "min": 0.3, "max": 0.95 },
+          { "key": "pixelSort.threshold", "min": 0.1, "max": 0.55 }
+        ]
+      },
+      {
+        "id": "degrade",
+        "label": "Degrade",
+        "default": 0.42,
+        "targets": [
+          { "key": "dataMosh.decay", "min": 0.02, "max": 0.12 },
+          { "key": "dataMosh.chunk", "min": 0.3, "max": 0.78 },
+          { "key": "feedback.feedback", "min": 0.68, "max": 0.94 }
+        ]
+      },
+      {
+        "id": "spectral",
+        "label": "Spectral",
+        "default": 0.48,
+        "targets": [
+          { "key": "chromaShift.amount", "min": 0.002, "max": 0.022 },
+          { "key": "posterize.bins", "min": 16, "max": 48 },
+          { "key": "audio.granulator.pitchJitter", "min": 1, "max": 8 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.44,
+        "feedback": 0.48,
+        "damping": 4800,
+        "cross": 1.0471975512,
+        "mix": 0.32
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "classic",
+        "density": 14,
+        "duration": 140,
+        "durationJitter": 0.15,
+        "position": 0.5,
+        "positionJitter": 0.08,
+        "pitch": 0,
+        "pitchJitter": 3,
+        "panSpread": 0.38,
+        "ySpread": 0.15,
+        "reverseProbability": 0.28,
+        "distribution": 0.18,
+        "voiceCount": 16,
+        "gain": 0.48
+      }
+    }
+  },
+  "orbitalResonance": {
+    "title": "Draft / Orbital Resonance",
+    "tagline": "A routed curl-noise field on bus 1 modulates the kaleidoscope rotation on bus 0 — two independent LFOs set orbital rhythms while video motion colours the loop.",
+    "videoIntent": "Best on symmetrical or slow-evolving footage: faces, architecture, clouds. The routed field gives the kaleid a living turbulent modulator instead of a fixed spin.",
+    "audioIntent": "Cloud granulator at medium density with the feedback delay cross-fed at π/4 so stereo rotation tracks the orbital geometry on screen.",
+    "operatorFocus": ["kaleid", "modulateRotateRouted", "curlNoise", "colorama"],
+    "chain": ["kaleid", "rotate", "hue", "curlNoise", "saturate", "modulateRotateRouted", "colorama", "contrast"],
+    "graph": {
+      "monitorBus": 0,
+      "nodes": [
+        { "target": "kaleid#0", "bus": 0, "inputs": ["source"] },
+        { "target": "rotate#0", "bus": 0, "inputs": ["kaleid#0"] },
+        { "target": "hue#0", "bus": 0, "inputs": ["rotate#0"] },
+        { "target": "curlNoise#0", "bus": 1, "inputs": ["source"] },
+        { "target": "saturate#0", "bus": 1, "inputs": ["curlNoise#0"] },
+        { "target": "modulateRotateRouted#0", "bus": 0, "inputs": ["hue#0", "saturate#0"] },
+        { "target": "colorama#0", "bus": 0, "inputs": ["modulateRotateRouted#0"] },
+        { "target": "contrast#0", "bus": 0, "inputs": ["colorama#0"] }
+      ]
+    },
+    "render": {
+      "look": "kinetic",
+      "quality": "cinema",
+      "lut": "chrome",
+      "postPreset": "glassWarp",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.46,
+      "feedback.feedback": 0.72,
+      "kaleid.nSides": 6,
+      "kaleid.drive": 0.32,
+      "kaleid.mix": 0.88,
+      "rotate.angle": 0.06,
+      "hue.amount": 0.2,
+      "curlNoise.mix": 1.0,
+      "curlNoise.strength": 0.28,
+      "curlNoise.scale": 2.4,
+      "curlNoise.speed": 0.42,
+      "curlNoise.warp": 0.55,
+      "saturate.amount": 1.24,
+      "modulateRotateRouted.multiple": 0.22,
+      "modulateRotateRouted.offset": 0.0,
+      "colorama.amount": 0.38,
+      "contrast.amount": 1.2,
+      "scale.amount": 1.002,
+      "modulate.amount": 0.04
+    },
+    "automation": {
+      "rotate.angle": {
+        "kind": "lfo",
+        "rate": 0.1,
+        "depth": 0.14,
+        "phase": 0
+      },
+      "modulateRotateRouted.multiple": {
+        "kind": "lfo",
+        "rate": 0.06,
+        "depth": 0.16,
+        "phase": 1.5707963268
+      },
+      "hue.amount": {
+        "kind": "lfo",
+        "rate": 0.14,
+        "depth": 0.12,
+        "phase": 3.1415926536
+      },
+      "colorama.amount": {
+        "kind": "video",
+        "feature": "motion",
+        "scale": 0.14,
+        "smooth": 0.76
+      }
+    },
+    "macros": [
+      {
+        "id": "orbit",
+        "label": "Orbit",
+        "default": 0.5,
+        "targets": [
+          { "key": "kaleid.nSides", "min": 4, "max": 10 },
+          { "key": "modulateRotateRouted.multiple", "min": 0.08, "max": 0.48 },
+          { "key": "feedback.feedback", "min": 0.52, "max": 0.84 }
+        ]
+      },
+      {
+        "id": "colour",
+        "label": "Colour",
+        "default": 0.46,
+        "targets": [
+          { "key": "colorama.amount", "min": 0.1, "max": 0.7 },
+          { "key": "hue.amount", "min": 0.0, "max": 0.44 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.38 }
+        ]
+      },
+      {
+        "id": "field",
+        "label": "Field",
+        "default": 0.52,
+        "targets": [
+          { "key": "curlNoise.strength", "min": 0.1, "max": 0.52 },
+          { "key": "curlNoise.warp", "min": 0.2, "max": 0.85 },
+          { "key": "audio.granulator.density", "min": 16, "max": 36 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.38,
+        "feedback": 0.52,
+        "damping": 6200,
+        "cross": 0.7853981634,
+        "mix": 0.22
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 22,
+        "duration": 95,
+        "durationJitter": 0.24,
+        "position": 0.5,
+        "positionJitter": 0.04,
+        "pitch": 0,
+        "pitchJitter": 5,
+        "panSpread": 0.48,
+        "ySpread": 0.26,
+        "reverseProbability": 0.12,
+        "distribution": 0.3,
+        "voiceCount": 20,
+        "gain": 0.52
+      }
+    }
   }
 }

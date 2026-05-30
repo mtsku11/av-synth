@@ -36,7 +36,7 @@ void main() {
   v_layer = a_layer;
   v_alpha = a_alpha;
   // G3: per-voice scale — loud grains larger, quiet grains smaller.
-  float scale = mix(1.0, mix(0.15, 1.5, a_amplitude), u_depth);
+  float scale = mix(1.0, mix(0.03, 3.0, a_amplitude), u_depth);
   vec2 pos = a_center + p * u_halfSize * scale;
   gl_Position = vec4(pos, 0.0, 1.0);
   // G4: per-voice brightness passed to fragment stage.

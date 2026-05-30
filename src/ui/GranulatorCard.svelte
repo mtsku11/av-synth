@@ -21,6 +21,13 @@
     FEEDBACK_DELAY_PARAM_SPECS,
     type FeedbackDelayParamName,
   } from '../audio/feedback-delay-params';
+  import {
+    GRAIN_DEPTH_SPEC,
+    GRAIN_SIZE_SPEC,
+    GRAIN_UV_SCALE_SPEC,
+    GRAIN_SOFTNESS_SPEC,
+    type GrainCompositeParamName,
+  } from '../video/grain-composite-params';
   import type { MidiBinding, MidiRouter } from '../core/midi';
   import { listGlobalLfoOptions, type GlobalLfo, type ParamLfoAssignments } from '../core/mod-bank';
   import type { ParamSpec } from '../core/params';
@@ -47,6 +54,8 @@
     onSetParamLfo: (name: GranulatorSliderParam, encoded: string) => void;
     feedbackDelayValues: Readonly<Record<FeedbackDelayParamName, number>>;
     onSetFeedbackDelayParam: (name: FeedbackDelayParamName, value: number) => void;
+    grainValues: { depth: number; size: number; uvScale: number; softness: number };
+    onSetGrainParam: (name: GrainCompositeParamName, value: number) => void;
   }
 
   let {
@@ -70,6 +79,8 @@
     onSetParamLfo,
     feedbackDelayValues,
     onSetFeedbackDelayParam,
+    grainValues,
+    onSetGrainParam,
   }: Props = $props();
 
   function specFor(name: GranulatorSliderParam): ParamSpec {
@@ -241,7 +252,7 @@
     {#each GROUPS as group (group.label)}
       <div class="param-group">
         <span class="group-label">{group.label}</span>
-        <div class="group-knobs" style="grid-template-columns: repeat({group.params.length}, 1fr)">
+        <div class="group-knobs" style="grid-template-columns: repeat({group.params.length + (group.label === 'pitch · space' ? 1 : 0)}, 1fr)">
           {#each group.params as name (name)}
             {@const spec = specFor(name)}
             <div class="knob-item">
@@ -285,12 +296,20 @@
               </div>
             </div>
           {/each}
+          {#if group.label === 'pitch · space'}
+            <Knob
+              spec={GRAIN_DEPTH_SPEC}
+              value={grainValues.depth}
+              size={32}
+              onValueChange={(v) => onSetGrainParam('depth', v)}
+            />
+          {/if}
         </div>
       </div>
     {/each}
     <div class="param-group">
-      <span class="group-label">delay</span>
-      <div class="group-knobs" style="grid-template-columns: repeat({FEEDBACK_DELAY_PARAM_ORDER.length}, 1fr)">
+      <span class="group-label">delay · shape</span>
+      <div class="group-knobs" style="grid-template-columns: repeat({FEEDBACK_DELAY_PARAM_ORDER.length + 3}, 1fr)">
         {#each FEEDBACK_DELAY_PARAM_ORDER as name (name)}
           <Knob
             spec={FEEDBACK_DELAY_PARAM_SPECS[name]}
@@ -299,6 +318,9 @@
             onValueChange={(v) => onSetFeedbackDelayParam(name, v)}
           />
         {/each}
+        <Knob spec={GRAIN_SIZE_SPEC} value={grainValues.size} size={32} onValueChange={(v) => onSetGrainParam('size', v)} />
+        <Knob spec={GRAIN_UV_SCALE_SPEC} value={grainValues.uvScale} size={32} onValueChange={(v) => onSetGrainParam('uvScale', v)} />
+        <Knob spec={GRAIN_SOFTNESS_SPEC} value={grainValues.softness} size={32} onValueChange={(v) => onSetGrainParam('softness', v)} />
       </div>
     </div>
   </section>

@@ -44,6 +44,9 @@
   import { estimateVideoFpsFromMediaTimes } from './video/clip-fps';
   import { GrainScheduler } from './core/grain-scheduler';
   import { GrainCompositeSource } from './video/grain-composite';
+  import {
+    type GrainCompositeParamName,
+  } from './video/grain-composite-params';
   import { MidiRouter, WebMidiInput, parseMidiMessage, type WebMidiDevice } from './core/midi';
   import {
     createInstance,
@@ -94,7 +97,6 @@
   import LfoBank from './ui/LfoBank.svelte';
   import Patch from './ui/Patch.svelte';
   import ProgramMacros from './ui/ProgramMacros.svelte';
-  import Knob from './ui/Knob.svelte';
   import type { ParamSpec } from './core/params';
   import {
     applyGlobalLfoAssignments,
@@ -176,42 +178,6 @@
     l: 74,
   };
   const heldKeys = new Set<string>();
-  const GRAIN_SIZE_SPEC: ParamSpec = {
-    id: 'grain-size',
-    label: 'grain size',
-    range: [0.001, 1.0],
-    default: 0.35,
-    curve: 'lin',
-    unit: 'pct',
-  };
-
-  const GRAIN_UV_SCALE_SPEC: ParamSpec = {
-    id: 'grain-uv-scale',
-    label: 'uv window',
-    range: [0.001, 1.0],
-    default: 1.0,
-    curve: 'lin',
-    unit: 'pct',
-  };
-
-  const GRAIN_SOFTNESS_SPEC: ParamSpec = {
-    id: 'grain-softness',
-    label: 'soft edge',
-    range: [0, 1],
-    default: 0,
-    curve: 'lin',
-    unit: 'norm',
-  };
-
-  const GRAIN_DEPTH_SPEC: ParamSpec = {
-    id: 'grain-depth',
-    label: 'depth',
-    range: [0, 1],
-    default: 0,
-    curve: 'lin',
-    unit: 'norm',
-  };
-
   let grainBuffer: GrainBuffer | null = null;
   let grainScheduler: GrainScheduler | null = null;
   let grainCompositeSource: GrainCompositeSource | null = null;
@@ -221,7 +187,7 @@
   let grainAspectCorrect = $state(false);
   let grainSoftness = $state(0.0);
   let grainAdditive = $state(false);
-  let grainDepth = $state(0.0);
+  let grainDepth = $state(0.5);
   let grainSourceMessage = $state<string | null>(null);
   // Decode-progress channel, kept distinct from grainSourceMessage (which is refusal-only).
   // grainDecodedSrc remembers which videoEl.src has already been uploaded into the texture
@@ -1100,6 +1066,28 @@
         target.setMix(value);
         return;
     }
+  }
+
+  function setGrainParam(name: GrainCompositeParamName, value: number): void {
+    switch (name) {
+      case 'depth':
+        grainDepth = value;
+        if (grainCompositeSource) grainCompositeSource.depth = value;
+        break;
+      case 'size':
+        grainHalfSize = value;
+        if (grainCompositeSource) grainCompositeSource.halfSize = value;
+        break;
+      case 'uvScale':
+        grainUvScale = value;
+        if (grainCompositeSource) grainCompositeSource.uvScale = value;
+        break;
+      case 'softness':
+        grainSoftness = value;
+        if (grainCompositeSource) grainCompositeSource.softness = value;
+        break;
+    }
+    activeProgram = null;
   }
 
   function setFeedbackDelayParam(
@@ -2881,46 +2869,6 @@
                   {/if}
                 </div>
               </div>
-              {#if !grainFullFrame}
-                <div class="grain-knobs">
-                  <Knob
-                    spec={GRAIN_SIZE_SPEC}
-                    value={grainHalfSize}
-                    size={32}
-                    onValueChange={(v) => {
-                      grainHalfSize = v;
-                      if (grainCompositeSource) grainCompositeSource.halfSize = v;
-                    }}
-                  />
-                  <Knob
-                    spec={GRAIN_UV_SCALE_SPEC}
-                    value={grainUvScale}
-                    size={32}
-                    onValueChange={(v) => {
-                      grainUvScale = v;
-                      if (grainCompositeSource) grainCompositeSource.uvScale = v;
-                    }}
-                  />
-                  <Knob
-                    spec={GRAIN_SOFTNESS_SPEC}
-                    value={grainSoftness}
-                    size={32}
-                    onValueChange={(v) => {
-                      grainSoftness = v;
-                      if (grainCompositeSource) grainCompositeSource.softness = v;
-                    }}
-                  />
-                  <Knob
-                    spec={GRAIN_DEPTH_SPEC}
-                    value={grainDepth}
-                    size={32}
-                    onValueChange={(v) => {
-                      grainDepth = v;
-                      if (grainCompositeSource) grainCompositeSource.depth = v;
-                    }}
-                  />
-                </div>
-              {/if}
             </div>
           {/if}
           <div class="audio-transport">
@@ -2956,6 +2904,8 @@
             onSetParamLfo={setGranulatorModSource}
             feedbackDelayValues={feedbackDelayParams}
             onSetFeedbackDelayParam={setFeedbackDelayParam}
+            grainValues={{ depth: grainDepth, size: grainHalfSize, uvScale: grainUvScale, softness: grainSoftness }}
+            onSetGrainParam={setGrainParam}
           />
         {:else if activeWorkspaceSurface === 'lfo'}
           <LfoBank
@@ -3316,12 +3266,6 @@
     flex-wrap: wrap;
   }
 
-  .grain-knobs {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    justify-items: center;
-    align-items: start;
-  }
 
   .stage-controls {
     display: flex;
