@@ -89,7 +89,6 @@
     orderInstancesByGraph,
   } from './core/patch-chain';
   import { BLEND_OPS } from './ops/blend';
-  import FeedbackDelayCard from './ui/FeedbackDelayCard.svelte';
   import GranulatorCard from './ui/GranulatorCard.svelte';
   import MasterMeter from './ui/MasterMeter.svelte';
   import LfoBank from './ui/LfoBank.svelte';
@@ -2842,49 +2841,52 @@
         {:else if activeWorkspaceSurface === 'audio'}
           {#if sourceKind === 'grain-composite'}
             <div class="grain-controls">
-              <div class="grain-toggles">
-                <button
-                  type="button"
-                  class="src-btn"
-                  class:active={grainFullFrame}
-                  data-qa="grain-full-frame"
-                  aria-pressed={grainFullFrame}
-                  onclick={() => {
-                    grainFullFrame = !grainFullFrame;
-                    if (grainCompositeSource) grainCompositeSource.fullFrame = grainFullFrame;
-                  }}
-                >full frame</button>
-                {#if !grainFullFrame}
+              <div class="grain-group-label">
+                <span class="grain-section-label">composite</span>
+                <div class="grain-toggles">
                   <button
                     type="button"
                     class="src-btn"
-                    class:active={grainAspectCorrect}
-                    data-qa="grain-aspect-correct"
-                    aria-pressed={grainAspectCorrect}
+                    class:active={grainFullFrame}
+                    data-qa="grain-full-frame"
+                    aria-pressed={grainFullFrame}
                     onclick={() => {
-                      grainAspectCorrect = !grainAspectCorrect;
-                      if (grainCompositeSource) grainCompositeSource.aspectCorrect = grainAspectCorrect;
+                      grainFullFrame = !grainFullFrame;
+                      if (grainCompositeSource) grainCompositeSource.fullFrame = grainFullFrame;
                     }}
-                  >aspect</button>
-                  <button
-                    type="button"
-                    class="src-btn"
-                    class:active={grainAdditive}
-                    data-qa="grain-additive"
-                    aria-pressed={grainAdditive}
-                    onclick={() => {
-                      grainAdditive = !grainAdditive;
-                      if (grainCompositeSource) grainCompositeSource.additive = grainAdditive;
-                    }}
-                  >additive</button>
-                {/if}
+                  >full frame</button>
+                  {#if !grainFullFrame}
+                    <button
+                      type="button"
+                      class="src-btn"
+                      class:active={grainAspectCorrect}
+                      data-qa="grain-aspect-correct"
+                      aria-pressed={grainAspectCorrect}
+                      onclick={() => {
+                        grainAspectCorrect = !grainAspectCorrect;
+                        if (grainCompositeSource) grainCompositeSource.aspectCorrect = grainAspectCorrect;
+                      }}
+                    >aspect</button>
+                    <button
+                      type="button"
+                      class="src-btn"
+                      class:active={grainAdditive}
+                      data-qa="grain-additive"
+                      aria-pressed={grainAdditive}
+                      onclick={() => {
+                        grainAdditive = !grainAdditive;
+                        if (grainCompositeSource) grainCompositeSource.additive = grainAdditive;
+                      }}
+                    >additive</button>
+                  {/if}
+                </div>
               </div>
               {#if !grainFullFrame}
                 <div class="grain-knobs">
                   <Knob
                     spec={GRAIN_SIZE_SPEC}
                     value={grainHalfSize}
-                    size={34}
+                    size={32}
                     onValueChange={(v) => {
                       grainHalfSize = v;
                       if (grainCompositeSource) grainCompositeSource.halfSize = v;
@@ -2893,7 +2895,7 @@
                   <Knob
                     spec={GRAIN_UV_SCALE_SPEC}
                     value={grainUvScale}
-                    size={34}
+                    size={32}
                     onValueChange={(v) => {
                       grainUvScale = v;
                       if (grainCompositeSource) grainCompositeSource.uvScale = v;
@@ -2902,7 +2904,7 @@
                   <Knob
                     spec={GRAIN_SOFTNESS_SPEC}
                     value={grainSoftness}
-                    size={34}
+                    size={32}
                     onValueChange={(v) => {
                       grainSoftness = v;
                       if (grainCompositeSource) grainCompositeSource.softness = v;
@@ -2911,7 +2913,7 @@
                   <Knob
                     spec={GRAIN_DEPTH_SPEC}
                     value={grainDepth}
-                    size={34}
+                    size={32}
                     onValueChange={(v) => {
                       grainDepth = v;
                       if (grainCompositeSource) grainCompositeSource.depth = v;
@@ -2921,6 +2923,17 @@
               {/if}
             </div>
           {/if}
+          <div class="audio-transport">
+            {#if !audio.isInitialised}
+              <button type="button" class="src-btn audio-start" data-qa="audio-start" onclick={onStart}>
+                start audio
+              </button>
+            {:else}
+              <button type="button" class="src-btn audio-stop" data-qa="audio-stop" onclick={onStop}>
+                stop
+              </button>
+            {/if}
+          </div>
           <MasterMeter poll={() => audio.getMasterPeak()} />
           <GranulatorCard
             {granulator}
@@ -2941,8 +2954,9 @@
             onSetAdaptiveQuality={setGranulatorAdaptiveQuality}
             onSetParam={setGranulatorParam}
             onSetParamLfo={setGranulatorModSource}
+            feedbackDelayValues={feedbackDelayParams}
+            onSetFeedbackDelayParam={setFeedbackDelayParam}
           />
-          <FeedbackDelayCard values={feedbackDelayParams} onSetParam={setFeedbackDelayParam} />
         {:else if activeWorkspaceSurface === 'lfo'}
           <LfoBank
             bank={clock.lfoBank}
@@ -3260,17 +3274,45 @@
     display: none;
   }
 
-  .grain-controls {
+  .audio-transport {
     padding: 6px 8px;
     border-bottom: 1px solid var(--line);
+  }
+
+  .audio-start {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .grain-controls {
+    padding: 4px 8px 6px;
+    border-bottom: 1px solid var(--line);
     display: grid;
-    gap: 5px;
+    gap: 3px;
     background: color-mix(in srgb, var(--bg) 92%, black);
+  }
+
+  .grain-group-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 2px;
+    margin-bottom: 1px;
+  }
+
+  .grain-section-label {
+    font-family: var(--font-mono);
+    font-size: 0.52rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    flex-shrink: 0;
   }
 
   .grain-toggles {
     display: flex;
-    gap: 0.3rem;
+    gap: 0.25rem;
     flex-wrap: wrap;
   }
 

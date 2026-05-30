@@ -16,6 +16,11 @@
     GRANULATOR_PARAM_SPECS,
     type GranulatorSliderParam,
   } from '../audio/granulator-params';
+  import {
+    FEEDBACK_DELAY_PARAM_ORDER,
+    FEEDBACK_DELAY_PARAM_SPECS,
+    type FeedbackDelayParamName,
+  } from '../audio/feedback-delay-params';
   import type { MidiBinding, MidiRouter } from '../core/midi';
   import { listGlobalLfoOptions, type GlobalLfo, type ParamLfoAssignments } from '../core/mod-bank';
   import type { ParamSpec } from '../core/params';
@@ -40,6 +45,8 @@
     onSetAdaptiveQuality: (next: boolean) => void;
     onSetParam: (name: GranulatorSliderParam, value: number) => void;
     onSetParamLfo: (name: GranulatorSliderParam, encoded: string) => void;
+    feedbackDelayValues: Readonly<Record<FeedbackDelayParamName, number>>;
+    onSetFeedbackDelayParam: (name: FeedbackDelayParamName, value: number) => void;
   }
 
   let {
@@ -61,6 +68,8 @@
     onSetAdaptiveQuality,
     onSetParam,
     onSetParamLfo,
+    feedbackDelayValues,
+    onSetFeedbackDelayParam,
   }: Props = $props();
 
   function specFor(name: GranulatorSliderParam): ParamSpec {
@@ -279,6 +288,19 @@
         </div>
       </div>
     {/each}
+    <div class="param-group">
+      <span class="group-label">delay</span>
+      <div class="group-knobs">
+        {#each FEEDBACK_DELAY_PARAM_ORDER as name (name)}
+          <Knob
+            spec={FEEDBACK_DELAY_PARAM_SPECS[name]}
+            value={feedbackDelayValues[name]}
+            size={32}
+            onValueChange={(v) => onSetFeedbackDelayParam(name, v)}
+          />
+        {/each}
+      </div>
+    </div>
   </section>
 </article>
 
