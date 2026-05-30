@@ -385,7 +385,7 @@
   .source-knobs {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    justify-content: space-evenly;
     margin-top: 0.3rem;
     align-items: flex-start;
   }
@@ -426,7 +426,7 @@
   .knob-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    justify-content: space-evenly;
     margin-top: 0.2rem;
     align-items: flex-start;
   }
@@ -439,6 +439,7 @@
 
   .knob-mod {
     width: 100%;
+    max-width: 3.5rem;
     font-size: 0.52rem;
     font-family: var(--font-mono);
     background: var(--bg);

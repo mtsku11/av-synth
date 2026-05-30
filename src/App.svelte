@@ -3318,8 +3318,7 @@
 
   .grain-knobs {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
+    justify-content: space-evenly;
     align-items: flex-start;
   }
 
