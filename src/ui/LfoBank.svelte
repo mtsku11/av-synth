@@ -21,6 +21,10 @@
     'sample-hold',
   ];
 
+  function waveLabel(w: GlobalLfoWaveform): string {
+    return w === 'sample-hold' ? 's&h' : w;
+  }
+
   const rateSpec: ParamSpec = {
     id: 'rate',
     label: 'rate',
@@ -43,32 +47,23 @@
 </script>
 
 <section class="lfo-bank">
-  <div class="bank-head">
-    <div>
-      <span class="eyebrow">mod bank</span>
-      <strong>6 global lfos</strong>
-    </div>
-    <span class="meta">map any operator or engine parameter to one shared motion source</span>
-  </div>
-
+  <span class="bank-label">mod bank · 6 lfos</span>
   <div class="bank-list">
     {#each bank as lfo, index (lfo.id)}
       <article class="lfo-row">
-        <div class="lfo-copy">
-          <span class="eyebrow">{lfo.label}</span>
-          <select
-            value={lfo.waveform}
-            onchange={(event) =>
-              onSetWaveform?.(
-                index,
-                (event.currentTarget as HTMLSelectElement).value as GlobalLfoWaveform,
-              )}
-          >
-            {#each waveformOptions as waveform (waveform)}
-              <option value={waveform}>{waveform}</option>
-            {/each}
-          </select>
-        </div>
+        <span class="eyebrow">{lfo.label}</span>
+        <select
+          value={lfo.waveform}
+          onchange={(event) =>
+            onSetWaveform?.(
+              index,
+              (event.currentTarget as HTMLSelectElement).value as GlobalLfoWaveform,
+            )}
+        >
+          {#each waveformOptions as waveform (waveform)}
+            <option value={waveform}>{waveLabel(waveform)}</option>
+          {/each}
+        </select>
         <div class="lfo-controls">
           <Knob
             spec={rateSpec}
@@ -91,78 +86,61 @@
 <style>
   .lfo-bank {
     display: grid;
-    gap: 0.4rem;
-    padding: 0.5rem 0.75rem;
+    gap: 0.3rem;
+    padding: 0.4rem 0.6rem;
     border: 1px solid var(--line);
     background: color-mix(in oklab, var(--bg) 92%, black 8%);
   }
 
-  .bank-head {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.5rem;
-    align-items: end;
-  }
-
-  .bank-head strong,
-  .lfo-copy select {
+  .bank-label {
     font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
   }
 
   .bank-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-    gap: 0.35rem;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.25rem;
   }
 
   .lfo-row {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    padding: 0.25rem 0;
-    border-top: 1px solid color-mix(in oklab, var(--line) 50%, transparent);
-  }
-
-  .lfo-row:first-child {
-    padding-top: 0;
-    border-top: none;
-  }
-
-  .lfo-copy {
     display: grid;
     gap: 0.2rem;
-    align-content: start;
-    min-width: 5.5rem;
+    padding: 0.2rem 0.15rem;
+    border-top: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
   }
 
-  .lfo-copy select {
+  .lfo-row:nth-child(-n+3) {
+    border-top: none;
+    padding-top: 0;
+  }
+
+  .lfo-row select {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    width: 100%;
     min-width: 0;
-    font-size: 0.65rem;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--line);
+    padding: 1px 2px;
   }
 
   .lfo-controls {
     display: flex;
-    gap: 0.3rem;
+    gap: 0.2rem;
+    justify-content: center;
     align-items: flex-start;
   }
 
-  .eyebrow,
-  .meta {
+  .eyebrow {
     color: var(--muted);
-    font-size: 0.62rem;
+    font-size: 0.58rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-  }
-
-  .meta {
-    text-transform: none;
-    letter-spacing: 0.02em;
-    font-size: 0.6rem;
-  }
-
-  @media (max-width: 900px) {
-    .bank-list {
-      grid-template-columns: 1fr;
-    }
+    font-family: var(--font-mono);
   }
 </style>

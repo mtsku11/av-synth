@@ -180,7 +180,7 @@
   const GRAIN_SIZE_SPEC: ParamSpec = {
     id: 'grain-size',
     label: 'grain size',
-    range: [0.05, 1.0],
+    range: [0.001, 1.0],
     default: 0.35,
     curve: 'lin',
     unit: 'pct',
@@ -189,7 +189,7 @@
   const GRAIN_UV_SCALE_SPEC: ParamSpec = {
     id: 'grain-uv-scale',
     label: 'uv window',
-    range: [0.05, 1.0],
+    range: [0.001, 1.0],
     default: 1.0,
     curve: 'lin',
     unit: 'pct',
@@ -2603,6 +2603,56 @@
     <div class="brand">
       <h1>av-synth</h1>
     </div>
+
+    <div class="source-strip">
+      <span class="src-status">
+        {#if sourceLoaded && loadedVideoName}{loadedVideoName}{:else}no clip{/if}
+      </span>
+      <label class="file src-file">
+        video
+        <input data-qa="video-file-input" type="file" accept="video/*" onchange={onFileChange} />
+      </label>
+      <button
+        type="button"
+        class="src-btn"
+        class:active={sourceKind === 'grain-composite'}
+        data-qa="source-kind-grain-composite"
+        aria-pressed={sourceKind === 'grain-composite'}
+        onclick={() => setSourceKind('grain-composite')}
+      >grain</button>
+      <button
+        type="button"
+        class="src-btn"
+        class:active={sourceKind === 'video'}
+        aria-pressed={sourceKind === 'video'}
+        onclick={() => setSourceKind('video')}
+      >video</button>
+      <span class="src-divider">│</span>
+      <span class="src-status">
+        {#if sourceBLoaded && loadedVideoBName}B: {loadedVideoBName}{:else}B: —{/if}
+      </span>
+      <label class="file src-file">
+        +B
+        <input
+          data-qa="source-b-file-input"
+          type="file"
+          accept="video/*"
+          onchange={onSourceBChange}
+        />
+      </label>
+      {#if sourceBLoaded}
+        <button type="button" class="src-btn" onclick={clearSourceB}>×B</button>
+      {/if}
+      {#if grainSourceMessage}
+        <span class="src-msg" role="status" data-qa="grain-source-message">{grainSourceMessage}</span>
+      {/if}
+      {#if grainDecodeStatus}
+        <span class="src-msg" role="status" data-qa="grain-decode-progress">
+          decoding {grainDecodeStatus.frameIndex + 1}/{grainDecodeStatus.frameCount}
+        </span>
+      {/if}
+    </div>
+
     <div class="stage-controls">
       <label class="stage-group">
         <span class="rl">── monitor ──</span>
@@ -2678,151 +2728,6 @@
       </label>
     </div>
   </header>
-
-  <section class="sources">
-    <div class="source-primary">
-      <div class="source-actions">
-        <span class="source-status">
-          {#if sourceLoaded && loadedVideoName}
-            {loadedVideoName}
-          {:else}
-            no clip loaded
-          {/if}
-        </span>
-        <label class="file source-file">
-          choose video
-          <input data-qa="video-file-input" type="file" accept="video/*" onchange={onFileChange} />
-        </label>
-        <button
-          class="source-kind-button"
-          type="button"
-          data-qa="source-kind-grain-composite"
-          aria-pressed={sourceKind === 'grain-composite'}
-          onclick={() => setSourceKind('grain-composite')}
-        >
-          grain composite
-        </button>
-        {#if sourceKind === 'grain-composite'}
-          <button
-            class="source-kind-button"
-            type="button"
-            data-qa="grain-full-frame"
-            aria-pressed={grainFullFrame}
-            onclick={() => {
-              grainFullFrame = !grainFullFrame;
-              if (grainCompositeSource) grainCompositeSource.fullFrame = grainFullFrame;
-            }}
-          >
-            full frame
-          </button>
-          <button
-            class="source-kind-button"
-            type="button"
-            data-qa="grain-aspect-correct"
-            aria-pressed={grainAspectCorrect}
-            onclick={() => {
-              grainAspectCorrect = !grainAspectCorrect;
-              if (grainCompositeSource) grainCompositeSource.aspectCorrect = grainAspectCorrect;
-            }}
-          >
-            aspect
-          </button>
-          <button
-            class="source-kind-button"
-            type="button"
-            data-qa="grain-additive"
-            aria-pressed={grainAdditive}
-            onclick={() => {
-              grainAdditive = !grainAdditive;
-              if (grainCompositeSource) grainCompositeSource.additive = grainAdditive;
-            }}
-          >
-            additive
-          </button>
-        {/if}
-        <button
-          class="source-kind-button"
-          type="button"
-          aria-pressed={sourceKind === 'video'}
-          onclick={() => setSourceKind('video')}
-        >
-          video
-        </button>
-      </div>
-      <div class="source-actions source-b-actions">
-        <span class="source-status">
-          {#if sourceBLoaded && loadedVideoBName}
-            B: {loadedVideoBName}
-          {:else}
-            source B: none
-          {/if}
-        </span>
-        <label class="file source-file">
-          load source B
-          <input
-            data-qa="source-b-file-input"
-            type="file"
-            accept="video/*"
-            onchange={onSourceBChange}
-          />
-        </label>
-        {#if sourceBLoaded}
-          <button class="source-kind-button" type="button" onclick={clearSourceB}> clear B </button>
-        {/if}
-      </div>
-      {#if sourceKind === 'grain-composite' && !grainFullFrame}
-        <div class="grain-size-row">
-          <Knob
-            spec={GRAIN_SIZE_SPEC}
-            value={grainHalfSize}
-            size={34}
-            onValueChange={(v) => {
-              grainHalfSize = v;
-              if (grainCompositeSource) grainCompositeSource.halfSize = v;
-            }}
-          />
-          <Knob
-            spec={GRAIN_UV_SCALE_SPEC}
-            value={grainUvScale}
-            size={34}
-            onValueChange={(v) => {
-              grainUvScale = v;
-              if (grainCompositeSource) grainCompositeSource.uvScale = v;
-            }}
-          />
-          <Knob
-            spec={GRAIN_SOFTNESS_SPEC}
-            value={grainSoftness}
-            size={34}
-            onValueChange={(v) => {
-              grainSoftness = v;
-              if (grainCompositeSource) grainCompositeSource.softness = v;
-            }}
-          />
-          <Knob
-            spec={GRAIN_DEPTH_SPEC}
-            value={grainDepth}
-            size={34}
-            onValueChange={(v) => {
-              grainDepth = v;
-              if (grainCompositeSource) grainCompositeSource.depth = v;
-            }}
-          />
-        </div>
-      {/if}
-      {#if grainSourceMessage}
-        <p class="source-message" role="status" data-qa="grain-source-message">
-          {grainSourceMessage}
-        </p>
-      {/if}
-      {#if grainDecodeStatus}
-        <p class="source-progress" role="status" data-qa="grain-decode-progress">
-          decoding grain buffer: frame {grainDecodeStatus.frameIndex +
-            1}/{grainDecodeStatus.frameCount}
-        </p>
-      {/if}
-    </div>
-  </section>
 
   <section class="workspace">
     <section class="stage">
@@ -2934,6 +2839,87 @@
             </select>
           </div>
         {:else if activeWorkspaceSurface === 'audio'}
+          {#if sourceKind === 'grain-composite'}
+            <div class="grain-controls">
+              <div class="grain-toggles">
+                <button
+                  type="button"
+                  class="src-btn"
+                  class:active={grainFullFrame}
+                  data-qa="grain-full-frame"
+                  aria-pressed={grainFullFrame}
+                  onclick={() => {
+                    grainFullFrame = !grainFullFrame;
+                    if (grainCompositeSource) grainCompositeSource.fullFrame = grainFullFrame;
+                  }}
+                >full frame</button>
+                {#if !grainFullFrame}
+                  <button
+                    type="button"
+                    class="src-btn"
+                    class:active={grainAspectCorrect}
+                    data-qa="grain-aspect-correct"
+                    aria-pressed={grainAspectCorrect}
+                    onclick={() => {
+                      grainAspectCorrect = !grainAspectCorrect;
+                      if (grainCompositeSource) grainCompositeSource.aspectCorrect = grainAspectCorrect;
+                    }}
+                  >aspect</button>
+                  <button
+                    type="button"
+                    class="src-btn"
+                    class:active={grainAdditive}
+                    data-qa="grain-additive"
+                    aria-pressed={grainAdditive}
+                    onclick={() => {
+                      grainAdditive = !grainAdditive;
+                      if (grainCompositeSource) grainCompositeSource.additive = grainAdditive;
+                    }}
+                  >additive</button>
+                {/if}
+              </div>
+              {#if !grainFullFrame}
+                <div class="grain-knobs">
+                  <Knob
+                    spec={GRAIN_SIZE_SPEC}
+                    value={grainHalfSize}
+                    size={34}
+                    onValueChange={(v) => {
+                      grainHalfSize = v;
+                      if (grainCompositeSource) grainCompositeSource.halfSize = v;
+                    }}
+                  />
+                  <Knob
+                    spec={GRAIN_UV_SCALE_SPEC}
+                    value={grainUvScale}
+                    size={34}
+                    onValueChange={(v) => {
+                      grainUvScale = v;
+                      if (grainCompositeSource) grainCompositeSource.uvScale = v;
+                    }}
+                  />
+                  <Knob
+                    spec={GRAIN_SOFTNESS_SPEC}
+                    value={grainSoftness}
+                    size={34}
+                    onValueChange={(v) => {
+                      grainSoftness = v;
+                      if (grainCompositeSource) grainCompositeSource.softness = v;
+                    }}
+                  />
+                  <Knob
+                    spec={GRAIN_DEPTH_SPEC}
+                    value={grainDepth}
+                    size={34}
+                    onValueChange={(v) => {
+                      grainDepth = v;
+                      if (grainCompositeSource) grainCompositeSource.depth = v;
+                    }}
+                  />
+                </div>
+              {/if}
+            </div>
+          {/if}
           <MasterMeter poll={() => audio.getMasterPeak()} />
           <GranulatorCard
             {granulator}
@@ -3016,21 +3002,12 @@
 <style>
   .shell {
     display: grid;
-    grid-template-rows: auto auto 1fr auto;
+    grid-template-rows: auto 1fr auto;
     height: 100vh;
     color: var(--fg);
     background: var(--bg);
     font-family: var(--font-mono);
     overflow: hidden;
-  }
-
-  .sources {
-    display: flex;
-    gap: 0.5rem;
-    padding: 0.4rem 1.5rem;
-    border-bottom: 1px solid var(--line);
-    flex-wrap: wrap;
-    align-items: center;
   }
 
   .sec-label {
@@ -3115,27 +3092,6 @@
     text-transform: uppercase;
   }
 
-  .source-primary {
-    display: grid;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.15rem 0;
-  }
-
-  .source-status {
-    color: var(--muted);
-    font-size: 0.75rem;
-    letter-spacing: 0.02em;
-    min-width: 0;
-  }
-
-  .source-progress {
-    color: var(--muted);
-    font-size: 0.75rem;
-    font-variant-numeric: tabular-nums;
-    margin: 0;
-  }
-
   .midi-row {
     display: flex;
     align-items: center;
@@ -3194,39 +3150,17 @@
     cursor: not-allowed;
   }
 
-  .source-actions {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-
-  .grain-size-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    align-items: flex-start;
-    padding: 0.2rem 0;
-  }
-
-  .source-file {
-    align-self: flex-start;
-  }
-
   .topbar {
-    padding: 0.75rem 1.5rem;
+    padding: 0.45rem 1.2rem;
     border-bottom: 1px solid var(--line);
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 1.5rem;
+    gap: 0.75rem;
     flex-wrap: wrap;
   }
 
   .brand {
-    display: flex;
-    align-items: baseline;
-    gap: 1rem;
+    flex-shrink: 0;
   }
 
   h1 {
@@ -3235,6 +3169,107 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--accent);
+  }
+
+  .source-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .src-status {
+    color: var(--muted);
+    font-size: 0.68rem;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 14rem;
+  }
+
+  .src-file {
+    align-self: center;
+  }
+
+  .src-divider {
+    color: var(--line);
+    font-size: 0.75rem;
+    margin: 0 0.1rem;
+    user-select: none;
+  }
+
+  .src-msg {
+    color: var(--muted);
+    font-size: 0.65rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .src-btn {
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--line);
+    padding: 0.2rem 0.4rem;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+  }
+
+  .src-btn:hover {
+    border-color: var(--accent);
+  }
+
+  .src-btn.active,
+  .src-btn[aria-pressed='true'] {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  .file {
+    background: var(--bg);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .file:hover {
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+  }
+
+  .file input {
+    display: none;
+  }
+
+  .grain-controls {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    gap: 5px;
+    background: color-mix(in srgb, var(--bg) 92%, black);
+  }
+
+  .grain-toggles {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+  }
+
+  .grain-knobs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: flex-start;
   }
 
   .stage-controls {
@@ -3279,31 +3314,9 @@
     font-size: 0.85em;
   }
 
-  .file {
-    background: var(--bg);
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    padding: 0.35rem 0.9rem;
-    cursor: pointer;
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    letter-spacing: 0.05em;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  .file:hover {
-    background: color-mix(in srgb, var(--accent) 12%, var(--bg));
-  }
-
-  .file input {
-    display: none;
-  }
-
   .workspace {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(24rem, 1fr);
+    grid-template-columns: minmax(0, 1fr) 20rem;
     min-height: 0;
     min-width: 0;
     overflow: hidden;
