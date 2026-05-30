@@ -73,10 +73,8 @@
         label: 'grain',
         params: ['position', 'positionJitter', 'duration', 'durationJitter', 'density', 'distribution', 'reverseProbability'],
       },
-      { label: 'pitch', params: ['pitch', 'pitchJitter', 'fmAmount', 'fmFreq'] },
-      { label: 'space', params: ['panSpread', 'ySpread'] },
-      { label: 'env', params: ['envAttack', 'envDecay', 'envSustain', 'envRelease'] },
-      { label: 'out', params: ['voiceCount', 'gain', 'mix'] },
+      { label: 'pitch · space', params: ['pitch', 'pitchJitter', 'fmAmount', 'fmFreq', 'panSpread', 'ySpread'] },
+      { label: 'envelope · output', params: ['envAttack', 'envDecay', 'envSustain', 'envRelease', 'voiceCount', 'gain', 'mix'] },
     ];
 
   // MIDI-learn state. learningParam is the name of the slider awaiting a MIDI surface
@@ -412,7 +410,7 @@
   .group-knobs {
     display: flex;
     flex-wrap: wrap;
-    gap: 3px;
+    gap: 0.4rem;
     align-items: flex-start;
   }
   .knob-item {

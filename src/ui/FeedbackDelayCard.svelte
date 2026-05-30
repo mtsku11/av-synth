@@ -50,7 +50,7 @@
   .knob-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.35rem;
+    gap: 0.4rem;
     align-items: flex-start;
   }
 </style>

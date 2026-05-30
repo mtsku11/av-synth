@@ -426,7 +426,7 @@
   .knob-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: 0.4rem;
     margin-top: 0.2rem;
     align-items: flex-start;
   }

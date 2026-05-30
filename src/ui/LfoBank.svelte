@@ -131,7 +131,7 @@
 
   .lfo-controls {
     display: flex;
-    gap: 0.2rem;
+    gap: 0.4rem;
     justify-content: center;
     align-items: flex-start;
   }
