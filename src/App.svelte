@@ -44,9 +44,7 @@
   import { estimateVideoFpsFromMediaTimes } from './video/clip-fps';
   import { GrainScheduler } from './core/grain-scheduler';
   import { GrainCompositeSource } from './video/grain-composite';
-  import {
-    type GrainCompositeParamName,
-  } from './video/grain-composite-params';
+  import { type GrainCompositeParamName } from './video/grain-composite-params';
   import { MidiRouter, WebMidiInput, parseMidiMessage, type WebMidiDevice } from './core/midi';
   import {
     createInstance,
@@ -126,7 +124,10 @@
   let monitorBus = $state<BusIndex>(0);
   let previewMode = $state<PreviewMode>('single');
   type WorkspaceSurface = 'video' | 'audio' | 'lfo' | 'presets';
-  let activeWorkspaceSurface = $state<WorkspaceSurface>('video');
+  let activeWorkspaceSurface = $state<WorkspaceSurface>('presets');
+  let advancedOpen = $state(false);
+  let demoStarted = $state(false);
+  let safeMode = $state(false);
 
   // Source kind: 'video' = external <video> element, 'placeholder' = built-in
   // plasma, or a registered procedural source name (e.g. 'osc').
@@ -237,6 +238,7 @@
   ) as PresentationLensDirtName[];
   let presentationLensDirt = $state<PresentationLensDirtName>('none');
   let bloomStrengthAssignment = $state<ParamLfoAssignment>(createParamLfoAssignment());
+  const FLAGSHIP_PROGRAM_KEY = 'temporalBloomGhost';
   const PUBLIC_PROGRAM_KEYS = new Set([
     'temporalBloomGhost',
     'slitScanEcho',
@@ -246,15 +248,13 @@
     'datamoshSmear',
     'datamoshHold',
     'flowMelt',
-    'motionBloomGhost',
     'kaleidoFeedbackTunnel',
     'freezeFeedback',
-    'granularVideoCloud',
     'grainField',
-    'vortexField',
-    'curlTurbulence',
-    'vortexPacketStorm',
-    'saddleSweep',
+    'kaleidResonance',
+    'turbulentBloom',
+    'chromaticShear',
+    'orbitalResonance',
   ]);
 
   const VIDEO_FEATURE_SAMPLE_WIDTH = 96;
@@ -302,7 +302,42 @@
   const visiblePrograms = $derived(
     Object.entries(programs).filter(([name]) => PUBLIC_PROGRAM_KEYS.has(name)),
   );
+  const experimentPrograms = $derived(
+    Object.entries(programs).filter(([name]) => !PUBLIC_PROGRAM_KEYS.has(name)),
+  );
   const activeProgramData = $derived(activeProgram ? programs[activeProgram] : undefined);
+
+  interface RuntimeCapability {
+    label: string;
+    available: boolean;
+  }
+
+  function getRuntimeCapabilities(): RuntimeCapability[] {
+    if (typeof window === 'undefined') return [];
+    const AudioContextCtor = window.AudioContext;
+    return [
+      { label: 'crossOriginIsolated', available: window.crossOriginIsolated },
+      { label: 'SharedArrayBuffer', available: typeof SharedArrayBuffer === 'function' },
+      {
+        label: 'AudioWorklet',
+        available:
+          typeof AudioWorkletNode === 'function' &&
+          !!AudioContextCtor &&
+          'audioWorklet' in AudioContextCtor.prototype,
+      },
+      { label: 'WebGL2', available: renderer !== null },
+      { label: 'Web MIDI', available: WebMidiInput.isSupported() },
+      {
+        label: 'recording',
+        available:
+          typeof MediaRecorder === 'function' &&
+          typeof HTMLCanvasElement !== 'undefined' &&
+          'captureStream' in HTMLCanvasElement.prototype,
+      },
+    ];
+  }
+
+  const runtimeCapabilities = $derived(getRuntimeCapabilities());
 
   interface QaBridge {
     getState(): {
@@ -1101,6 +1136,68 @@
       syncSharedFeedbackToVideoChain(value);
     }
     if (options.clearProgram !== false) activeProgram = null;
+  }
+
+  function clearFeedback(): void {
+    renderer?.resetTemporalState();
+    if (!audio.isInitialised || !granulator || !feedbackDelay) return;
+    const previous = feedbackDelay;
+    feedbackDelayDisconnect?.();
+    feedbackDelayDisconnect = null;
+    try {
+      granulator.output.disconnect(previous.input);
+    } catch {
+      // The prior graph may already be detached during recovery.
+    }
+    previous.dispose();
+    const next = new FeedbackDelay(audio.ctx, feedbackDelayParams);
+    granulator.output.connect(next.input);
+    feedbackDelay = next;
+    feedbackDelayDisconnect = audio.attachAuxiliarySource(next.output);
+  }
+
+  function resetVisuals(): void {
+    if (!renderer) return;
+    for (const instance of instances) disposeInstance(instance, renderer.gl);
+    instances = [];
+    graph.clear();
+    activeProgram = null;
+    activeProgramMacros = {};
+    monitorBus = 0;
+    previewMode = 'single';
+    presentationLook = 'cine';
+    presentationQuality = safeMode ? 'performance' : 'standard';
+    presentationLut = 'neutral';
+    presentationPostPreset = 'none';
+    presentationLensDirt = 'none';
+    renderer.resetTemporalState();
+  }
+
+  async function stopAudioOnly(): Promise<void> {
+    if (captureStatus === 'recording') await stopCapture();
+    await clock.stop();
+  }
+
+  function setSafeMode(next: boolean): void {
+    safeMode = next;
+    presentationQuality = next ? 'performance' : 'standard';
+    previewMode = 'single';
+    setGranulatorQuality(next ? 'eco' : 'balanced');
+    setGranulatorAdaptiveQuality(next);
+  }
+
+  function toggleAdvanced(): void {
+    advancedOpen = !advancedOpen;
+    if (!advancedOpen) activeWorkspaceSurface = 'presets';
+  }
+
+  async function startDemo(): Promise<void> {
+    if (!renderer) return;
+    setSourceKind('placeholder');
+    onProgram(FLAGSHIP_PROGRAM_KEY);
+    activeWorkspaceSurface = 'presets';
+    demoStarted = true;
+    await onStart();
   }
 
   function setGranulatorParam(name: GranulatorSliderParam, value: number): void {
@@ -2472,6 +2569,7 @@
     const input = e.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     if (!file || !renderer || !videoEl) return;
+    demoStarted = true;
     // New clip invalidates any prior grain-buffer decode. Bumping the gen prevents any
     // in-flight decode from writing to UI state, and disposing the buffer forces
     // ensureGrainComposite() to reallocate against the new clip's dimensions on demand.
@@ -2589,6 +2687,7 @@
   <header class="topbar">
     <div class="brand">
       <h1>av-synth</h1>
+      <span>video-first audiovisual effects</span>
     </div>
 
     <div class="source-strip">
@@ -2599,40 +2698,44 @@
       {#if sourceLoaded && loadedVideoName}
         <span class="src-status">{loadedVideoName}</span>
       {/if}
-      <label class="file src-file">
-        load video B
-        <input
-          data-qa="source-b-file-input"
-          type="file"
-          accept="video/*"
-          onchange={onSourceBChange}
-        />
-      </label>
-      {#if sourceBLoaded && loadedVideoBName}
-        <span class="src-status">B: {loadedVideoBName}</span>
+      {#if advancedOpen}
+        <label class="file src-file">
+          load video B
+          <input
+            data-qa="source-b-file-input"
+            type="file"
+            accept="video/*"
+            onchange={onSourceBChange}
+          />
+        </label>
+        {#if sourceBLoaded && loadedVideoBName}
+          <span class="src-status">B: {loadedVideoBName}</span>
+        {/if}
+        {#if sourceBLoaded}
+          <button type="button" class="src-btn" onclick={clearSourceB}>clear B</button>
+        {/if}
+        <span class="src-divider">│</span>
+        <span class="src-mode-label">mode</span>
+        <button
+          type="button"
+          class="src-btn"
+          class:active={sourceKind === 'video'}
+          aria-pressed={sourceKind === 'video'}
+          onclick={() => setSourceKind('video')}>video</button
+        >
+        <button
+          type="button"
+          class="src-btn"
+          class:active={sourceKind === 'grain-composite'}
+          data-qa="source-kind-grain-composite"
+          aria-pressed={sourceKind === 'grain-composite'}
+          onclick={() => setSourceKind('grain-composite')}>grain</button
+        >
       {/if}
-      {#if sourceBLoaded}
-        <button type="button" class="src-btn" onclick={clearSourceB}>clear B</button>
-      {/if}
-      <span class="src-divider">│</span>
-      <span class="src-mode-label">mode</span>
-      <button
-        type="button"
-        class="src-btn"
-        class:active={sourceKind === 'video'}
-        aria-pressed={sourceKind === 'video'}
-        onclick={() => setSourceKind('video')}
-      >video</button>
-      <button
-        type="button"
-        class="src-btn"
-        class:active={sourceKind === 'grain-composite'}
-        data-qa="source-kind-grain-composite"
-        aria-pressed={sourceKind === 'grain-composite'}
-        onclick={() => setSourceKind('grain-composite')}
-      >grain</button>
       {#if grainSourceMessage}
-        <span class="src-msg" role="status" data-qa="grain-source-message">{grainSourceMessage}</span>
+        <span class="src-msg" role="status" data-qa="grain-source-message"
+          >{grainSourceMessage}</span
+        >
       {/if}
       {#if grainDecodeStatus}
         <span class="src-msg" role="status" data-qa="grain-decode-progress">
@@ -2641,80 +2744,103 @@
       {/if}
     </div>
 
-    <div class="stage-controls">
-      <label class="stage-group">
-        <span class="rl">── monitor ──</span>
-        <div class="stage-toggle">
-          {#each BUS_INDICES as bus (bus)}
-            <button
-              class:active={monitorBus === bus}
-              type="button"
-              onclick={() => onSetMonitorBus(bus)}
-              title={sourceBLoaded && bus === 0
-                ? 'monitor bus 0 — defaults to Source A'
-                : sourceBLoaded && bus === 1
-                  ? 'monitor bus 1 — defaults to Source B'
-                  : `monitor bus ${bus}`}
-            >
-              o{bus}{#if sourceBLoaded && bus === 0}<span class="bus-source">·A</span
-                >{:else if sourceBLoaded && bus === 1}<span class="bus-source">·B</span>{/if}
-            </button>
-          {/each}
-        </div>
-      </label>
-      <label class="stage-group">
-        <span class="rl">── preview ──</span>
-        <div class="stage-toggle">
-          <button
-            class:active={previewMode === 'single'}
-            type="button"
-            onclick={() => onSetPreviewMode('single')}
-          >
-            single
-          </button>
-          <button
-            class:active={previewMode === 'quad'}
-            type="button"
-            onclick={() => onSetPreviewMode('quad')}
-          >
-            quad
-          </button>
-        </div>
-      </label>
-      <label class="stage-group">
-        <span class="rl">── midi ──</span>
-        <div class="midi-row">
-          <span class="midi-status" data-qa="midi-status">
-            {#if midiUnavailableReason}
-              {midiUnavailableReason}
-            {:else if selectedMidiSource === 'keyboard'}
-              keyboard
-            {:else if midiDevices.length === 0}
-              no devices
-            {:else if selectedMidiSource === 'all'}
-              {midiDevices.map((d) => d.name).join(', ')}
-            {:else}
-              {selectedMidiSource}
-            {/if}
-          </span>
-          <select
-            class="midi-source-select"
-            data-qa="midi-source-select"
-            value={selectedMidiSource}
-            onchange={(e) => {
-              selectedMidiSource = (e.currentTarget as HTMLSelectElement).value;
-            }}
-            disabled={!!midiUnavailableReason}
-          >
-            <option value="all">all devices</option>
-            <option value="keyboard">keyboard</option>
-            {#each midiDevices as device (device.id)}
-              <option value={device.name}>{device.name}</option>
-            {/each}
-          </select>
-        </div>
-      </label>
+    <div class="release-actions" aria-label="Recovery controls">
+      <button type="button" class="src-btn demo-btn" onclick={startDemo}>start demo</button>
+      <button type="button" class="src-btn" onclick={resetVisuals}>reset visuals</button>
+      <button type="button" class="src-btn" onclick={stopAudioOnly}>stop audio</button>
+      <button type="button" class="src-btn" onclick={clearFeedback}>clear feedback</button>
+      <button
+        type="button"
+        class="src-btn"
+        class:active={safeMode}
+        aria-pressed={safeMode}
+        onclick={() => setSafeMode(!safeMode)}>safe mode</button
+      >
+      <button
+        type="button"
+        class="src-btn"
+        class:active={advancedOpen}
+        aria-pressed={advancedOpen}
+        onclick={toggleAdvanced}>advanced</button
+      >
     </div>
+
+    {#if advancedOpen}
+      <div class="stage-controls">
+        <label class="stage-group">
+          <span class="rl">── monitor ──</span>
+          <div class="stage-toggle">
+            {#each BUS_INDICES as bus (bus)}
+              <button
+                class:active={monitorBus === bus}
+                type="button"
+                onclick={() => onSetMonitorBus(bus)}
+                title={sourceBLoaded && bus === 0
+                  ? 'monitor bus 0 — defaults to Source A'
+                  : sourceBLoaded && bus === 1
+                    ? 'monitor bus 1 — defaults to Source B'
+                    : `monitor bus ${bus}`}
+              >
+                o{bus}{#if sourceBLoaded && bus === 0}<span class="bus-source">·A</span
+                  >{:else if sourceBLoaded && bus === 1}<span class="bus-source">·B</span>{/if}
+              </button>
+            {/each}
+          </div>
+        </label>
+        <label class="stage-group">
+          <span class="rl">── preview ──</span>
+          <div class="stage-toggle">
+            <button
+              class:active={previewMode === 'single'}
+              type="button"
+              onclick={() => onSetPreviewMode('single')}
+            >
+              single
+            </button>
+            <button
+              class:active={previewMode === 'quad'}
+              type="button"
+              onclick={() => onSetPreviewMode('quad')}
+            >
+              quad
+            </button>
+          </div>
+        </label>
+        <label class="stage-group">
+          <span class="rl">── midi ──</span>
+          <div class="midi-row">
+            <span class="midi-status" data-qa="midi-status">
+              {#if midiUnavailableReason}
+                {midiUnavailableReason}
+              {:else if selectedMidiSource === 'keyboard'}
+                keyboard
+              {:else if midiDevices.length === 0}
+                no devices
+              {:else if selectedMidiSource === 'all'}
+                {midiDevices.map((d) => d.name).join(', ')}
+              {:else}
+                {selectedMidiSource}
+              {/if}
+            </span>
+            <select
+              class="midi-source-select"
+              data-qa="midi-source-select"
+              value={selectedMidiSource}
+              onchange={(e) => {
+                selectedMidiSource = (e.currentTarget as HTMLSelectElement).value;
+              }}
+              disabled={!!midiUnavailableReason}
+            >
+              <option value="all">all devices</option>
+              <option value="keyboard">keyboard</option>
+              {#each midiDevices as device (device.id)}
+                <option value={device.name}>{device.name}</option>
+              {/each}
+            </select>
+          </div>
+        </label>
+      </div>
+    {/if}
   </header>
 
   <section class="workspace">
@@ -2724,6 +2850,26 @@
           <div class="error">init failed: {initError}</div>
         {/if}
         <canvas bind:this={canvasEl} width="1280" height="720"></canvas>
+        {#if !demoStarted && !sourceLoaded}
+          <section class="welcome-card" aria-label="Start av-synth demo">
+            <span class="sec-label">private staging rc</span>
+            <h2>Shape a short video clip into a coupled audiovisual performance.</h2>
+            <p>
+              Start with the built-in visual demo, then load your own clip to unlock its attached
+              audio and the granulator-first showcase path.
+            </p>
+            <div class="welcome-actions">
+              <button type="button" class="primary-action" onclick={startDemo}>start demo</button>
+              <label class="file">
+                load your clip
+                <input type="file" accept="video/*" onchange={onFileChange} />
+              </label>
+              <a class="desktop-cta" href="#desktop-app" aria-disabled="true"
+                >desktop download · coming after staging sign-off</a
+              >
+            </div>
+          </section>
+        {/if}
         {#if previewMode === 'quad'}
           <div class="quad-monitor-overlay">
             {#each BUS_INDICES as bus (bus)}
@@ -2747,49 +2893,51 @@
 
     <aside class="patch-panel">
       <div class="patch-head">
-        <span class="sec-label">── workspace ──</span>
-        <div class="workspace-tabs" role="tablist" aria-label="Edit surface">
-          <button
-            class:active={activeWorkspaceSurface === 'video'}
-            class="workspace-tab"
-            type="button"
-            role="tab"
-            aria-selected={activeWorkspaceSurface === 'video'}
-            onclick={() => (activeWorkspaceSurface = 'video')}
-          >
-            video
-          </button>
-          <button
-            class:active={activeWorkspaceSurface === 'audio'}
-            class="workspace-tab"
-            type="button"
-            role="tab"
-            aria-selected={activeWorkspaceSurface === 'audio'}
-            onclick={() => (activeWorkspaceSurface = 'audio')}
-          >
-            audio
-          </button>
-          <button
-            class:active={activeWorkspaceSurface === 'lfo'}
-            class="workspace-tab"
-            type="button"
-            role="tab"
-            aria-selected={activeWorkspaceSurface === 'lfo'}
-            onclick={() => (activeWorkspaceSurface = 'lfo')}
-          >
-            lfo
-          </button>
-          <button
-            class:active={activeWorkspaceSurface === 'presets'}
-            class="workspace-tab"
-            type="button"
-            role="tab"
-            aria-selected={activeWorkspaceSurface === 'presets'}
-            onclick={() => (activeWorkspaceSurface = 'presets')}
-          >
-            presets
-          </button>
-        </div>
+        <span class="sec-label">{advancedOpen ? '── workspace ──' : '── showcase ──'}</span>
+        {#if advancedOpen}
+          <div class="workspace-tabs" role="tablist" aria-label="Edit surface">
+            <button
+              class:active={activeWorkspaceSurface === 'video'}
+              class="workspace-tab"
+              type="button"
+              role="tab"
+              aria-selected={activeWorkspaceSurface === 'video'}
+              onclick={() => (activeWorkspaceSurface = 'video')}
+            >
+              video
+            </button>
+            <button
+              class:active={activeWorkspaceSurface === 'audio'}
+              class="workspace-tab"
+              type="button"
+              role="tab"
+              aria-selected={activeWorkspaceSurface === 'audio'}
+              onclick={() => (activeWorkspaceSurface = 'audio')}
+            >
+              audio
+            </button>
+            <button
+              class:active={activeWorkspaceSurface === 'lfo'}
+              class="workspace-tab"
+              type="button"
+              role="tab"
+              aria-selected={activeWorkspaceSurface === 'lfo'}
+              onclick={() => (activeWorkspaceSurface = 'lfo')}
+            >
+              lfo
+            </button>
+            <button
+              class:active={activeWorkspaceSurface === 'presets'}
+              class="workspace-tab"
+              type="button"
+              role="tab"
+              aria-selected={activeWorkspaceSurface === 'presets'}
+              onclick={() => (activeWorkspaceSurface = 'presets')}
+            >
+              presets
+            </button>
+          </div>
+        {/if}
       </div>
       <div class="graph-shell">
         {#if activeWorkspaceSurface === 'video'}
@@ -2841,8 +2989,8 @@
                     onclick={() => {
                       grainFullFrame = !grainFullFrame;
                       if (grainCompositeSource) grainCompositeSource.fullFrame = grainFullFrame;
-                    }}
-                  >full frame</button>
+                    }}>full frame</button
+                  >
                   {#if !grainFullFrame}
                     <button
                       type="button"
@@ -2852,9 +3000,10 @@
                       aria-pressed={grainAspectCorrect}
                       onclick={() => {
                         grainAspectCorrect = !grainAspectCorrect;
-                        if (grainCompositeSource) grainCompositeSource.aspectCorrect = grainAspectCorrect;
-                      }}
-                    >aspect</button>
+                        if (grainCompositeSource)
+                          grainCompositeSource.aspectCorrect = grainAspectCorrect;
+                      }}>aspect</button
+                    >
                     <button
                       type="button"
                       class="src-btn"
@@ -2864,8 +3013,8 @@
                       onclick={() => {
                         grainAdditive = !grainAdditive;
                         if (grainCompositeSource) grainCompositeSource.additive = grainAdditive;
-                      }}
-                    >additive</button>
+                      }}>additive</button
+                    >
                   {/if}
                 </div>
               </div>
@@ -2873,11 +3022,21 @@
           {/if}
           <div class="audio-transport">
             {#if !audio.isInitialised}
-              <button type="button" class="src-btn audio-start" data-qa="audio-start" onclick={onStart}>
+              <button
+                type="button"
+                class="src-btn audio-start"
+                data-qa="audio-start"
+                onclick={onStart}
+              >
                 start audio
               </button>
             {:else}
-              <button type="button" class="src-btn audio-stop" data-qa="audio-stop" onclick={onStop}>
+              <button
+                type="button"
+                class="src-btn audio-stop"
+                data-qa="audio-stop"
+                onclick={onStop}
+              >
                 stop
               </button>
             {/if}
@@ -2904,7 +3063,12 @@
             onSetParamLfo={setGranulatorModSource}
             feedbackDelayValues={feedbackDelayParams}
             onSetFeedbackDelayParam={setFeedbackDelayParam}
-            grainValues={{ depth: grainDepth, size: grainHalfSize, uvScale: grainUvScale, softness: grainSoftness }}
+            grainValues={{
+              depth: grainDepth,
+              size: grainHalfSize,
+              uvScale: grainUvScale,
+              softness: grainSoftness,
+            }}
             onSetGrainParam={setGrainParam}
           />
         {:else if activeWorkspaceSurface === 'lfo'}
@@ -2950,6 +3114,21 @@
                 <span class="muted">effect programs loading…</span>
               {/if}
             </div>
+            {#if advancedOpen}
+              <span class="sec-label">── experiments ──</span>
+              <div class="program-grid experiment-grid">
+                {#each experimentPrograms as [name, program] (name)}
+                  <button
+                    class:active={activeProgram === name}
+                    class="program-card"
+                    title={program.tagline}
+                    onclick={() => onProgram(name)}
+                  >
+                    <span class="program-name">{program.title}</span>
+                  </button>
+                {/each}
+              </div>
+            {/if}
           </div>
         {/if}
       </div>
@@ -2957,9 +3136,16 @@
   </section>
 
   <footer>
-    <span class="status"
-      >staging rc · video-first shell live · final local listening pass and first Cloudflare deploy
-      remain</span
+    <span class="status">staging rc · diagnostics</span>
+    <div class="runtime-diagnostics" data-qa="runtime-diagnostics">
+      {#each runtimeCapabilities as capability (capability.label)}
+        <span class:pass={capability.available} class:fail={!capability.available}>
+          {capability.label}: {capability.available ? 'yes' : 'no'}
+        </span>
+      {/each}
+    </div>
+    <span id="desktop-app" class="desktop-note"
+      >desktop app: feasibility prepared; download not shipped</span
     >
   </footer>
 </main>
@@ -3126,6 +3312,15 @@
 
   .brand {
     flex-shrink: 0;
+    display: grid;
+    gap: 0.1rem;
+  }
+
+  .brand span {
+    color: var(--muted);
+    font-size: 0.56rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
   h1 {
@@ -3203,6 +3398,17 @@
     background: color-mix(in srgb, var(--accent) 10%, transparent);
   }
 
+  .release-actions {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+  }
+
+  .demo-btn {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
   .file {
     background: var(--bg);
     color: var(--accent);
@@ -3265,7 +3471,6 @@
     gap: 0.25rem;
     flex-wrap: wrap;
   }
-
 
   .stage-controls {
     display: flex;
@@ -3353,6 +3558,58 @@
     border: 1px solid var(--warn);
     padding: 0.5rem 0.75rem;
     font-size: 0.75rem;
+  }
+
+  .welcome-card {
+    position: absolute;
+    left: clamp(1.25rem, 6vw, 5rem);
+    bottom: clamp(1.25rem, 8vh, 5rem);
+    z-index: 2;
+    max-width: 38rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
+    background: color-mix(in srgb, var(--bg) 90%, transparent);
+    backdrop-filter: blur(12px);
+  }
+
+  .welcome-card h2 {
+    margin: 0.45rem 0;
+    color: var(--fg);
+    font-size: clamp(1.1rem, 2vw, 1.55rem);
+    line-height: 1.15;
+  }
+
+  .welcome-card p {
+    margin: 0 0 0.8rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+
+  .welcome-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .primary-action {
+    background: var(--accent);
+    color: var(--bg);
+    border: 1px solid var(--accent);
+    padding: 0.32rem 0.62rem;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .desktop-cta {
+    color: var(--muted);
+    font-size: 0.68rem;
+    text-decoration: none;
   }
 
   .quad-monitor-overlay {
@@ -3489,10 +3746,39 @@
     border-top: 1px solid var(--line);
     font-size: 0.75rem;
     color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
   }
 
   .status::before {
     content: '·  ';
     color: var(--accent);
+  }
+
+  .runtime-diagnostics {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  .runtime-diagnostics span {
+    border: 1px solid var(--line);
+    padding: 0.08rem 0.3rem;
+    font-size: 0.62rem;
+  }
+
+  .runtime-diagnostics .pass {
+    color: var(--accent);
+  }
+
+  .runtime-diagnostics .fail {
+    color: var(--warn);
+  }
+
+  .desktop-note {
+    margin-left: auto;
+    font-size: 0.66rem;
   }
 </style>
