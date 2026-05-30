@@ -2605,13 +2605,37 @@
     </div>
 
     <div class="source-strip">
-      <span class="src-status">
-        {#if sourceLoaded && loadedVideoName}{loadedVideoName}{:else}no clip{/if}
-      </span>
       <label class="file src-file">
-        video
+        load video A
         <input data-qa="video-file-input" type="file" accept="video/*" onchange={onFileChange} />
       </label>
+      {#if sourceLoaded && loadedVideoName}
+        <span class="src-status">{loadedVideoName}</span>
+      {/if}
+      <label class="file src-file">
+        load video B
+        <input
+          data-qa="source-b-file-input"
+          type="file"
+          accept="video/*"
+          onchange={onSourceBChange}
+        />
+      </label>
+      {#if sourceBLoaded && loadedVideoBName}
+        <span class="src-status">B: {loadedVideoBName}</span>
+      {/if}
+      {#if sourceBLoaded}
+        <button type="button" class="src-btn" onclick={clearSourceB}>clear B</button>
+      {/if}
+      <span class="src-divider">│</span>
+      <span class="src-mode-label">mode</span>
+      <button
+        type="button"
+        class="src-btn"
+        class:active={sourceKind === 'video'}
+        aria-pressed={sourceKind === 'video'}
+        onclick={() => setSourceKind('video')}
+      >video</button>
       <button
         type="button"
         class="src-btn"
@@ -2620,29 +2644,6 @@
         aria-pressed={sourceKind === 'grain-composite'}
         onclick={() => setSourceKind('grain-composite')}
       >grain</button>
-      <button
-        type="button"
-        class="src-btn"
-        class:active={sourceKind === 'video'}
-        aria-pressed={sourceKind === 'video'}
-        onclick={() => setSourceKind('video')}
-      >video</button>
-      <span class="src-divider">│</span>
-      <span class="src-status">
-        {#if sourceBLoaded && loadedVideoBName}B: {loadedVideoBName}{:else}B: —{/if}
-      </span>
-      <label class="file src-file">
-        +B
-        <input
-          data-qa="source-b-file-input"
-          type="file"
-          accept="video/*"
-          onchange={onSourceBChange}
-        />
-      </label>
-      {#if sourceBLoaded}
-        <button type="button" class="src-btn" onclick={clearSourceB}>×B</button>
-      {/if}
       {#if grainSourceMessage}
         <span class="src-msg" role="status" data-qa="grain-source-message">{grainSourceMessage}</span>
       {/if}
@@ -3201,6 +3202,14 @@
     user-select: none;
   }
 
+  .src-mode-label {
+    color: var(--muted);
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-right: 0.1rem;
+  }
+
   .src-msg {
     color: var(--muted);
     font-size: 0.65rem;
@@ -3316,7 +3325,7 @@
 
   .workspace {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 20rem;
+    grid-template-columns: minmax(0, 1fr) 26rem;
     min-height: 0;
     min-width: 0;
     overflow: hidden;
