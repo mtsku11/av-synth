@@ -241,7 +241,7 @@
     {#each GROUPS as group (group.label)}
       <div class="param-group">
         <span class="group-label">{group.label}</span>
-        <div class="group-knobs">
+        <div class="group-knobs" style="grid-template-columns: repeat({group.params.length}, 1fr)">
           {#each group.params as name (name)}
             {@const spec = specFor(name)}
             <div class="knob-item">
@@ -290,7 +290,7 @@
     {/each}
     <div class="param-group">
       <span class="group-label">delay</span>
-      <div class="group-knobs">
+      <div class="group-knobs" style="grid-template-columns: repeat({FEEDBACK_DELAY_PARAM_ORDER.length}, 1fr)">
         {#each FEEDBACK_DELAY_PARAM_ORDER as name (name)}
           <Knob
             spec={FEEDBACK_DELAY_PARAM_SPECS[name]}
@@ -430,9 +430,9 @@
     padding-bottom: 1px;
   }
   .group-knobs {
-    display: flex;
-    justify-content: space-evenly;
-    align-items: flex-start;
+    display: grid;
+    justify-items: center;
+    align-items: start;
   }
   .knob-item {
     display: grid;

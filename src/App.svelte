@@ -3317,9 +3317,10 @@
   }
 
   .grain-knobs {
-    display: flex;
-    justify-content: space-evenly;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    justify-items: center;
+    align-items: start;
   }
 
   .stage-controls {
