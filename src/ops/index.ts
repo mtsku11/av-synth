@@ -19,6 +19,7 @@ import { saddleFieldDef } from './saddleField';
 import { pinchBulgeDef } from './pinchBulge';
 import { polarRippleDef } from './polarRipple';
 import { sinkSourceFieldDef } from './sinkSourceField';
+import { fieldScanDef } from './fieldScan';
 import { spiralFieldDef } from './spiralField';
 import { domainFoldDef } from './domainFold';
 import { gyreFieldDef } from './gyreField';
@@ -90,6 +91,7 @@ export function registerAllOps(): void {
   registerOp(pinchBulgeDef);
   registerOp(polarRippleDef);
   registerOp(sinkSourceFieldDef);
+  registerOp(fieldScanDef);
   registerOp(spiralFieldDef);
   registerOp(domainFoldDef);
   registerOp(gyreFieldDef);
@@ -172,6 +174,7 @@ export const DEFAULT_CHAIN: readonly string[] = [
   'pinchBulge',
   'polarRipple',
   'sinkSourceField',
+  'fieldScan',
   'spiralField',
   'domainFold',
   'gyreField',

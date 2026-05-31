@@ -284,6 +284,12 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['feedback', 'video texture', 'motion'],
     coreParams: ['mix', 'strength', 'radius', 'falloff', 'spin', 'drift'],
   },
+  fieldScan: {
+    family: 'Feedback',
+    blurb: 'multi-tap smear traced along a configurable vector field — like slitScan but the streak direction curves with the field',
+    intents: ['feedback', 'motion trails', 'video texture'],
+    coreParams: ['mix', 'strength', 'scan', 'twist'],
+  },
   spiralField: {
     family: 'Feedback',
     blurb: 'simple predictable spiral twist — a macro performance warp distinct from vortex flow',
