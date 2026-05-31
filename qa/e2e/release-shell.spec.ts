@@ -52,7 +52,7 @@ test.describe('release showcase shell', () => {
       video: { paused: true },
     });
     expect(coldStartState?.video?.readyState).toBeGreaterThanOrEqual(2);
-    await expect(page.locator('.program-card')).toHaveCount(9);
+    await expect(page.locator('.program-card')).toHaveCount(8);
     await expect(page.locator('.experiment-grid')).toHaveCount(0);
     await expect(page.locator('[data-qa="runtime-diagnostics"]')).toContainText(
       'crossOriginIsolated: yes',

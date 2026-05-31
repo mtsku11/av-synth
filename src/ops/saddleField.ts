@@ -133,6 +133,10 @@ class SaddleFieldVideoStage implements VideoStage {
 
 export const saddleFieldDef: OperatorDef = {
   op: 'saddleField',
+  ownedState: {
+    uniform: 'u_prev_frame',
+    bindAsPrevFrame: true,
+  },
   paramOrder: ['mix', 'strength', 'softness', 'anisotropy', 'drift', 'advect'],
   defaults: { mix: 0, strength: 0.2, softness: 0.25, anisotropy: 1.0, drift: 0.4, advect: 0 },
   coupling: {

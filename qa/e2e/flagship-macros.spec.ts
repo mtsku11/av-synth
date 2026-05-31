@@ -101,7 +101,7 @@ test.describe('flagship program macros', () => {
       .setInputFiles(resolveFixturePath('qa/fixtures/ci-smoke.mp4'));
     await waitForVideoReady(page);
 
-    await expect(page.locator('.program-card')).toHaveCount(9);
+    await expect(page.locator('.program-card')).toHaveCount(8);
     for (const title of [
       'Singularity Bloom',
       'Fracture Relay',
@@ -111,7 +111,6 @@ test.describe('flagship program macros', () => {
       'Halftone Feedback Bloom',
       'Slit-Scan Hands',
       'Glyph Vortex',
-      'Terminal Kaleidoscope',
     ]) {
       await expect(page.getByRole('button', { name: title })).toBeVisible();
     }

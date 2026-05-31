@@ -55,6 +55,10 @@ class DomainFoldVideoStage implements VideoStage {
 
 export const domainFoldDef: OperatorDef = {
   op: 'domainFold',
+  ownedState: {
+    uniform: 'u_prev_frame',
+    bindAsPrevFrame: true,
+  },
   paramOrder: ['mix', 'folds', 'angle', 'softness', 'zoom', 'drift', 'advect'],
   defaults: { mix: 0, folds: 3.0, angle: 0, softness: 0.05, zoom: 1.0, drift: 0, advect: 0 },
   coupling: {

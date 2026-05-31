@@ -55,6 +55,10 @@ class PinchBulgeVideoStage implements VideoStage {
 
 export const pinchBulgeDef: OperatorDef = {
   op: 'pinchBulge',
+  ownedState: {
+    uniform: 'u_prev_frame',
+    bindAsPrevFrame: true,
+  },
   paramOrder: ['mix', 'amount', 'radius', 'falloff', 'centerX', 'centerY', 'drift', 'advect'],
   defaults: {
     mix: 0,

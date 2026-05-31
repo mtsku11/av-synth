@@ -174,6 +174,10 @@ class VortexPacketVideoStage implements VideoStage {
 
 export const vortexPacketDef: OperatorDef = {
   op: 'vortexPacket',
+  ownedState: {
+    uniform: 'u_prev_frame',
+    bindAsPrevFrame: true,
+  },
   paramOrder: [
     'mix',
     'strength',

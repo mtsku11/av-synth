@@ -141,6 +141,10 @@ class VortexVideoStage implements VideoStage {
 
 export const vortexDef: OperatorDef = {
   op: 'vortex',
+  ownedState: {
+    uniform: 'u_prev_frame',
+    bindAsPrevFrame: true,
+  },
   paramOrder: ['mix', 'strength', 'drift', 'softness', 'advect'],
   defaults: { mix: 0, strength: 0.18, drift: 0.4, softness: 0.08, advect: 0 },
   coupling: {

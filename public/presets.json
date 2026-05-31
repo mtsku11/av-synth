@@ -3270,42 +3270,42 @@
       "lensDirt": "scuffedGlass"
     },
     "values": {
-      "clock.rate": 0.48,
-      "slitScan.mix": 0.88,
+      "clock.rate": 0.46,
+      "slitScan.mix": 0.72,
       "slitScan.orientation": 3,
       "slitScan.slitX": 0.52,
       "slitScan.slitY": 0.48,
-      "slitScan.scanSpeed": 0.78,
-      "slitScan.depth": 0.04,
-      "slitScan.delayAmount": 1,
-      "slitScan.smearWidth": 0.9,
-      "slitScan.feedbackBlend": 0.84,
+      "slitScan.scanSpeed": 0.54,
+      "slitScan.depth": 0.14,
+      "slitScan.delayAmount": 0.72,
+      "slitScan.smearWidth": 0.36,
+      "slitScan.feedbackBlend": 0.38,
       "slitScan.direction": 1,
-      "slitScan.strobe": 0.28,
-      "flow.mix": 0.34,
-      "flow.strength": 0.28,
-      "flow.smear": 0.42,
-      "flow.memory": 0.48,
-      "flow.gate": 0.1,
-      "flow.glitch": 0.22,
-      "flow.chroma": 0.2,
-      "glyphRender.mix": 0.44,
+      "slitScan.strobe": 0.04,
+      "flow.mix": 0.28,
+      "flow.strength": 0.22,
+      "flow.smear": 0.36,
+      "flow.memory": 0.42,
+      "flow.gate": 0.08,
+      "flow.glitch": 0.16,
+      "flow.chroma": 0.16,
+      "glyphRender.mix": 0.34,
       "glyphRender.mode": 2,
-      "glyphRender.cellSize": 11,
-      "glyphRender.density": 0.8,
-      "glyphRender.contrast": 1.56,
+      "glyphRender.cellSize": 12,
+      "glyphRender.density": 0.74,
+      "glyphRender.contrast": 1.32,
       "glyphRender.invert": 0,
       "glyphRender.colorMode": 0,
-      "glyphMotion.mix": 0.38,
-      "glyphMotion.cellSize": 11,
-      "glyphMotion.bassPush": 0.4,
-      "glyphMotion.midRotate": 0.58,
-      "glyphMotion.highJitter": 0.3,
-      "glyphMotion.decay": 0.46,
-      "glyphMotion.ring": 0.56,
-      "glyphMotion.motionAmount": 0.72,
-      "chromaShift.amount": 0.012,
-      "contrast.amount": 1.24
+      "glyphMotion.mix": 0.26,
+      "glyphMotion.cellSize": 12,
+      "glyphMotion.bassPush": 0.34,
+      "glyphMotion.midRotate": 0.46,
+      "glyphMotion.highJitter": 0.22,
+      "glyphMotion.decay": 0.5,
+      "glyphMotion.ring": 0.46,
+      "glyphMotion.motionAmount": 0.44,
+      "chromaShift.amount": 0.009,
+      "contrast.amount": 1.16
     },
     "automation": {
       "slitScan.strobe": {
@@ -3329,31 +3329,32 @@
       {
         "id": "ribbon",
         "label": "Ribbon",
-        "default": 0.68,
+        "default": 0.52,
         "targets": [
-          { "key": "slitScan.feedbackBlend", "min": 0.46, "max": 1 },
-          { "key": "slitScan.smearWidth", "min": 0.42, "max": 1 },
-          { "key": "slitScan.strobe", "min": 0, "max": 0.62 }
+          { "key": "slitScan.mix", "min": 0.34, "max": 0.98 },
+          { "key": "slitScan.delayAmount", "min": 0.18, "max": 1 },
+          { "key": "slitScan.feedbackBlend", "min": 0.08, "max": 0.92 }
         ]
       },
       {
         "id": "gesture",
         "label": "Gesture",
-        "default": 0.62,
+        "default": 0.58,
         "targets": [
-          { "key": "flow.strength", "min": 0.12, "max": 0.52 },
-          { "key": "glyphMotion.motionAmount", "min": 0.24, "max": 1.2 },
-          { "key": "glyphMotion.midRotate", "min": 0.18, "max": 1.1 }
+          { "key": "slitScan.scanSpeed", "min": 0.18, "max": 1 },
+          { "key": "slitScan.depth", "min": 0.04, "max": 0.32 },
+          { "key": "glyphMotion.motionAmount", "min": 0.18, "max": 1.1 }
         ]
       },
       {
         "id": "fragment",
         "label": "Fragment",
-        "default": 0.52,
+        "default": 0.48,
         "targets": [
-          { "key": "glyphRender.mix", "min": 0.18, "max": 0.74 },
+          { "key": "slitScan.smearWidth", "min": 0.08, "max": 1 },
+          { "key": "glyphRender.mix", "min": 0.14, "max": 0.7 },
           { "key": "glyphRender.cellSize", "min": 7, "max": 18 },
-          { "key": "audio.granulator.reverseProbability", "min": 0.12, "max": 0.52 }
+          { "key": "audio.granulator.reverseProbability", "min": 0.08, "max": 0.46 }
         ]
       }
     ],
@@ -3386,70 +3387,60 @@
   },
   "glyphVortex": {
     "title": "Glyph Vortex",
-    "tagline": "Spin palette glyphs through a mirrored vortex field while mid-band energy rotates the cells from within.",
-    "videoIntent": "Best on faces, architecture, and saturated footage where the vortex can keep a strong centre and readable radial structure.",
+    "tagline": "Bend the clip into a readable vortex and let block cells ride the source rather than replacing it.",
+    "videoIntent": "Best on faces, architecture, and saturated footage where the spiral can stay legible and still preserve the original silhouette.",
     "audioIntent": "A looping granulator bed and orbital delay should support the continuous visual pull without smearing the mix flat.",
     "operatorFocus": ["glyphRender", "glyphMotion", "spiralField", "domainFold"],
-    "chain": [
-      "domainFold",
-      "spiralField",
-      "glyphRender",
-      "glyphMotion",
-      "feedback",
-      "colorama",
-      "contrast"
-    ],
+    "chain": ["spiralField", "domainFold", "glyphRender", "glyphMotion", "contrast"],
     "render": {
       "look": "clean",
       "quality": "standard",
-      "lut": "chrome",
-      "postPreset": "glassWarp",
+      "lut": "neutral",
+      "postPreset": "none",
       "lensDirt": "none"
     },
     "values": {
       "clock.rate": 0.44,
-      "domainFold.mix": 0.82,
-      "domainFold.folds": 4,
-      "domainFold.angle": 0.22,
-      "domainFold.softness": 0.08,
-      "domainFold.zoom": 1.12,
-      "domainFold.drift": 0.22,
-      "spiralField.mix": 0.86,
-      "spiralField.twist": 2.8,
-      "spiralField.radius": 0.78,
-      "spiralField.falloff": 1.6,
+      "domainFold.mix": 0.28,
+      "domainFold.folds": 3,
+      "domainFold.angle": 0.12,
+      "domainFold.softness": 0.06,
+      "domainFold.zoom": 1.04,
+      "domainFold.drift": 0.14,
+      "spiralField.mix": 0.42,
+      "spiralField.twist": 1.8,
+      "spiralField.radius": 0.66,
+      "spiralField.falloff": 2.2,
       "spiralField.centerX": 0.5,
       "spiralField.centerY": 0.5,
-      "spiralField.phase": 0.1,
-      "spiralField.drift": 0.36,
-      "spiralField.advect": 0.18,
-      "glyphRender.mix": 0.88,
-      "glyphRender.mode": 0,
-      "glyphRender.cellSize": 14,
-      "glyphRender.density": 0.9,
-      "glyphRender.contrast": 1.48,
+      "spiralField.phase": 0.08,
+      "spiralField.drift": 0.22,
+      "spiralField.advect": 0.08,
+      "glyphRender.mix": 0.34,
+      "glyphRender.mode": 2,
+      "glyphRender.cellSize": 10,
+      "glyphRender.density": 0.74,
+      "glyphRender.contrast": 1.16,
       "glyphRender.invert": 0,
-      "glyphRender.colorMode": 2,
-      "glyphMotion.mix": 0.76,
-      "glyphMotion.cellSize": 14,
-      "glyphMotion.bassPush": 0.62,
-      "glyphMotion.midRotate": 1,
-      "glyphMotion.highJitter": 0.22,
-      "glyphMotion.decay": 0.54,
-      "glyphMotion.ring": 0.48,
-      "glyphMotion.motionAmount": 0.32,
-      "feedback.feedback": 0.62,
-      "colorama.amount": 0.22,
-      "contrast.amount": 1.18
+      "glyphRender.colorMode": 0,
+      "glyphMotion.mix": 0.22,
+      "glyphMotion.cellSize": 10,
+      "glyphMotion.bassPush": 0.34,
+      "glyphMotion.midRotate": 0.52,
+      "glyphMotion.highJitter": 0.12,
+      "glyphMotion.decay": 0.56,
+      "glyphMotion.ring": 0.42,
+      "glyphMotion.motionAmount": 0.2,
+      "contrast.amount": 1.12
     },
     "automation": {
-      "spiralField.phase": { "kind": "lfo", "rate": 0.12, "depth": 0.44, "phase": 0 },
-      "domainFold.angle": { "kind": "lfo", "rate": 0.07, "depth": 0.2, "phase": 1.5707963268 },
+      "spiralField.phase": { "kind": "lfo", "rate": 0.12, "depth": 0.18, "phase": 0 },
+      "domainFold.angle": { "kind": "lfo", "rate": 0.07, "depth": 0.1, "phase": 1.5707963268 },
       "glyphMotion.midRotate": {
         "kind": "fft",
         "bin": 12,
-        "scale": 3.2,
-        "smooth": 0.74,
+        "scale": 1.6,
+        "smooth": 0.78,
         "cutoff": 0.03
       }
     },
@@ -3459,9 +3450,9 @@
         "label": "Vortex",
         "default": 0.56,
         "targets": [
-          { "key": "spiralField.twist", "min": 1.2, "max": 5.2 },
-          { "key": "spiralField.advect", "min": 0.04, "max": 0.52 },
-          { "key": "glyphMotion.midRotate", "min": 0.24, "max": 1.7 }
+          { "key": "spiralField.twist", "min": 0.8, "max": 3.2 },
+          { "key": "spiralField.mix", "min": 0.18, "max": 0.78 },
+          { "key": "glyphMotion.midRotate", "min": 0.16, "max": 1.2 }
         ]
       },
       {
@@ -3469,9 +3460,9 @@
         "label": "Fold",
         "default": 0.5,
         "targets": [
-          { "key": "domainFold.folds", "min": 2, "max": 8 },
-          { "key": "domainFold.zoom", "min": 1, "max": 1.42 },
-          { "key": "feedback.feedback", "min": 0.42, "max": 0.82 }
+          { "key": "domainFold.mix", "min": 0.08, "max": 0.54 },
+          { "key": "domainFold.folds", "min": 2, "max": 6 },
+          { "key": "domainFold.zoom", "min": 1, "max": 1.22 }
         ]
       },
       {
@@ -3479,9 +3470,10 @@
         "label": "Choir",
         "default": 0.52,
         "targets": [
-          { "key": "glyphRender.density", "min": 0.7, "max": 1 },
+          { "key": "glyphRender.mix", "min": 0.12, "max": 0.54 },
+          { "key": "glyphRender.density", "min": 0.56, "max": 0.94 },
           { "key": "audio.granulator.density", "min": 18, "max": 38 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.38 }
+          { "key": "audio.feedbackDelay.mix", "min": 0.08, "max": 0.34 }
         ]
       }
     ],
@@ -3508,126 +3500,6 @@
         "reverseProbability": 0.12,
         "distribution": 0.3,
         "voiceCount": 24,
-        "gain": 0.48
-      }
-    }
-  },
-  "terminalKaleidoscope": {
-    "title": "Terminal Kaleidoscope",
-    "tagline": "Layer binary cells and digital rain over the clip, then fold the result into a restrained terminal mandala.",
-    "videoIntent": "Best on portraits, hands, signage, and stage footage where the source should stay legible while the terminal lattice takes over the midtones.",
-    "audioIntent": "A bright but bounded cloud and ping-pong delay should mirror the crystalline repeat pattern.",
-    "operatorFocus": ["matrixRain", "glyphRender", "kaleid", "chromaShift"],
-    "chain": ["matrixRain", "glyphRender", "kaleid", "brightness", "contrast", "chromaShift"],
-    "render": {
-      "look": "clean",
-      "quality": "standard",
-      "lut": "neutral",
-      "postPreset": "none",
-      "lensDirt": "none"
-    },
-    "values": {
-      "clock.rate": 0.62,
-      "matrixRain.mix": 0.1,
-      "matrixRain.rainSpeed": 0.46,
-      "matrixRain.columnDensity": 0.36,
-      "matrixRain.glyphChangeRate": 0.56,
-      "matrixRain.trailLength": 0.58,
-      "matrixRain.sourceColorBlend": 0.9,
-      "matrixRain.audioReact": 0.2,
-      "glyphRender.mix": 0.14,
-      "glyphRender.mode": 1,
-      "glyphRender.cellSize": 12,
-      "glyphRender.density": 0.78,
-      "glyphRender.contrast": 1.42,
-      "glyphRender.invert": 0,
-      "glyphRender.colorMode": 2,
-      "kaleid.nSides": 4,
-      "kaleid.drive": 1.16,
-      "kaleid.symmetry": 0.08,
-      "kaleid.bias": 0.02,
-      "kaleid.tone": 0.5,
-      "kaleid.output": 0.94,
-      "kaleid.mix": 0.18,
-      "brightness.amount": 0.1,
-      "chromaShift.amount": 0.007,
-      "contrast.amount": 1.04
-    },
-    "automation": {
-      "kaleid.nSides": {
-        "kind": "sequence",
-        "values": [3, 4, 5, 4],
-        "fast": 0.12,
-        "smooth": 0.14,
-        "ease": "easeInOutCubic",
-        "offset": 0,
-        "invert": false
-      },
-      "matrixRain.rainSpeed": {
-        "kind": "fft",
-        "bin": 28,
-        "scale": 1.6,
-        "smooth": 0.72,
-        "cutoff": 0.025
-      },
-      "glyphRender.mix": { "kind": "video", "feature": "flux", "scale": 0.08, "smooth": 0.84 },
-      "brightness.amount": { "kind": "video", "feature": "luma", "scale": 0.14, "smooth": 0.84 }
-    },
-    "macros": [
-      {
-        "id": "mirror",
-        "label": "Mirror",
-        "default": 0.56,
-        "targets": [
-          { "key": "kaleid.nSides", "min": 3, "max": 8 },
-          { "key": "kaleid.drive", "min": 1, "max": 1.7 },
-          { "key": "kaleid.mix", "min": 0.08, "max": 0.32 }
-        ]
-      },
-      {
-        "id": "terminal",
-        "label": "Terminal",
-        "default": 0.58,
-        "targets": [
-          { "key": "glyphRender.mix", "min": 0.04, "max": 0.26 },
-          { "key": "matrixRain.columnDensity", "min": 0.22, "max": 0.72 },
-          { "key": "matrixRain.trailLength", "min": 0.26, "max": 0.84 }
-        ]
-      },
-      {
-        "id": "spark",
-        "label": "Spark",
-        "default": 0.48,
-        "targets": [
-          { "key": "brightness.amount", "min": 0.04, "max": 0.24 },
-          { "key": "matrixRain.audioReact", "min": 0.08, "max": 0.58 },
-          { "key": "chromaShift.amount", "min": 0.002, "max": 0.018 }
-        ]
-      }
-    ],
-    "audio": {
-      "feedbackDelay": {
-        "time": 0.26,
-        "feedback": 0.54,
-        "damping": 7200,
-        "cross": 1.5707963268,
-        "mix": 0.28
-      },
-      "granulator": {
-        "envelope": "hann",
-        "mode": "cloud",
-        "density": 32,
-        "duration": 96,
-        "durationJitter": 0.34,
-        "position": 0.5,
-        "positionJitter": 0.08,
-        "pitch": 0,
-        "pitchJitter": 7,
-        "panSpread": 0.7,
-        "ySpread": 0.34,
-        "reverseProbability": 0.16,
-        "distribution": 0.38,
-        "voiceCount": 26,
         "gain": 0.48
       }
     }

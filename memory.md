@@ -3095,3 +3095,39 @@ coverage before chasing stronger operator identity. `Binary Bass Rain` now uses 
 a restrained binary glyph overlay; `Halftone Feedback Bloom` keeps its print-memory idea but with much
 lower feedback/displace/structure weight and an explicit brightness lift. Public presets should be tuned
 against the actual bundled demo footage, not only against isolated operator intent.
+
+## 2026-05-31 — Slit macros must move the picture, and failed showcase looks should be culled
+
+The `slitScan` shader path was live; the weak feel came from authored macro ranges that all sat on subtle
+controls near already-wet defaults. `Slit-Scan Hands` now starts from a less saturated base state and its
+three performance macros reach obviously visible scan parameters (`mix`, `delayAmount`, `feedbackBlend`,
+`scanSpeed`, `depth`, `smearWidth`) instead of hiding most of the effect behind minor strobe/feedback
+nudges.
+
+`Glyph Vortex` also crossed the line from transformed footage into effectively independent graphics. The
+fix is not more infrastructure; it is curating the authored stack back toward source-preserving values.
+Lower fold/spiral wetness, source-colour glyphs, weaker cell motion, and no extra feedback/color wash keep
+the clip readable while still selling the vortex idea.
+
+`Terminal Kaleidoscope` is removed from the curated/public bank and deleted from `presets.json` rather
+than defended indefinitely. Public showcase slots are scarce; once a look is not carrying its weight, the
+honest move is to cut it and update the allowlist, capture slate, and release docs in the same change.
+
+## 2026-05-31 — `advect` should transport the operator's own state, not ghost the global frame
+
+The field operators (`spiralField`, `vortex`, `vortexPacket`, `curlNoise`, `gyreField`,
+`sinkSourceField`, `saddleField`, `magneticDipole`, `domainFold`, `pinchBulge`, `polarRipple`,
+`turbulenceWarp`) were all using the same cheap pattern: warp the live source UV, then mix that with a
+sample from the renderer's global `u_prev_frame`. That read as feedback tinting, not pixel transport.
+
+The release-safe fix is to reuse the renderer's existing per-instance `ownedState` ping-pong path and let
+those advect-enabled operators bind that state as `u_prev_frame`. The renderer now seeds owned-state
+buffers from the current input on first use, clears them on `resetTemporalState()`, and only routes them
+onto `TEXTURE1` for ops that explicitly opt in with `bindAsPrevFrame`.
+
+Shader-side, the advect family now performs simple semi-Lagrangian carry: sample live colour at the
+back-traced UV, sample the operator's previous transported state at the same UV, and inject a controlled
+amount of fresh live video each frame. This is still lightweight and single-pass, but it turns `advect`
+from a one-frame ghost blend into persistent transport. The remaining hard limit is still the shared
+single-scale motion estimator; true multi-scale flow is a later architectural step, not part of this
+release-hardening pass.

@@ -58,6 +58,10 @@ class SinkSourceFieldVideoStage implements VideoStage {
 
 export const sinkSourceFieldDef: OperatorDef = {
   op: 'sinkSourceField',
+  ownedState: {
+    uniform: 'u_prev_frame',
+    bindAsPrevFrame: true,
+  },
   paramOrder: [
     'mix',
     'strength',

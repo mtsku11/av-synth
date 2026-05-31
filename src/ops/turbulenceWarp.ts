@@ -59,6 +59,10 @@ class TurbulenceWarpVideoStage implements VideoStage {
 
 export const turbulenceWarpDef: OperatorDef = {
   op: 'turbulenceWarp',
+  ownedState: {
+    uniform: 'u_prev_frame',
+    bindAsPrevFrame: true,
+  },
   paramOrder: ['mix', 'strength', 'scale', 'octaves', 'phase', 'anisotropy', 'drift', 'advect'],
   defaults: {
     mix: 0,

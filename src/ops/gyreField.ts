@@ -59,6 +59,10 @@ class GyreFieldVideoStage implements VideoStage {
 
 export const gyreFieldDef: OperatorDef = {
   op: 'gyreField',
+  ownedState: {
+    uniform: 'u_prev_frame',
+    bindAsPrevFrame: true,
+  },
   paramOrder: ['mix', 'strength', 'cells', 'scale', 'phase', 'bias', 'drift', 'advect'],
   defaults: { mix: 0, strength: 0.2, cells: 2, scale: 1.0, phase: 0, bias: 0, drift: 0, advect: 0 },
   coupling: {

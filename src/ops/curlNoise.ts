@@ -54,6 +54,10 @@ class CurlNoiseVideoStage implements VideoStage {
 
 export const curlNoiseDef: OperatorDef = {
   op: 'curlNoise',
+  ownedState: {
+    uniform: 'u_prev_frame',
+    bindAsPrevFrame: true,
+  },
   paramOrder: ['mix', 'strength', 'scale', 'speed', 'warp', 'advect'],
   defaults: { mix: 0, strength: 0.12, scale: 3.0, speed: 0.4, warp: 0.4, advect: 0 },
   coupling: {

@@ -61,6 +61,10 @@ class MagneticDipoleVideoStage implements VideoStage {
 
 export const magneticDipoleDef: OperatorDef = {
   op: 'magneticDipole',
+  ownedState: {
+    uniform: 'u_prev_frame',
+    bindAsPrevFrame: true,
+  },
   paramOrder: [
     'mix',
     'strength',

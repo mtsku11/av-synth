@@ -58,6 +58,10 @@ class SpiralFieldVideoStage implements VideoStage {
 
 export const spiralFieldDef: OperatorDef = {
   op: 'spiralField',
+  ownedState: {
+    uniform: 'u_prev_frame',
+    bindAsPrevFrame: true,
+  },
   paramOrder: [
     'mix',
     'twist',

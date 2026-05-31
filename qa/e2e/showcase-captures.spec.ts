@@ -14,7 +14,6 @@ const PUBLIC_PROGRAMS = [
   'halftoneFeedbackBloom',
   'slitScanHands',
   'glyphVortex',
-  'terminalKaleidoscope',
 ] as const;
 
 interface CaptureResult {

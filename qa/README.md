@@ -70,8 +70,8 @@ Granulator-specific helpers:
 - `npm run qa:granulator:listening` refreshes the committed listening input fixtures and writes the av-synth comparison renders to `qa/results/granulator-listening/`.
 - `npm run qa:granulator:latency` runs the internal lower-bound MIDI-latency proxy and writes `qa/results/granulator-latency-proxy.json`.
 - `npm run qa:granulator:soak:matrix` reruns the warmed B2.3 discriminator for `no-spawn`, shipped `grainField`, and forced-dense patches. Override duration with `GRANULATOR_SOAK_S`; the release soak remains four hours.
-- `npm run qa:showcase:capture` records the curated nine-program showcase slate into `qa/results/showcase-captures/`. The slate leads with the graph-authored `Singularity Bloom`, `Fracture Relay`, and `Magnetic Cathedral` programs before the six typographic / time-domain supporting looks.
-- `qa/e2e/glyph-pack-programs.spec.ts` recalls the six public typographic / time-domain programs, checks their three-macro surfaces and low-rate audio-band feed, and holds each authored stack to a local ≥30 fps median floor.
+- `npm run qa:showcase:capture` records the curated eight-program showcase slate into `qa/results/showcase-captures/`. The slate leads with the graph-authored `Singularity Bloom`, `Fracture Relay`, and `Magnetic Cathedral` programs before the five typographic / time-domain supporting looks.
+- `qa/e2e/glyph-pack-programs.spec.ts` recalls the five public typographic / time-domain programs, checks their three-macro surfaces and low-rate audio-band feed, and holds each authored stack to a local ≥30 fps median floor.
 - The review/protocol note for both harnesses lives at `qa/reviews/granulator/2026-05-24-d3-d4-harnesses.md`.
 
 Operator characterisation:

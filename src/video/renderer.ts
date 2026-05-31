@@ -1601,6 +1601,9 @@ export class VideoRenderer {
         : null;
 
       if (ownedState) {
+        if (ownedState.framesWritten === 0) {
+          this.#primeOwnedState(primaryInput, ownedState);
+        }
         // Render into ownedState[next]; ownedState[current] is exposed to the
         // shader on TEXTURE6 as the previous-frame state.
         gl.bindFramebuffer(gl.FRAMEBUFFER, ownedState.fbo);
@@ -1624,7 +1627,12 @@ export class VideoRenderer {
 
       // Bind previous-frame final → TEXTURE1 (u_prev_frame).
       gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, this.#prevFrame.tex);
+      gl.bindTexture(
+        gl.TEXTURE_2D,
+        ownedState && instance.def.ownedState?.bindAsPrevFrame
+          ? ownedState.current
+          : this.#prevFrame.tex,
+      );
 
       if (secondaryInput) {
         gl.activeTexture(gl.TEXTURE2);
@@ -2044,6 +2052,50 @@ export class VideoRenderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
+  #copyTargetIntoTexture(
+    source: OffscreenTarget,
+    fbo: WebGLFramebuffer,
+    texture: WebGLTexture,
+    width: number,
+    height: number,
+  ): void {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, source.fbo);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    gl.blitFramebuffer(
+      0,
+      0,
+      source.width,
+      source.height,
+      0,
+      0,
+      width,
+      height,
+      gl.COLOR_BUFFER_BIT,
+      gl.LINEAR,
+    );
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  #primeOwnedState(source: OffscreenTarget, ownedState: OwnedStateBuffer): void {
+    this.#copyTargetIntoTexture(
+      source,
+      ownedState.fbo,
+      ownedState.current,
+      ownedState.width,
+      ownedState.height,
+    );
+    this.#copyTargetIntoTexture(
+      source,
+      ownedState.fbo,
+      ownedState.next,
+      ownedState.width,
+      ownedState.height,
+    );
+    ownedState.framesWritten = 1;
+  }
+
   #clearTarget(target: OffscreenTarget): void {
     const gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
@@ -2348,6 +2400,21 @@ export class VideoRenderer {
     this.#clearTarget(this.#prevMotionFieldTarget);
     this.#clearTemporalHistory();
     for (const target of this.#busHistory.values()) this.#clearTarget(target);
+    for (const buffer of this.#ownedStateBuffers.values()) {
+      glBindOwnedStateAndClear(this.gl, buffer);
+      buffer.framesWritten = 0;
+    }
     this.#hasSourceHistory = false;
   }
+}
+
+function glBindOwnedStateAndClear(gl: WebGL2RenderingContext, buffer: OwnedStateBuffer): void {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, buffer.fbo);
+  gl.viewport(0, 0, buffer.width, buffer.height);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, buffer.current, 0);
+  gl.clearColor(0, 0, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, buffer.next, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }

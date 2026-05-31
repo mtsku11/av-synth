@@ -8,7 +8,6 @@ const GLYPH_PACK_PROGRAMS = [
   ['halftoneFeedbackBloom', 'Halftone Feedback Bloom'],
   ['slitScanHands', 'Slit-Scan Hands'],
   ['glyphVortex', 'Glyph Vortex'],
-  ['terminalKaleidoscope', 'Terminal Kaleidoscope'],
 ] as const;
 
 interface RgbSample {

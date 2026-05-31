@@ -87,6 +87,12 @@ export interface VideoStageRendererResources {
 export interface OwnedStateSpec {
   /** Sampler uniform name the shader reads for the previous-frame state. */
   readonly uniform: string;
+  /**
+   * When true, the renderer binds the ownedState texture on TEXTURE1 so ops
+   * that already read `u_prev_frame` can advect their own accumulated pixels
+   * instead of sampling the global previous composite frame.
+   */
+  readonly bindAsPrevFrame?: boolean;
 }
 
 export interface OperatorDef {

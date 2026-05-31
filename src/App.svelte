@@ -254,7 +254,6 @@
     'halftoneFeedbackBloom',
     'slitScanHands',
     'glyphVortex',
-    'terminalKaleidoscope',
   ]);
 
   const VIDEO_FEATURE_SAMPLE_WIDTH = 96;

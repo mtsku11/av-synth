@@ -58,6 +58,10 @@ class PolarRippleVideoStage implements VideoStage {
 
 export const polarRippleDef: OperatorDef = {
   op: 'polarRipple',
+  ownedState: {
+    uniform: 'u_prev_frame',
+    bindAsPrevFrame: true,
+  },
   paramOrder: [
     'mix',
     'amplitude',

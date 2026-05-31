@@ -38,11 +38,11 @@ void main() {
   vec2 field = poleField(v_uv, poleA, u_falloff, weightA) - poleField(v_uv, poleB, u_falloff, weightB);
   field = clamp(field * u_strength * 0.03, vec2(-0.3), vec2(0.3));
   vec2 src_uv = fract(v_uv - field);
-  vec3 displaced = mix(
-    texture(u_tex, src_uv).rgb,
-    texture(u_prev_frame, src_uv).rgb,
-    clamp(u_advect, 0.0, 0.95)
-  );
+  float advect = clamp(u_advect, 0.0, 0.95);
+  vec3 live = texture(u_tex, src_uv).rgb;
+  vec3 carried = texture(u_prev_frame, src_uv).rgb;
+  float inject = mix(0.42, 0.08, advect);
+  vec3 displaced = advect > 0.0001 ? mix(carried, live, inject) : live;
   vec3 current = texture(u_tex, v_uv).rgb;
   o_color = vec4(mix(current, displaced, clamp(u_mix, 0.0, 1.0)), 1.0);
 }
