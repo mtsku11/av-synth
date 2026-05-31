@@ -12,10 +12,7 @@
     GRANULATOR_MODES,
     GRANULATOR_QUALITIES,
   } from '../audio/granulator';
-  import {
-    GRANULATOR_PARAM_SPECS,
-    type GranulatorSliderParam,
-  } from '../audio/granulator-params';
+  import { GRANULATOR_PARAM_SPECS, type GranulatorSliderParam } from '../audio/granulator-params';
   import {
     FEEDBACK_DELAY_PARAM_ORDER,
     FEEDBACK_DELAY_PARAM_SPECS,
@@ -87,15 +84,31 @@
     return GRANULATOR_PARAM_SPECS[name]!.spec;
   }
 
-  const GROUPS: readonly { readonly label: string; readonly params: readonly GranulatorSliderParam[] }[] =
-    [
-      {
-        label: 'grain',
-        params: ['position', 'positionJitter', 'duration', 'durationJitter', 'density', 'distribution', 'reverseProbability'],
-      },
-      { label: 'pitch · space', params: ['pitch', 'pitchJitter', 'fmAmount', 'fmFreq', 'panSpread', 'ySpread'] },
-      { label: 'envelope · output', params: ['envAttack', 'envDecay', 'envSustain', 'envRelease', 'voiceCount', 'gain', 'mix'] },
-    ];
+  const GROUPS: readonly {
+    readonly label: string;
+    readonly params: readonly GranulatorSliderParam[];
+  }[] = [
+    {
+      label: 'grain',
+      params: [
+        'position',
+        'positionJitter',
+        'duration',
+        'durationJitter',
+        'density',
+        'distribution',
+        'reverseProbability',
+      ],
+    },
+    {
+      label: 'pitch · space',
+      params: ['pitch', 'pitchJitter', 'fmAmount', 'fmFreq', 'panSpread', 'ySpread'],
+    },
+    {
+      label: 'envelope · output',
+      params: ['envAttack', 'envDecay', 'envSustain', 'envRelease', 'voiceCount', 'gain', 'mix'],
+    },
+  ];
 
   // MIDI-learn state. learningParam is the name of the slider awaiting a MIDI surface
   // event; bindingsByParam reflects whatever the router currently has bound. Last
@@ -241,18 +254,28 @@
   </section>
 
   <div class="diagnostics" data-qa="granulator-diagnostics">
-    <span class="diag-label">voices</span><span class="diag-value">{formatVoiceSummary(runtimeSnapshot)}</span>
+    <span class="diag-label">voices</span><span class="diag-value"
+      >{formatVoiceSummary(runtimeSnapshot)}</span
+    >
     <span class="diag-sep">·</span>
-    <span class="diag-label">interp</span><span class="diag-value">{runtimeSnapshot?.interpMode ?? 'n/a'}</span>
+    <span class="diag-label">interp</span><span class="diag-value"
+      >{runtimeSnapshot?.interpMode ?? 'n/a'}</span
+    >
     <span class="diag-sep">·</span>
-    <span class="diag-label">budget</span><span class="diag-value">{!runtimeSnapshot ? 'n/a' : runtimeSnapshot.budgetLimited ? 'lim' : 'ok'}</span>
+    <span class="diag-label">budget</span><span class="diag-value"
+      >{!runtimeSnapshot ? 'n/a' : runtimeSnapshot.budgetLimited ? 'lim' : 'ok'}</span
+    >
   </div>
 
   <section class="param-sections">
     {#each GROUPS as group (group.label)}
       <div class="param-group">
         <span class="group-label">{group.label}</span>
-        <div class="group-knobs" style="grid-template-columns: repeat({group.params.length + (group.label === 'pitch · space' ? 1 : 0)}, 1fr)">
+        <div
+          class="group-knobs"
+          style="grid-template-columns: repeat({group.params.length +
+            (group.label === 'pitch · space' ? 1 : 0)}, 1fr)"
+        >
           {#each group.params as name (name)}
             {@const spec = specFor(name)}
             <div class="knob-item">
@@ -309,7 +332,10 @@
     {/each}
     <div class="param-group">
       <span class="group-label">delay · shape</span>
-      <div class="group-knobs" style="grid-template-columns: repeat({FEEDBACK_DELAY_PARAM_ORDER.length + 3}, 1fr)">
+      <div
+        class="group-knobs"
+        style="grid-template-columns: repeat({FEEDBACK_DELAY_PARAM_ORDER.length + 3}, 1fr)"
+      >
         {#each FEEDBACK_DELAY_PARAM_ORDER as name (name)}
           <Knob
             spec={FEEDBACK_DELAY_PARAM_SPECS[name]}
@@ -318,9 +344,24 @@
             onValueChange={(v) => onSetFeedbackDelayParam(name, v)}
           />
         {/each}
-        <Knob spec={GRAIN_SIZE_SPEC} value={grainValues.size} size={32} onValueChange={(v) => onSetGrainParam('size', v)} />
-        <Knob spec={GRAIN_UV_SCALE_SPEC} value={grainValues.uvScale} size={32} onValueChange={(v) => onSetGrainParam('uvScale', v)} />
-        <Knob spec={GRAIN_SOFTNESS_SPEC} value={grainValues.softness} size={32} onValueChange={(v) => onSetGrainParam('softness', v)} />
+        <Knob
+          spec={GRAIN_SIZE_SPEC}
+          value={grainValues.size}
+          size={32}
+          onValueChange={(v) => onSetGrainParam('size', v)}
+        />
+        <Knob
+          spec={GRAIN_UV_SCALE_SPEC}
+          value={grainValues.uvScale}
+          size={32}
+          onValueChange={(v) => onSetGrainParam('uvScale', v)}
+        />
+        <Knob
+          spec={GRAIN_SOFTNESS_SPEC}
+          value={grainValues.softness}
+          size={32}
+          onValueChange={(v) => onSetGrainParam('softness', v)}
+        />
       </div>
     </div>
   </section>

@@ -423,7 +423,12 @@ class GranulatorV1Processor extends AudioWorkletProcessor {
         const channels = msg.channels | 0;
         const leftBuffer = msg.left;
         const rightBuffer = msg.right;
-        if (typeof SharedArrayBuffer !== 'function' || !(leftBuffer instanceof SharedArrayBuffer) || samples <= 0) return;
+        if (
+          typeof SharedArrayBuffer !== 'function' ||
+          !(leftBuffer instanceof SharedArrayBuffer) ||
+          samples <= 0
+        )
+          return;
         if (leftBuffer.byteLength < samples * Float32Array.BYTES_PER_ELEMENT) return;
         const left = new Float32Array(leftBuffer, 0, samples);
         let right = left;

@@ -238,23 +238,19 @@
   ) as PresentationLensDirtName[];
   let presentationLensDirt = $state<PresentationLensDirtName>('none');
   let bloomStrengthAssignment = $state<ParamLfoAssignment>(createParamLfoAssignment());
-  const FLAGSHIP_PROGRAM_KEY = 'temporalBloomGhost';
+  const FLAGSHIP_PROGRAM_KEY = 'singularityBloom';
   const PUBLIC_PROGRAM_KEYS = new Set([
+    'singularityBloom',
+    'fractureRelay',
+    'magneticCathedral',
     'temporalBloomGhost',
     'slitScanEcho',
-    'lumaTimeSmear',
-    'edgeFeedback',
-    'contourBloom',
     'datamoshSmear',
     'datamoshHold',
     'flowMelt',
     'kaleidoFeedbackTunnel',
     'freezeFeedback',
     'grainField',
-    'kaleidResonance',
-    'turbulentBloom',
-    'chromaticShear',
-    'orbitalResonance',
   ]);
 
   const VIDEO_FEATURE_SAMPLE_WIDTH = 96;
@@ -325,7 +321,10 @@
           !!AudioContextCtor &&
           'audioWorklet' in AudioContextCtor.prototype,
       },
-      { label: 'WebGL2', available: renderer !== null },
+      {
+        label: 'WebGL2',
+        available: document.createElement('canvas').getContext('webgl2') !== null,
+      },
       { label: 'Web MIDI', available: WebMidiInput.isSupported() },
       {
         label: 'recording',
@@ -395,6 +394,7 @@
     getOperatorParam(op: string, paramId: string, opIndex?: number): number | null;
     setSourceParam(paramId: string, value: number): Promise<boolean>;
     applyProgram(name: string): Promise<boolean>;
+    setProgramMacro(id: string, value: number): Promise<boolean>;
     setGranulatorParam(name: string, value: number): Promise<boolean>;
     setGranulatorEnabled(enabled: boolean): Promise<boolean>;
     setGranulatorDiagnostics(options: {
@@ -1586,6 +1586,13 @@
         if (!renderer) return false;
         if (!programs[name]) return false;
         onProgram(name);
+        await tick();
+        return true;
+      },
+      setProgramMacro: async (id, value) => {
+        const program = activeProgram ? programs[activeProgram] : undefined;
+        if (!program?.macros?.some((macro) => macro.id === id)) return false;
+        setActiveProgramMacro(id, value);
         await tick();
         return true;
       },

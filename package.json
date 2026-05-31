@@ -33,6 +33,8 @@
     "qa:ci": "npm run check && npm run lint && npm run test:run && npm run build && npm run qa:full",
     "qa:granulator:listening": "node qa/scripts/granulator-listening-pack.mjs",
     "qa:granulator:latency": "playwright test -c qa/playwright.config.ts qa/e2e/d4-midi-latency-proxy.spec.ts",
+    "qa:granulator:soak:matrix": "node qa/scripts/granulator-soak-matrix.mjs",
+    "qa:showcase:capture": "PLAYWRIGHT_WORKERS=1 playwright test -c qa/playwright.config.ts qa/e2e/showcase-captures.spec.ts",
     "qa:opSweep": "playwright test -c qa/playwright.config.ts qa/e2e/op-characterisation.spec.ts",
     "qa:opSweep:bless": "BLESS=1 playwright test -c qa/playwright.config.ts qa/e2e/op-characterisation.spec.ts",
     "qa:opSweep:thorough": "playwright test -c qa/playwright.config.ts qa/e2e/op-characterisation-thorough.spec.ts",

@@ -65,7 +65,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           if [ -f qa/results/granulator-soak-summary.json ]; then
-            node -e "const s = require('./qa/results/granulator-soak-summary.json'); console.log('verdict:', s.verdict); console.log('soak:', s.soakDuration_s + 's', 'warmup:', s.warmup_ms + 'ms', 'forceNoSpawn:', s.forceNoSpawn); console.log('worklet major GC:', s.majorGC.count, s.majorGC.timestamps_s); console.log('worklet minor GC:', s.minorGC.count); console.log('attribution:', s.attribution);"
+            node -e "const s = require('./qa/results/granulator-soak-summary.json'); console.log('verdict:', s.verdict); console.log('patch:', s.patch, 'soak:', s.soakDuration_s + 's', 'warmup:', s.warmup_ms + 'ms', 'forceNoSpawn:', s.forceNoSpawn); console.log('worklet major GC:', s.majorGC.count, s.majorGC.timestamps_s); console.log('worklet minor GC:', s.minorGC.count); console.log('attribution:', s.attribution);"
           else
             echo "no summary file produced"
             exit 1

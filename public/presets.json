@@ -746,6 +746,526 @@
       "posterize.gamma": 1.0
     }
   },
+  "singularityBloom": {
+    "title": "Singularity Bloom",
+    "tagline": "Fold a live clip around a slow orbital field, displace it through a routed ripple branch, then let contour memory bloom around the moving subject.",
+    "videoIntent": "A first-run showcase for portraits, dancers, practical lights, and organic motion: the frame stays recognisable while a second field branch pulls selected movement into a luminous gravity well.",
+    "audioIntent": "A wide gaussian grain cloud and cross-coupled delay should feel suspended around the visual orbit, with density, width, and memory moving as one gesture.",
+    "operatorFocus": [
+      "domainFold",
+      "spiralField",
+      "polarRipple",
+      "modulateDisplace",
+      "structure",
+      "feedback"
+    ],
+    "chain": [
+      "domainFold",
+      "spiralField",
+      "polarRipple",
+      "timeDisplace",
+      "pinchBulge",
+      "modulateDisplace",
+      "structure",
+      "feedback",
+      "saturate",
+      "contrast"
+    ],
+    "graph": {
+      "monitorBus": 0,
+      "nodes": [
+        { "target": "domainFold#0", "bus": 1, "inputs": ["source"] },
+        { "target": "spiralField#0", "bus": 1, "inputs": ["domainFold#0"] },
+        { "target": "polarRipple#0", "bus": 1, "inputs": ["spiralField#0"] },
+        { "target": "timeDisplace#0", "bus": 0, "inputs": ["source"] },
+        { "target": "pinchBulge#0", "bus": 0, "inputs": ["timeDisplace#0"] },
+        {
+          "target": "modulateDisplace#0",
+          "bus": 0,
+          "inputs": ["pinchBulge#0", "polarRipple#0"]
+        },
+        { "target": "structure#0", "bus": 0, "inputs": ["modulateDisplace#0"] },
+        { "target": "feedback#0", "bus": 0, "inputs": ["structure#0"] },
+        { "target": "saturate#0", "bus": 0, "inputs": ["feedback#0"] },
+        { "target": "contrast#0", "bus": 0, "inputs": ["saturate#0"] }
+      ]
+    },
+    "render": {
+      "look": "cine",
+      "quality": "standard",
+      "lut": "amber",
+      "postPreset": "radialSmear",
+      "lensDirt": "bloomMist"
+    },
+    "values": {
+      "clock.rate": 0.44,
+      "domainFold.mix": 1.0,
+      "domainFold.folds": 4,
+      "domainFold.angle": 0.16,
+      "domainFold.softness": 0.08,
+      "domainFold.zoom": 1.12,
+      "domainFold.drift": 0.18,
+      "spiralField.mix": 1.0,
+      "spiralField.twist": 2.2,
+      "spiralField.radius": 0.82,
+      "spiralField.falloff": 1.8,
+      "spiralField.phase": 0.12,
+      "spiralField.drift": 0.22,
+      "polarRipple.mix": 0.72,
+      "polarRipple.amplitude": 0.038,
+      "polarRipple.frequency": 9,
+      "polarRipple.phase": 0.18,
+      "polarRipple.falloff": 1.4,
+      "polarRipple.drift": 0.16,
+      "timeDisplace.mix": 0.32,
+      "timeDisplace.depth": 0.48,
+      "timeDisplace.scan": 0.34,
+      "timeDisplace.smear": 0.22,
+      "timeDisplace.decay": 0.74,
+      "pinchBulge.mix": 0.56,
+      "pinchBulge.amount": -0.22,
+      "pinchBulge.radius": 0.76,
+      "pinchBulge.falloff": 2.2,
+      "pinchBulge.drift": 0.14,
+      "modulateDisplace.amount": 0.38,
+      "modulateDisplace.bias": -0.08,
+      "structure.mix": 0.52,
+      "structure.mode": 0.42,
+      "structure.threshold": 0.14,
+      "structure.softness": 0.12,
+      "structure.displace": 0.22,
+      "structure.memory": 0.46,
+      "structure.glow": 0.34,
+      "feedback.feedback": 0.7,
+      "feedback.zoom": 0.012,
+      "feedback.motionBlend": 0.1,
+      "feedback.chromaDrift": 0.006,
+      "saturate.amount": 1.18,
+      "contrast.amount": 1.12
+    },
+    "automation": {
+      "spiralField.phase": { "kind": "lfo", "rate": 0.07, "depth": 0.18, "phase": 0.0 },
+      "polarRipple.phase": {
+        "kind": "fft",
+        "bin": 8,
+        "scale": 0.38,
+        "smooth": 0.68,
+        "cutoff": 0.02
+      },
+      "modulateDisplace.amount": {
+        "kind": "video",
+        "feature": "motion",
+        "scale": 0.2,
+        "smooth": 0.72
+      },
+      "structure.glow": { "kind": "video", "feature": "edge", "scale": 0.24, "smooth": 0.74 },
+      "feedback.motionBlend": { "kind": "video", "feature": "flux", "scale": 0.18, "smooth": 0.8 }
+    },
+    "macros": [
+      {
+        "id": "gravity",
+        "label": "Gravity",
+        "default": 0.54,
+        "targets": [
+          { "key": "pinchBulge.amount", "min": -0.08, "max": -0.5 },
+          { "key": "spiralField.twist", "min": 0.8, "max": 4.4 },
+          { "key": "modulateDisplace.amount", "min": 0.18, "max": 0.68 }
+        ]
+      },
+      {
+        "id": "halo",
+        "label": "Halo",
+        "default": 0.58,
+        "targets": [
+          { "key": "structure.glow", "min": 0.16, "max": 0.72 },
+          { "key": "feedback.feedback", "min": 0.52, "max": 0.84 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.38 }
+        ]
+      },
+      {
+        "id": "cloud",
+        "label": "Cloud",
+        "default": 0.62,
+        "targets": [
+          { "key": "audio.granulator.density", "min": 20, "max": 48 },
+          { "key": "audio.granulator.panSpread", "min": 0.3, "max": 0.78 },
+          { "key": "audio.granulator.distribution", "min": 0.16, "max": 0.62 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.31,
+        "feedback": 0.7,
+        "damping": 6400,
+        "cross": 0.7853981634,
+        "mix": 0.27
+      },
+      "granulator": {
+        "envelope": "gaussian",
+        "mode": "cloud",
+        "quality": "balanced",
+        "density": 36,
+        "duration": 96,
+        "durationJitter": 0.36,
+        "position": 0.5,
+        "positionJitter": 0.07,
+        "pitch": 0,
+        "pitchJitter": 6,
+        "panSpread": 0.6,
+        "ySpread": 0.34,
+        "reverseProbability": 0.12,
+        "distribution": 0.44,
+        "voiceCount": 28,
+        "gain": 0.48
+      }
+    }
+  },
+  "fractureRelay": {
+    "title": "Fracture Relay",
+    "tagline": "Sweep a slit through held codec fragments, sort the moving debris into angled bands, then route that branch back as a chromatic modulator.",
+    "videoIntent": "A sharper glitch showcase for motion-heavy clips, hard cuts, and silhouettes: one branch keeps the live image structured while the other relays stateful temporal damage back into it.",
+    "audioIntent": "Sparse exp-decay grains, deliberate reverse events, and a longer cross-fed delay should sound like fragments being caught and thrown back across the stereo field.",
+    "operatorFocus": [
+      "slitScan",
+      "dataMosh",
+      "fieldSort",
+      "domainFold",
+      "modulateHueRouted",
+      "feedback"
+    ],
+    "chain": [
+      "slitScan",
+      "dataMosh",
+      "fieldSort",
+      "domainFold",
+      "modulateHueRouted",
+      "structure",
+      "feedback",
+      "posterize",
+      "chromaShift",
+      "contrast"
+    ],
+    "graph": {
+      "monitorBus": 0,
+      "nodes": [
+        { "target": "slitScan#0", "bus": 1, "inputs": ["source"] },
+        { "target": "dataMosh#0", "bus": 1, "inputs": ["slitScan#0"] },
+        { "target": "fieldSort#0", "bus": 1, "inputs": ["dataMosh#0"] },
+        { "target": "domainFold#0", "bus": 0, "inputs": ["source"] },
+        {
+          "target": "modulateHueRouted#0",
+          "bus": 0,
+          "inputs": ["domainFold#0", "fieldSort#0"]
+        },
+        { "target": "structure#0", "bus": 0, "inputs": ["modulateHueRouted#0"] },
+        { "target": "feedback#0", "bus": 0, "inputs": ["structure#0"] },
+        { "target": "posterize#0", "bus": 0, "inputs": ["feedback#0"] },
+        { "target": "chromaShift#0", "bus": 0, "inputs": ["posterize#0"] },
+        { "target": "contrast#0", "bus": 0, "inputs": ["chromaShift#0"] }
+      ]
+    },
+    "render": {
+      "look": "bleach",
+      "quality": "standard",
+      "lut": "bleachBypass",
+      "postPreset": "edgeTrails",
+      "lensDirt": "scuffedGlass"
+    },
+    "values": {
+      "clock.rate": 0.36,
+      "slitScan.mix": 0.9,
+      "slitScan.orientation": 0,
+      "slitScan.slitX": 0.5,
+      "slitScan.slitY": 0.5,
+      "slitScan.scanSpeed": 0.68,
+      "slitScan.depth": 0.16,
+      "dataMosh.mix": 0.72,
+      "dataMosh.drift": 0.94,
+      "dataMosh.decay": 0.055,
+      "dataMosh.chunk": 0.58,
+      "fieldSort.mix": 0.58,
+      "fieldSort.threshold": 0.24,
+      "fieldSort.angle": 0.14,
+      "fieldSort.bands": 7,
+      "fieldSort.speed": 3,
+      "domainFold.mix": 1.0,
+      "domainFold.folds": 3,
+      "domainFold.angle": -0.22,
+      "domainFold.softness": 0.05,
+      "domainFold.zoom": 1.08,
+      "domainFold.drift": 0.1,
+      "modulateHueRouted.amount": 0.2,
+      "structure.mix": 0.34,
+      "structure.mode": 0.68,
+      "structure.threshold": 0.18,
+      "structure.softness": 0.08,
+      "structure.displace": 0.16,
+      "structure.memory": 0.32,
+      "structure.glow": 0.18,
+      "feedback.feedback": 0.76,
+      "feedback.zoom": 0.008,
+      "feedback.motionBlend": 0.14,
+      "feedback.chromaDrift": 0.008,
+      "posterize.bins": 28,
+      "posterize.gamma": 0.92,
+      "chromaShift.amount": 0.012,
+      "contrast.amount": 1.24
+    },
+    "automation": {
+      "slitScan.slitX": { "kind": "lfo", "rate": 0.16, "depth": 0.34, "phase": 0.0 },
+      "dataMosh.drift": { "kind": "lfo", "rate": 0.055, "depth": 0.28, "phase": 3.1415926536 },
+      "fieldSort.angle": {
+        "kind": "sequence",
+        "values": [0.02, 0.14, 0.24, 0.38, 0.58],
+        "fast": 0.22,
+        "smooth": 0.24,
+        "ease": "easeInOutCubic",
+        "offset": 0,
+        "invert": false
+      },
+      "modulateHueRouted.amount": {
+        "kind": "video",
+        "feature": "flux",
+        "scale": 0.24,
+        "smooth": 0.76
+      },
+      "feedback.chromaDrift": { "kind": "video", "feature": "edge", "scale": 0.016, "smooth": 0.78 }
+    },
+    "macros": [
+      {
+        "id": "fracture",
+        "label": "Fracture",
+        "default": 0.58,
+        "targets": [
+          { "key": "dataMosh.mix", "min": 0.3, "max": 0.92 },
+          { "key": "fieldSort.mix", "min": 0.18, "max": 0.82 },
+          { "key": "fieldSort.bands", "min": 3, "max": 13 }
+        ]
+      },
+      {
+        "id": "relay",
+        "label": "Relay",
+        "default": 0.62,
+        "targets": [
+          { "key": "modulateHueRouted.amount", "min": 0.06, "max": 0.54 },
+          { "key": "feedback.feedback", "min": 0.58, "max": 0.9 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.16, "max": 0.48 }
+        ]
+      },
+      {
+        "id": "reverse",
+        "label": "Reverse",
+        "default": 0.56,
+        "targets": [
+          { "key": "audio.granulator.reverseProbability", "min": 0.14, "max": 0.64 },
+          { "key": "audio.granulator.duration", "min": 110, "max": 260 },
+          { "key": "chromaShift.amount", "min": 0.004, "max": 0.024 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.46,
+        "feedback": 0.76,
+        "damping": 4600,
+        "cross": 1.1519173063,
+        "mix": 0.36
+      },
+      "granulator": {
+        "envelope": "expdec",
+        "mode": "classic",
+        "quality": "balanced",
+        "density": 14,
+        "duration": 188,
+        "durationJitter": 0.22,
+        "position": 0.5,
+        "positionJitter": 0.1,
+        "pitch": 0,
+        "pitchJitter": 5,
+        "panSpread": 0.46,
+        "ySpread": 0.18,
+        "reverseProbability": 0.42,
+        "distribution": 0.2,
+        "voiceCount": 18,
+        "gain": 0.46
+      }
+    }
+  },
+  "magneticCathedral": {
+    "title": "Magnetic Cathedral",
+    "tagline": "Build a stained-glass field from opposing magnetic poles and counter-rotating cells, then route that branch into a slowly breathing kaleidoscopic turn.",
+    "videoIntent": "A geometric showcase for architecture, faces, and centered action: broad symmetry remains legible while magnetic and gyre fields keep the internal motion alive.",
+    "audioIntent": "Loop-mode tukey grains and a restrained ping-pong delay should form a sustained stereo choir rather than a diffuse wash.",
+    "operatorFocus": [
+      "magneticDipole",
+      "gyreField",
+      "polarRipple",
+      "kaleid",
+      "spiralField",
+      "modulateRotateRouted"
+    ],
+    "chain": [
+      "magneticDipole",
+      "gyreField",
+      "polarRipple",
+      "saturate",
+      "kaleid",
+      "spiralField",
+      "modulateRotateRouted",
+      "feedback",
+      "colorama",
+      "contrast"
+    ],
+    "graph": {
+      "monitorBus": 0,
+      "nodes": [
+        { "target": "magneticDipole#0", "bus": 1, "inputs": ["source"] },
+        { "target": "gyreField#0", "bus": 1, "inputs": ["magneticDipole#0"] },
+        { "target": "polarRipple#0", "bus": 1, "inputs": ["gyreField#0"] },
+        { "target": "saturate#0", "bus": 1, "inputs": ["polarRipple#0"] },
+        { "target": "kaleid#0", "bus": 0, "inputs": ["source"] },
+        { "target": "spiralField#0", "bus": 0, "inputs": ["kaleid#0"] },
+        {
+          "target": "modulateRotateRouted#0",
+          "bus": 0,
+          "inputs": ["spiralField#0", "saturate#0"]
+        },
+        { "target": "feedback#0", "bus": 0, "inputs": ["modulateRotateRouted#0"] },
+        { "target": "colorama#0", "bus": 0, "inputs": ["feedback#0"] },
+        { "target": "contrast#0", "bus": 0, "inputs": ["colorama#0"] }
+      ]
+    },
+    "render": {
+      "look": "silver",
+      "quality": "standard",
+      "lut": "chrome",
+      "postPreset": "glassWarp",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.48,
+      "magneticDipole.mix": 1.0,
+      "magneticDipole.strength": 0.34,
+      "magneticDipole.separation": 0.46,
+      "magneticDipole.angle": 0.18,
+      "magneticDipole.falloff": 2.4,
+      "magneticDipole.balance": -0.08,
+      "magneticDipole.drift": 0.24,
+      "gyreField.mix": 0.82,
+      "gyreField.strength": 0.34,
+      "gyreField.cells": 4,
+      "gyreField.scale": 1.26,
+      "gyreField.phase": 0.16,
+      "gyreField.bias": 0.08,
+      "gyreField.drift": 0.18,
+      "polarRipple.mix": 0.46,
+      "polarRipple.amplitude": 0.024,
+      "polarRipple.frequency": 13,
+      "polarRipple.phase": 0.2,
+      "polarRipple.falloff": 1.8,
+      "polarRipple.drift": 0.12,
+      "saturate.amount": 1.16,
+      "kaleid.nSides": 7,
+      "kaleid.drive": 1.22,
+      "kaleid.symmetry": 0.18,
+      "kaleid.bias": -0.08,
+      "kaleid.tone": 0.46,
+      "kaleid.output": 0.94,
+      "kaleid.mix": 0.86,
+      "spiralField.mix": 0.7,
+      "spiralField.twist": 1.48,
+      "spiralField.radius": 0.88,
+      "spiralField.falloff": 1.6,
+      "spiralField.phase": 0.1,
+      "spiralField.drift": 0.18,
+      "modulateRotateRouted.multiple": 0.24,
+      "modulateRotateRouted.offset": 0.02,
+      "feedback.feedback": 0.66,
+      "feedback.zoom": 0.006,
+      "feedback.motionBlend": 0.12,
+      "feedback.chromaDrift": 0.004,
+      "colorama.amount": 0.32,
+      "contrast.amount": 1.18
+    },
+    "automation": {
+      "magneticDipole.angle": { "kind": "lfo", "rate": 0.065, "depth": 0.42, "phase": 0.0 },
+      "gyreField.phase": { "kind": "lfo", "rate": 0.11, "depth": 0.18, "phase": 1.5707963268 },
+      "polarRipple.phase": {
+        "kind": "fft",
+        "bin": 5,
+        "scale": 0.34,
+        "smooth": 0.72,
+        "cutoff": 0.02
+      },
+      "modulateRotateRouted.multiple": {
+        "kind": "video",
+        "feature": "motion",
+        "scale": 0.22,
+        "smooth": 0.78
+      },
+      "colorama.amount": { "kind": "video", "feature": "luma", "scale": 0.16, "smooth": 0.8 }
+    },
+    "macros": [
+      {
+        "id": "orbit",
+        "label": "Orbit",
+        "default": 0.54,
+        "targets": [
+          { "key": "magneticDipole.strength", "min": 0.12, "max": 0.62 },
+          { "key": "gyreField.strength", "min": 0.12, "max": 0.58 },
+          { "key": "modulateRotateRouted.multiple", "min": 0.08, "max": 0.52 }
+        ]
+      },
+      {
+        "id": "prism",
+        "label": "Prism",
+        "default": 0.56,
+        "targets": [
+          { "key": "kaleid.nSides", "min": 4, "max": 11 },
+          { "key": "colorama.amount", "min": 0.12, "max": 0.62 },
+          { "key": "feedback.feedback", "min": 0.48, "max": 0.8 }
+        ]
+      },
+      {
+        "id": "choir",
+        "label": "Choir",
+        "default": 0.6,
+        "targets": [
+          { "key": "audio.granulator.density", "min": 16, "max": 38 },
+          { "key": "audio.granulator.duration", "min": 96, "max": 220 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.36 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.38,
+        "feedback": 0.66,
+        "damping": 6800,
+        "cross": 0.7853981634,
+        "mix": 0.26
+      },
+      "granulator": {
+        "envelope": "tukey-25",
+        "mode": "loop",
+        "quality": "balanced",
+        "density": 28,
+        "duration": 156,
+        "durationJitter": 0.18,
+        "position": 0.5,
+        "positionJitter": 0.05,
+        "pitch": 0,
+        "pitchJitter": 3,
+        "panSpread": 0.52,
+        "ySpread": 0.28,
+        "reverseProbability": 0.14,
+        "distribution": 0.24,
+        "voiceCount": 24,
+        "gain": 0.48
+      }
+    }
+  },
   "temporalBloomGhost": {
     "title": "Temporal Bloom Ghost",
     "tagline": "Hold the clip inside a soft multi-frame memory field, then let the brightest gestures bloom back through it.",
@@ -2732,7 +3252,7 @@
       "pixelSort.threshold": 0.28,
       "pixelSort.direction": 0.0,
       "pixelSort.speed": 0.35,
-      "chromaShift.amount": 0.010,
+      "chromaShift.amount": 0.01,
       "contrast.amount": 1.26,
       "posterize.bins": 32,
       "posterize.gamma": 0.96,
@@ -2831,7 +3351,16 @@
     "videoIntent": "Best on symmetrical or slow-evolving footage: faces, architecture, clouds. The routed field gives the kaleid a living turbulent modulator instead of a fixed spin.",
     "audioIntent": "Cloud granulator at medium density with the feedback delay cross-fed at π/4 so stereo rotation tracks the orbital geometry on screen.",
     "operatorFocus": ["kaleid", "modulateRotateRouted", "curlNoise", "colorama"],
-    "chain": ["kaleid", "rotate", "hue", "curlNoise", "saturate", "modulateRotateRouted", "colorama", "contrast"],
+    "chain": [
+      "kaleid",
+      "rotate",
+      "hue",
+      "curlNoise",
+      "saturate",
+      "modulateRotateRouted",
+      "colorama",
+      "contrast"
+    ],
     "graph": {
       "monitorBus": 0,
       "nodes": [

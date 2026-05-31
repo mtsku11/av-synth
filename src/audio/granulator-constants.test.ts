@@ -61,7 +61,8 @@ const workletSrc = readFileSync(resolve(process.cwd(), 'public/worklets/granulat
 function parseWorkletConsts(src: string): Map<string, number> {
   const map = new Map<string, number>();
   // Match top-level `const NAME = <number>;` — skips function-scoped locals.
-  const re = /^const\s+(\w+)\s*=\s*(-?(?:\d+(?:\.\d*)?(?:[eE][+-]?\d+)?|\.\d+(?:[eE][+-]?\d+)?));/gm;
+  const re =
+    /^const\s+(\w+)\s*=\s*(-?(?:\d+(?:\.\d*)?(?:[eE][+-]?\d+)?|\.\d+(?:[eE][+-]?\d+)?));/gm;
   let m: RegExpExecArray | null;
   while ((m = re.exec(src)) !== null) {
     map.set(m[1]!, parseFloat(m[2]!));
@@ -91,8 +92,10 @@ describe('worklet/main-thread constant sync', () => {
   });
 
   describe('grain-event ring protocol (grain-scheduler.ts ↔ granulator.js)', () => {
-    it('GRAIN_EVENT_RING_FIELDS', () => expect(GRAIN_EVENT_RING_FIELDS).toBe(wk('GRAIN_EVENT_RING_FIELDS')));
-    it('GRAIN_EVENT_WRITE_SEQ_IDX', () => expect(GRAIN_EVENT_WRITE_SEQ_IDX).toBe(wk('GRAIN_EVENT_WRITE_SEQ_IDX')));
+    it('GRAIN_EVENT_RING_FIELDS', () =>
+      expect(GRAIN_EVENT_RING_FIELDS).toBe(wk('GRAIN_EVENT_RING_FIELDS')));
+    it('GRAIN_EVENT_WRITE_SEQ_IDX', () =>
+      expect(GRAIN_EVENT_WRITE_SEQ_IDX).toBe(wk('GRAIN_EVENT_WRITE_SEQ_IDX')));
     it('field offsets', () => {
       expect(GRAIN_EVENT_F_VOICE_ID).toBe(wk('GRAIN_EVENT_F_VOICE_ID'));
       expect(GRAIN_EVENT_F_SEED).toBe(wk('GRAIN_EVENT_F_SEED'));
@@ -109,26 +112,33 @@ describe('worklet/main-thread constant sync', () => {
   });
 
   describe('grain-event ring capacity (granulator.ts ↔ granulator.js)', () => {
-    it('GRAIN_EVENT_RING_CAPACITY', () => expect(GRAIN_EVENT_RING_CAPACITY).toBe(wk('GRAIN_EVENT_RING_CAPACITY')));
+    it('GRAIN_EVENT_RING_CAPACITY', () =>
+      expect(GRAIN_EVENT_RING_CAPACITY).toBe(wk('GRAIN_EVENT_RING_CAPACITY')));
   });
 
   describe('runtime-diag ring protocol (granulator.ts ↔ granulator.js)', () => {
-    it('RUNTIME_DIAG_RING_FIELDS', () => expect(RUNTIME_DIAG_RING_FIELDS).toBe(wk('RUNTIME_DIAG_RING_FIELDS')));
-    it('RUNTIME_DIAG_WRITE_SEQ_IDX', () => expect(RUNTIME_DIAG_WRITE_SEQ_IDX).toBe(wk('RUNTIME_DIAG_WRITE_SEQ_IDX')));
+    it('RUNTIME_DIAG_RING_FIELDS', () =>
+      expect(RUNTIME_DIAG_RING_FIELDS).toBe(wk('RUNTIME_DIAG_RING_FIELDS')));
+    it('RUNTIME_DIAG_WRITE_SEQ_IDX', () =>
+      expect(RUNTIME_DIAG_WRITE_SEQ_IDX).toBe(wk('RUNTIME_DIAG_WRITE_SEQ_IDX')));
     it('field offsets', () => {
       expect(RUNTIME_DIAG_F_REL_TIME_SEC).toBe(wk('RUNTIME_DIAG_F_REL_TIME_SEC'));
       expect(RUNTIME_DIAG_F_ACTIVE_VOICES).toBe(wk('RUNTIME_DIAG_F_ACTIVE_VOICES'));
       expect(RUNTIME_DIAG_F_FADING_VOICES).toBe(wk('RUNTIME_DIAG_F_FADING_VOICES'));
       expect(RUNTIME_DIAG_F_PITCH_LOAD).toBe(wk('RUNTIME_DIAG_F_PITCH_LOAD'));
       expect(RUNTIME_DIAG_F_INTERP_MODE).toBe(wk('RUNTIME_DIAG_F_INTERP_MODE'));
-      expect(RUNTIME_DIAG_F_SAMPLES_UNTIL_NEXT_SPAWN).toBe(wk('RUNTIME_DIAG_F_SAMPLES_UNTIL_NEXT_SPAWN'));
+      expect(RUNTIME_DIAG_F_SAMPLES_UNTIL_NEXT_SPAWN).toBe(
+        wk('RUNTIME_DIAG_F_SAMPLES_UNTIL_NEXT_SPAWN'),
+      );
       expect(RUNTIME_DIAG_F_NEXT_VOICE_ID).toBe(wk('RUNTIME_DIAG_F_NEXT_VOICE_ID'));
       expect(RUNTIME_DIAG_F_SPAWN_COUNT).toBe(wk('RUNTIME_DIAG_F_SPAWN_COUNT'));
       expect(RUNTIME_DIAG_F_STEAL_COUNT).toBe(wk('RUNTIME_DIAG_F_STEAL_COUNT'));
       expect(RUNTIME_DIAG_F_NORM_GAIN).toBe(wk('RUNTIME_DIAG_F_NORM_GAIN'));
       expect(RUNTIME_DIAG_F_DENSITY).toBe(wk('RUNTIME_DIAG_F_DENSITY'));
       expect(RUNTIME_DIAG_F_VOICE_COUNT).toBe(wk('RUNTIME_DIAG_F_VOICE_COUNT'));
-      expect(RUNTIME_DIAG_F_MEAN_SAMPLES_PER_GRAIN).toBe(wk('RUNTIME_DIAG_F_MEAN_SAMPLES_PER_GRAIN'));
+      expect(RUNTIME_DIAG_F_MEAN_SAMPLES_PER_GRAIN).toBe(
+        wk('RUNTIME_DIAG_F_MEAN_SAMPLES_PER_GRAIN'),
+      );
       expect(RUNTIME_DIAG_F_REQUESTED_QUALITY).toBe(wk('RUNTIME_DIAG_F_REQUESTED_QUALITY'));
       expect(RUNTIME_DIAG_F_EFFECTIVE_QUALITY).toBe(wk('RUNTIME_DIAG_F_EFFECTIVE_QUALITY'));
       expect(RUNTIME_DIAG_F_BUDGET_LIMITED).toBe(wk('RUNTIME_DIAG_F_BUDGET_LIMITED'));

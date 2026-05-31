@@ -114,4 +114,5 @@ export const ease = (name: EasingName, t: number): number => {
     case 'easeInOutSine':
       return -(Math.cos(Math.PI * x) - 1) / 2;
   }
+  return x;
 };

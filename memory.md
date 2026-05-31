@@ -2926,3 +2926,58 @@ The modulation fabric was unidirectional: LFOs → params, video features → au
 **Degraded mode without SAB**: The worklet falls back to (a) AudioWorklet `parameters` for control values, (b) `{type: 'grain'}` port messages for grain events, (c) no runtime diagnostics. GranulatorCard shows "n/a" for voice count (expected). Grain composite still produces output via the message-port path.
 
 **Why not caught earlier**: The local dev server always sends COOP/COEP headers (see `vite.config.ts`), so Playwright CI also runs with SAB available. The crash only manifests on deployed static sites without those headers.
+
+## 2026-05-30 — Release-hardening shell and staging truth
+
+The first Cloudflare staging pass is now prepared without expanding operator scope. `public/_headers`
+ships COOP `same-origin`, COEP `require-corp`, and CORP `same-origin`; the manual Pages workflow verifies
+the built copy before upload. The runbook now states the important deployment truth: a Pages branch alias
+is a staging URL, but it is not private unless Cloudflare Access or another explicit access layer protects
+it.
+
+The public showcase surface is narrowed to 11 authored three-macro programs and starts on Presets. One
+built-in placeholder demo provides an immediate visual path; uploaded short-form video remains the primary
+product path and is required for the attached-audio granulator experience. Recovery controls stay visible:
+Reset Visuals, Stop Audio, Clear Feedback, Safe Mode, and Advanced. Experiments and patch complexity are
+hidden until Advanced is chosen.
+
+B2.3 stays closed with the 2026-05-25 narrow waiver: only V8 `incremental marking` code-flush housekeeping
+is informational. Any allocation-driven worklet `MajorGC` still fails release QA. D3 human listening, D4
+physical latency, reference-hardware CPU, hosted smoke, and showcase-capture review remain explicit public
+release blockers in `RELEASE_VERDICT.md`.
+
+The release-hardening QA follow-up added `npm run qa:granulator:soak:matrix`, which reruns warmed B2.3
+`no-spawn`, shipped `grainField`, and forced-dense patches with per-shape summaries. A short wiring pass
+completed green on 2026-05-30. The existing 2026-05-25 four-hour soak remains the acceptance evidence.
+`npm run qa:showcase:capture` now generates the 11-program local recorder slate; the 2026-05-30 default
+8-second pass exported non-empty VP9/Opus WebM payloads for all 11 programs. Hosted visual/CPU selection is
+still owed before publication.
+
+The D4 in-app lower-bound proxy was refreshed after the shell changes: `3.152 ms` against the `5 ms`
+proxy target. This is regression evidence only; it does not close the physical loopback/scope gate.
+
+## 2026-05-31 — Public showcase bank now leads with three graph-authored programs
+
+The release-track preset bank needed authored looks that expose the existing engine's range without reopening
+operator scope. Three new public programs now lead the 11-program allowlist:
+
+- `Singularity Bloom`: a warm radial dual-bus treatment combining domain fold, spiral and polar fields,
+  routed displacement, structure, feedback, and finish controls with a gaussian cloud granulator patch.
+- `Fracture Relay`: a codec-fracture treatment combining slit scan, data mosh, field sort, routed hue
+  modulation, feedback, posterize, and chroma shift with sparse reverse-capable grains and cross feedback.
+- `Magnetic Cathedral`: a symmetric prism treatment combining magnetic dipole, gyre, polar ripple, kaleid,
+  routed rotation modulation, feedback, and colorama with a loop-mode granulator and ping-pong delay.
+
+Each program carries an explicit dual-bus graph, three stable macros, presentation style, LFO plus
+FFT/video-feature automation, and deterministic `granulator + feedback delay` audio recall. No new operator
+family or public audio engine was added. `Luma Time Smear`, `Edge Feedback`, and `Contour Bloom` remain
+available under Advanced experiments rather than occupying first-run public slots.
+
+The first exact recall/performance browser pass exposed an authoring-boundary bug: `Fracture Relay` used
+`"ease": "smoothstep"` for `fieldSort.angle`, but the sequence runtime accepts `linear` and the named
+`ease*` family only. Because presets arrive from JSON, the cast in `loadPrograms()` could not protect the
+runtime; the invalid easing returned `undefined`, produced `NaN`, and caused `Graph.syncParams()` to enter a
+reactive update loop. The program now uses `easeInOutCubic`, and `ease()` falls back to linear interpolation
+for malformed external preset data. Focused Playwright coverage applies all three programs serially,
+checks active recall, three-macro exposure, local frame-rate floor, visible output delta, bounded peak, and
+console cleanliness.

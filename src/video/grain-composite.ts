@@ -210,7 +210,10 @@ export class GrainCompositeSource implements VideoSourceStage {
       const s = INSTANCE_FLOATS;
       for (let i = s; i < count * s; i += s) {
         const amp = data[i + 4]!;
-        const cx = data[i]!, cy = data[i + 1]!, cl = data[i + 2]!, ca = data[i + 3]!;
+        const cx = data[i]!,
+          cy = data[i + 1]!,
+          cl = data[i + 2]!,
+          ca = data[i + 3]!;
         let j = i - s;
         while (j >= 0 && data[j + 4]! > amp) {
           data[j + s] = data[j]!;
@@ -234,7 +237,7 @@ export class GrainCompositeSource implements VideoSourceStage {
     gl.uniform1i(this.#uGrain, 0);
 
     const hs = fullFrame ? 1.0 : this.#halfSize;
-    let hsX = hs;
+    const hsX = hs;
     let hsY = hs;
     if (!fullFrame && this.#aspectCorrect && plan.width > 0 && plan.height > 0) {
       hsY = hs * (gl.drawingBufferWidth / gl.drawingBufferHeight) * (plan.height / plan.width);

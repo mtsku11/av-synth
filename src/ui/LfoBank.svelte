@@ -113,7 +113,7 @@
     border-top: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
   }
 
-  .lfo-row:nth-child(-n+3) {
+  .lfo-row:nth-child(-n + 3) {
     border-top: none;
     padding-top: 0;
   }

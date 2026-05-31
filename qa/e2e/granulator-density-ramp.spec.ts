@@ -127,14 +127,12 @@ test.describe('Granulator density ramp', () => {
       });
     }
 
-     
     console.log('=== density ramp readings ===');
-     
+
     console.table(readings);
-     
+
     console.log('=== console events captured (' + consoleEvents.length + ') ===');
     for (const e of consoleEvents.slice(-30)) {
-       
       console.log(`[${e.type}] ${e.text}`);
     }
   });

@@ -276,7 +276,6 @@ test.describe('Op characterisation sweeps', () => {
     // assertion so the failure message is the whole picture, not just the
     // first offender.
     if (BLESS) {
-       
       console.log(
         `[op-sweeps] BLESS mode: wrote ${sweepable.length} baselines under ${BASELINE_DIR}`,
       );
@@ -287,7 +286,6 @@ test.describe('Op characterisation sweeps', () => {
       .map((op) => op.op)
       .filter((op) => !existsSync(resolve(BASELINE_DIR, `${op}.json`)));
     if (missingBaselines.length > 0) {
-       
       console.log(
         `[op-sweeps] new ops without baselines: ${missingBaselines.join(', ')} — run with BLESS=1 to add them`,
       );

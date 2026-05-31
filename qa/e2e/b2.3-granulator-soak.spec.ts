@@ -48,7 +48,15 @@ interface RuntimeSnapshot {
 const WARMUP_MS = Number.parseInt(process.env.GRANULATOR_WARMUP_MS ?? '35000', 10);
 const SOAK_S = Number.parseInt(process.env.GRANULATOR_SOAK_S ?? '60', 10);
 const SOAK_MS = SOAK_S * 1000;
-const FORCE_NO_SPAWN = process.env.GRANULATOR_FORCE_NO_SPAWN === '1';
+type SoakPatch = 'no-spawn' | 'grainField' | 'dense';
+const requestedPatch =
+  process.env.GRANULATOR_SOAK_PATCH ??
+  (process.env.GRANULATOR_FORCE_NO_SPAWN === '1' ? 'no-spawn' : 'grainField');
+if (!['no-spawn', 'grainField', 'dense'].includes(requestedPatch)) {
+  throw new Error(`Unknown GRANULATOR_SOAK_PATCH '${requestedPatch}'`);
+}
+const SOAK_PATCH = requestedPatch as SoakPatch;
+const FORCE_NO_SPAWN = SOAK_PATCH === 'no-spawn';
 
 function buildInspectionPointsSec(durationSec: number): number[] {
   const targets = [1, 5, 15, 30, 60, 90, 120];
@@ -62,7 +70,7 @@ test.describe('B2.3 — granulator steady-state long soak (gate #4)', () => {
   // so GC events from that isolate carry the worklet thread's pid/tid. We
   // build a (pid:tid) set from the metadata, then count GC events restricted
   // to that set. Page-wide counts are retained as diagnostic context.
-  test(`64 voices for ${SOAK_S}s after ${WARMUP_MS}ms warm-up, zero worklet major-GC in steady state`, async ({
+  test(`${SOAK_PATCH}: 64 voices for ${SOAK_S}s after ${WARMUP_MS}ms warm-up, zero worklet major-GC in steady state`, async ({
     page,
   }, testInfo) => {
     // Add 60 s of headroom on top of warm-up + trace so set-up + tear-down fit.
@@ -150,6 +158,34 @@ test.describe('B2.3 — granulator steady-state long soak (gate #4)', () => {
         { timeout: 10_000 },
       )
       .toBe(true);
+
+    if (SOAK_PATCH === 'dense') {
+      const denseConfigured = await page.evaluate(async () => {
+        const bridge = (
+          window as Window & {
+            __AV_SYNTH_QA__?: {
+              setGranulatorParam(name: string, value: number): Promise<boolean>;
+            };
+          }
+        ).__AV_SYNTH_QA__;
+        if (!bridge) return false;
+        const values = {
+          density: 400,
+          duration: 250,
+          durationJitter: 0,
+          positionJitter: 0,
+          pitchJitter: 0,
+          panSpread: 0,
+          ySpread: 0,
+          reverseProbability: 0,
+        };
+        for (const [name, value] of Object.entries(values)) {
+          if (!(await bridge.setGranulatorParam(name, value))) return false;
+        }
+        return true;
+      });
+      expect(denseConfigured).toBe(true);
+    }
 
     // Warm up before starting the measured trace so cold activation noise
     // is not counted as steady-state allocation churn.
@@ -345,6 +381,7 @@ test.describe('B2.3 — granulator steady-state long soak (gate #4)', () => {
     const summary = {
       gate: '§13 #4 (zero steady-state major-GC over 4-hour soak, 64 voices)',
       preset: 'grainField',
+      patch: SOAK_PATCH,
       voiceCount: 64,
       warmup_ms: WARMUP_MS,
       soakDuration_s: SOAK_S,

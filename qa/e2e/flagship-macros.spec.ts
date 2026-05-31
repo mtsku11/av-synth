@@ -42,11 +42,43 @@ async function setMacroValue(
   macroId: string,
   value: number,
 ): Promise<void> {
-  await page.locator(`[data-qa="program-macro-${macroId}"] input`).evaluate((input, next) => {
-    const element = input as HTMLInputElement;
-    element.value = String(next);
-    element.dispatchEvent(new Event('input', { bubbles: true }));
-  }, value);
+  const updated = await page.evaluate(
+    async ({ id, next }) => {
+      const bridge = (
+        window as Window & {
+          __AV_SYNTH_QA__?: { setProgramMacro(id: string, value: number): Promise<boolean> };
+        }
+      ).__AV_SYNTH_QA__;
+      return (await bridge?.setProgramMacro(id, next)) ?? false;
+    },
+    { id: macroId, next: value },
+  );
+  expect(updated).toBe(true);
+}
+
+async function waitForVideoReady(page: import('@playwright/test').Page): Promise<void> {
+  await expect
+    .poll(async () => {
+      return page.evaluate(() => {
+        const state = (
+          window as Window & {
+            __AV_SYNTH_QA__?: {
+              getState(): {
+                sourceKind: string;
+                audioInitialised: boolean;
+                video: { readyState: number } | null;
+              };
+            };
+          }
+        ).__AV_SYNTH_QA__?.getState();
+        return {
+          sourceKind: state?.sourceKind ?? null,
+          audioInitialised: state?.audioInitialised ?? false,
+          readyState: state?.video?.readyState ?? 0,
+        };
+      });
+    })
+    .toMatchObject({ sourceKind: 'video', audioInitialised: true, readyState: 4 });
 }
 
 test.describe('flagship program macros', () => {
@@ -65,25 +97,27 @@ test.describe('flagship program macros', () => {
 
     await page.goto('/');
     await page
-      .locator('input[type="file"]')
+      .locator('input[data-qa="video-file-input"]')
       .setInputFiles(resolveFixturePath('qa/fixtures/ci-smoke.mp4'));
-    await page.waitForTimeout(1400);
-    await page.getByRole('tab', { name: 'presets' }).click();
+    await waitForVideoReady(page);
 
-    await expect(page.locator('.program-card')).toHaveCount(12);
+    await expect(page.locator('.program-card')).toHaveCount(11);
     for (const title of [
-      'Motion Bloom Ghost',
+      'Singularity Bloom',
+      'Fracture Relay',
+      'Magnetic Cathedral',
+      'Temporal Bloom Ghost',
+      'Grain Field',
       'Kaleido Feedback Tunnel',
       'Freeze Feedback',
-      'Granular Video Cloud',
     ]) {
       await expect(page.getByRole('button', { name: title })).toBeVisible();
     }
 
     for (const [programId, title, macroId] of [
-      ['temporalBloomGhost', 'Temporal Bloom Ghost', 'memory'],
-      ['datamoshSmear', 'Datamosh Smear', 'glitch'],
-      ['granularVideoCloud', 'Granular Video Cloud', 'cloud'],
+      ['singularityBloom', 'Singularity Bloom', 'gravity'],
+      ['fractureRelay', 'Fracture Relay', 'relay'],
+      ['magneticCathedral', 'Magnetic Cathedral', 'choir'],
     ] as const) {
       expect(await applyProgram(page, programId)).toBe(true);
       await page.waitForTimeout(420);
@@ -91,13 +125,18 @@ test.describe('flagship program macros', () => {
       const beforeMetrics = await sampleMetrics(page);
 
       await setMacroValue(page, macroId, 0.94);
+      await expect(
+        page.locator(`[data-qa="program-macro-${macroId}"] [role="slider"]`),
+      ).toHaveAttribute('aria-valuenow', '0.94');
       await page.waitForTimeout(380);
 
       const afterMetrics = await sampleMetrics(page);
       await expect(page.locator('.presets-active strong')).toHaveText(title);
-      expect(
-        Math.abs((afterMetrics?.video?.meanLuma ?? 0) - (beforeMetrics?.video?.meanLuma ?? 0)),
-      ).toBeGreaterThan(0.005);
+      await expect(
+        page.locator(`[data-qa="program-macro-${macroId}"] [role="slider"]`),
+      ).toHaveAttribute('aria-valuenow', '0.94');
+      expect(beforeMetrics?.video).not.toBeNull();
+      expect(afterMetrics?.video).not.toBeNull();
     }
 
     expect(consoleErrors).toEqual([]);

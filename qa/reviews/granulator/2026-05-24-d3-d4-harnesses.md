@@ -46,6 +46,15 @@ Reviewer sheet:
 
 Release status after this pass: **harness landed, review still owed**.
 
+Sign-off record:
+
+| Field | Value |
+|---|---|
+| Reviewer 1 | PENDING |
+| Reviewer 2 | PENDING |
+| Comparison date | PENDING |
+| Final D3 verdict | **FAIL: HUMAN REVIEW OWED** |
+
 ---
 
 ## D4 — MIDI latency
@@ -61,9 +70,9 @@ Proxy command:
 npm run qa:granulator:latency
 ```
 
-Current local result on this machine:
+Current local result on this machine, refreshed 2026-05-30:
 
-- proxy latency: **2.993 ms**
+- proxy latency: **3.152 ms**
 - capture fixture: `qa/fixtures/ci-smoke.mp4`
 - result file: `qa/results/granulator-latency-proxy.json`
 
@@ -84,3 +93,13 @@ await window.__AV_SYNTH_QA__.fireGranulatorLatencyProbe()
 6. Log the observed value in a follow-up review note in this directory.
 
 Release status after this pass: **proxy PASS, hardware loopback still owed**.
+
+Sign-off record:
+
+| Field | Value |
+|---|---|
+| Interface / loopback path | PENDING |
+| Browser / host | PENDING |
+| Observed round-trip latency | PENDING |
+| Scope or recording artifact | PENDING |
+| Final D4 verdict | **FAIL: HARDWARE MEASUREMENT OWED** |

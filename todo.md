@@ -17,6 +17,8 @@ Treat this section, `Granulator release gates` below, and the audit recommendati
 - [ ] **D4 real loopback/scope latency sign-off.** Run the external hardware measurement and log it in `qa/reviews/granulator/2026-05-24-d3-d4-harnesses.md`. The in-app proxy remains regression protection, not the final gate.
 - [ ] **Final manual audible sign-off for explicit QA exceptions.** Close the older operator-family manual cases in `qa/reviews/` and note any conscious deferrals in writing.
 - [ ] **First staging deploy + post-deploy smoke.** Publish the private/staging build, record the canonical URL in `deploy.md`, and run the smoke pass against the real host before talking about public release.
+- [ ] **Hosted showcase capture review.** Capture and review 6–12 short exports from the curated public bank in `SHOWCASE_CAPTURES.md`; log visual stability, clipping, and CPU observations before public publication.
+- [x] **Curate three release-track showcase programs.** ✅ 2026-05-31 — Added `Singularity Bloom`, `Fracture Relay`, and `Magnetic Cathedral` as the public lead trio without expanding operator scope. Each has an explicit dual-bus graph, three macros, granulator + shared-delay audio recall, automation, and focused Playwright recall/performance coverage. The replaced narrower looks remain available under Advanced experiments.
 
 ## Audit recommendations (2026-05-28)
 

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#070b10"/>
+      <stop offset="1" stop-color="#101e25"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop stop-color="#7df9d6" stop-opacity=".48"/>
+      <stop offset="1" stop-color="#7df9d6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="915" cy="300" r="330" fill="url(#glow)"/>
+  <g fill="none" stroke="#7df9d6" stroke-opacity=".5">
+    <path d="M690 425c120-310 290-310 430 0"/>
+    <path d="M650 470c165-410 375-410 530 0" stroke-opacity=".22"/>
+    <path d="M715 365c90-210 235-210 370 0" stroke-opacity=".75"/>
+  </g>
+  <text x="92" y="220" fill="#7df9d6" font-family="ui-monospace, monospace" font-size="94" letter-spacing="8">av-synth</text>
+  <text x="98" y="302" fill="#e9fff8" font-family="ui-monospace, monospace" font-size="34">video-first audiovisual effects</text>
+  <text x="100" y="390" fill="#9db2af" font-family="ui-monospace, monospace" font-size="24">load a clip · choose a look · shape image and sound together</text>
+</svg>

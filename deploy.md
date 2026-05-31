@@ -25,6 +25,10 @@ Optional repository variables:
 
 The Cloudflare Pages project must already exist. The workflow uses Wrangler direct upload against that project.
 
+Cloudflare Pages branch deployments are **not access-controlled by default**. A `staging` branch alias is
+appropriate for release-candidate validation, but it is only private when the Pages project is protected
+with Cloudflare Access or another explicit access layer.
+
 ## Workflow
 
 Use [deploy-cloudflare.yml](./.github/workflows/deploy-cloudflare.yml) through `workflow_dispatch`.
@@ -38,10 +42,29 @@ Behavior:
 
 1. Installs dependencies
 2. Runs `npm run build`
-3. Deploys `dist/` to Cloudflare Pages with Wrangler
-4. Optionally runs the external Playwright smoke suite against the deployed URL
+3. Verifies that `dist/_headers` contains the required cross-origin isolation policy
+4. Deploys `dist/` to Cloudflare Pages with Wrangler
+5. Optionally runs the external Playwright smoke suite against the deployed URL
 
 The workflow is intentionally manual. Automatic public deployment is not enabled by default.
+
+## Cross-origin isolation headers
+
+[`public/_headers`](./public/_headers) is copied into `dist/` by Vite and interpreted by Cloudflare Pages
+for static responses. This follows the
+[Cloudflare Pages `_headers` contract](https://developers.cloudflare.com/pages/configuration/headers/).
+If Pages Functions are introduced later, attach the same headers in function responses because `_headers`
+does not cover them.
+
+```text
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin
+```
+
+These headers are required for the isolated SharedArrayBuffer path. The runtime footer reports
+`crossOriginIsolated`, `SharedArrayBuffer`, `AudioWorklet`, `WebGL2`, `Web MIDI`, and recording support.
 
 ## Manual local fallback
 
@@ -61,5 +84,21 @@ Run the smoke suite against the deployed URL:
 ```bash
 PLAYWRIGHT_BASE_URL=https://<your-deployment-url> npm run qa:smoke:external
 ```
+
+Confirm the hosted response and runtime before sign-off:
+
+```bash
+curl -sI https://<your-deployment-url>/
+```
+
+Expected response headers:
+
+```text
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+Cross-Origin-Resource-Policy: same-origin
+```
+
+Canonical private staging URL: **PENDING first Cloudflare deploy**.
 
 Staging is the place to complete the final local listening pass and to catch hosted-only regressions. Do not treat a staging deploy as the public release.

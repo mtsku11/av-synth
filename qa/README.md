@@ -69,6 +69,8 @@ Granulator-specific helpers:
 
 - `npm run qa:granulator:listening` refreshes the committed listening input fixtures and writes the av-synth comparison renders to `qa/results/granulator-listening/`.
 - `npm run qa:granulator:latency` runs the internal lower-bound MIDI-latency proxy and writes `qa/results/granulator-latency-proxy.json`.
+- `npm run qa:granulator:soak:matrix` reruns the warmed B2.3 discriminator for `no-spawn`, shipped `grainField`, and forced-dense patches. Override duration with `GRANULATOR_SOAK_S`; the release soak remains four hours.
+- `npm run qa:showcase:capture` records the curated 11-program showcase slate into `qa/results/showcase-captures/`. The slate leads with the graph-authored `Singularity Bloom`, `Fracture Relay`, and `Magnetic Cathedral` programs before the narrower supporting looks.
 - The review/protocol note for both harnesses lives at `qa/reviews/granulator/2026-05-24-d3-d4-harnesses.md`.
 
 Operator characterisation:

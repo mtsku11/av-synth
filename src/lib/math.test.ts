@@ -61,4 +61,8 @@ describe('math utils', () => {
       expect(ease(e, 1)).toBe(1);
     }
   });
+
+  it('falls back to linear easing for malformed external preset data', () => {
+    expect(ease('invalid' as never, 0.4)).toBe(0.4);
+  });
 });

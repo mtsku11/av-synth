@@ -1355,7 +1355,14 @@ export class VideoRenderer {
         initialized: false,
       };
       const resources: VideoStageRendererResources = {
-        temporalHistory: { textureUnit: 3, capacity: 0, validCount: 0, writeIndex: 0, width: 0, height: 0 },
+        temporalHistory: {
+          textureUnit: 3,
+          capacity: 0,
+          validCount: 0,
+          writeIndex: 0,
+          width: 0,
+          height: 0,
+        },
         structureAnalysis: { textureUnit: 4, width: 0, height: 0 },
         motionField: { textureUnit: 5, width: 0, height: 0, scale: MOTION_FIELD_SCALE },
         ownedState: null,

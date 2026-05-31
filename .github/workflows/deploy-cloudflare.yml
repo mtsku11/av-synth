@@ -58,6 +58,13 @@ jobs:
       - name: Build app
         run: npm run build
 
+      - name: Verify cross-origin isolation headers
+        run: |
+          test -f dist/_headers
+          grep -Fx "  Cross-Origin-Opener-Policy: same-origin" dist/_headers
+          grep -Fx "  Cross-Origin-Embedder-Policy: require-corp" dist/_headers
+          grep -Fx "  Cross-Origin-Resource-Policy: same-origin" dist/_headers
+
       - name: Deploy staging build
         if: ${{ inputs.target == 'staging' }}
         id: deploy_staging

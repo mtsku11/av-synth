@@ -544,6 +544,11 @@ The repo now has three explicit release tracks:
 2. **Staging RC** — private evaluation target. Goal: deploy the best current quality-sprint slice to a private/staging URL for real browser, device, visual, and listening validation. Required: QA/audit green on the implemented surface, final human audible/visual sign-off on the documented manual cases, a deploy workflow/runbook, and a post-deploy smoke pass against the staging URL.
 3. **Public v1** — the first broadly shareable release. Goal: ship the current video-first product honestly, without implying unfinished Hydra parity. Required beyond staging: quality-sprint scope complete or explicitly narrowed, issues discovered during staging absorbed, and public positioning anchored to "video-first AV effects" rather than "general AV synth." Remaining public-surface Color work (`sum`, `.r .g .b .a`) should be implemented only if it is still a real launch requirement after quality sign-off.
 
+The showcase shell leads with the built-in `Singularity Bloom` demo and an 11-program public allowlist.
+`Singularity Bloom`, `Fracture Relay`, and `Magnetic Cathedral` are the sophisticated graph-authored lead
+programs; patch editing, secondary video input, mode switching, and the exploratory bank remain available
+under **Advanced**. This is a presentation boundary, not an engine fork.
+
 What is intentionally **not** a blocker for the current release track unless the user explicitly changes product scope:
 
 - the CodeMirror/Hydra live-code surface from `M4`

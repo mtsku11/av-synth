@@ -211,8 +211,17 @@ export class GrainScheduler {
   // Pre-allocated grain-event pool — drained from the ring directly into slots, never allocated
   // per-event. Pool is large enough to hold a full ring drain without overflow.
   #eventPool: MutableGrainEvent[] = Array.from({ length: MAX_GRAIN_EVENTS }, () => ({
-    voiceId: 0, seed: 0, spawnTime: 0, durationSec: 0, positionSec: 0,
-    pitchRatio: 1, panX: 0, panY: 0, reverse: 0, envelopeIndex: 0, amplitude: 1,
+    voiceId: 0,
+    seed: 0,
+    spawnTime: 0,
+    durationSec: 0,
+    positionSec: 0,
+    pitchRatio: 1,
+    panX: 0,
+    panY: 0,
+    reverse: 0,
+    envelopeIndex: 0,
+    amplitude: 1,
   }));
   #eventCount = 0;
   #node: WorkletNodeLike;
@@ -224,9 +233,18 @@ export class GrainScheduler {
   #ringReadSeq = 0;
   // Pre-allocated voice pool — filled in place by getActiveVoices, never reallocated.
   #voicePool: MutableVoice[] = Array.from({ length: MAX_RENDERED_VOICES }, () => ({
-    voiceId: 0, frameIndex: 0, envelopePhase: 0, envelopeAlpha: 0, panX: 0, panY: 0, amplitude: 1,
+    voiceId: 0,
+    frameIndex: 0,
+    envelopePhase: 0,
+    envelopeAlpha: 0,
+    panX: 0,
+    panY: 0,
+    amplitude: 1,
   }));
-  #activeVoiceViewData: { voices: readonly RenderedVoice[]; count: number } = { voices: this.#voicePool, count: 0 };
+  #activeVoiceViewData: { voices: readonly RenderedVoice[]; count: number } = {
+    voices: this.#voicePool,
+    count: 0,
+  };
 
   constructor(node: WorkletNodeLike, ringTransport?: GrainEventRingTransport | null) {
     this.#node = node;
@@ -351,7 +369,11 @@ export class GrainScheduler {
     this.#eventCount = w;
   }
 
-  getActiveVoices(now: number, plan: GrainBufferPlan, maxVoices = MAX_RENDERED_VOICES): ActiveVoiceView {
+  getActiveVoices(
+    now: number,
+    plan: GrainBufferPlan,
+    maxVoices = MAX_RENDERED_VOICES,
+  ): ActiveVoiceView {
     this.prune(now);
     const pool = this.#voicePool;
     let count = 0;
@@ -363,7 +385,13 @@ export class GrainScheduler {
       const elapsedSec = now - ev.spawnTime;
       const phase = computeEnvelopePhase(elapsedSec, ev.durationSec);
       slot.voiceId = ev.voiceId;
-      slot.frameIndex = computeFrameIndex(ev.positionSec, ev.pitchRatio, elapsedSec, plan.fps, plan.frameCount);
+      slot.frameIndex = computeFrameIndex(
+        ev.positionSec,
+        ev.pitchRatio,
+        elapsedSec,
+        plan.fps,
+        plan.frameCount,
+      );
       slot.envelopePhase = phase;
       slot.envelopeAlpha = computeEnvelopeAlpha(phase, ev.envelopeIndex);
       slot.panX = ev.panX;
