@@ -3079,3 +3079,19 @@ does not open on a frozen frame while audio prep catches up.
 and macro range fell below the operator's supported raw range (`1..4`). That made the preset behave
 differently from what the JSON claimed. Keep public preset values inside real operator ranges, especially
 for authored macro targets that bypass TypeScript validation.
+
+## 2026-05-31 — First visible frame must come from the built-in clip
+
+For the public shell, the renderer should not start drawing until the bundled cello clip has loaded and
+been primed to its paused preview frame. Earlier code set the source to `placeholder`, started the
+renderer, then raced the hidden `<video>` setup on the next tick. That was enough to let the generic
+placeholder shader win the first visible frames on slower loads, even though the built-in clip eventually
+became active. The release-track behavior is stricter: cold boot should present the bundled footage, not
+the procedural fallback.
+
+That same browser pass confirmed that `Binary Bass Rain` and `Halftone Feedback Bloom` had drifted into
+destructive wet mixes on the dark cello clip. For first-run/public presets, preserve readable source
+coverage before chasing stronger operator identity. `Binary Bass Rain` now uses a lighter rain layer plus
+a restrained binary glyph overlay; `Halftone Feedback Bloom` keeps its print-memory idea but with much
+lower feedback/displace/structure weight and an explicit brightness lift. Public presets should be tuned
+against the actual bundled demo footage, not only against isolated operator intent.

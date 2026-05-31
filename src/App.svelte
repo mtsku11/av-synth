@@ -2074,10 +2074,6 @@
       instances = [];
       syncSerialGraph(instances);
       renderer.setPlan(graphPlan);
-      renderer.start();
-      // Cold boot stays stable on the placeholder, but the product-facing UX
-      // now leads toward uploaded video rather than procedural generation.
-      setSourceKind('placeholder');
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
       return;
@@ -2091,17 +2087,34 @@
       const vid = videoEl;
       vid.src = `${import.meta.env.BASE_URL}placeholder.mp4`;
       vid.loop = true;
+      vid.preload = 'auto';
       loadedVideoName = 'built-in cello demo';
-      setSourceKind('video');
-      const onLoaded = () => {
-        void primeBuiltInDemoVideo(vid);
-      };
-      if (vid.readyState >= 2) {
-        onLoaded();
-      } else {
-        vid.addEventListener('loadeddata', onLoaded, { once: true });
+      try {
+        if (vid.readyState >= 2) {
+          await primeBuiltInDemoVideo(vid);
+        } else {
+          await new Promise<void>((resolve, reject) => {
+            const onLoaded = () => {
+              vid.removeEventListener('error', onError);
+              resolve();
+            };
+            const onError = () => {
+              vid.removeEventListener('loadeddata', onLoaded);
+              reject(new Error('built-in demo video failed to load'));
+            };
+            vid.addEventListener('loadeddata', onLoaded, { once: true });
+            vid.addEventListener('error', onError, { once: true });
+          });
+          await primeBuiltInDemoVideo(vid);
+        }
+      } catch (e) {
+        initError = e instanceof Error ? e.message : String(e);
+        setSourceKind('placeholder');
       }
+    } else {
+      setSourceKind('placeholder');
     }
+    renderer.start();
 
     try {
       programs = await loadPrograms();

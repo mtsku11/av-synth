@@ -3044,8 +3044,8 @@
     "tagline": "Feed binary cells into falling terminal columns while bass energy kicks the grid outward.",
     "videoIntent": "Best on high-contrast clips, city lights, and graphic movement where the digital rain can borrow source colour without turning muddy.",
     "audioIntent": "Compact grains and a dark stereo delay should leave room for the bass-reactive visual columns.",
-    "operatorFocus": ["matrixRain", "brightness", "saturate"],
-    "chain": ["matrixRain", "brightness", "contrast", "saturate"],
+    "operatorFocus": ["matrixRain", "glyphRender", "brightness", "contrast"],
+    "chain": ["matrixRain", "glyphRender", "brightness", "contrast", "saturate"],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -3055,27 +3055,34 @@
     },
     "values": {
       "clock.rate": 0.56,
-      "matrixRain.mix": 0.12,
-      "matrixRain.rainSpeed": 0.44,
-      "matrixRain.columnDensity": 0.38,
-      "matrixRain.glyphChangeRate": 0.62,
-      "matrixRain.trailLength": 0.56,
-      "matrixRain.sourceColorBlend": 0.92,
-      "matrixRain.audioReact": 0.32,
-      "brightness.amount": 0.16,
-      "contrast.amount": 0.9,
-      "saturate.amount": 1.02
+      "matrixRain.mix": 0.16,
+      "matrixRain.rainSpeed": 0.52,
+      "matrixRain.columnDensity": 0.34,
+      "matrixRain.glyphChangeRate": 0.68,
+      "matrixRain.trailLength": 0.74,
+      "matrixRain.sourceColorBlend": 0.76,
+      "matrixRain.audioReact": 0.42,
+      "glyphRender.mix": 0.2,
+      "glyphRender.mode": 1,
+      "glyphRender.cellSize": 12,
+      "glyphRender.density": 0.58,
+      "glyphRender.contrast": 1.12,
+      "glyphRender.invert": 0,
+      "glyphRender.colorMode": 1,
+      "brightness.amount": 0.26,
+      "contrast.amount": 0.96,
+      "saturate.amount": 1.04
     },
     "automation": {
       "matrixRain.rainSpeed": {
         "kind": "fft",
         "bin": 2,
-        "scale": 2.2,
+        "scale": 1.8,
         "smooth": 0.7,
         "cutoff": 0.04
       },
       "matrixRain.sourceColorBlend": { "kind": "lfo", "rate": 0.08, "depth": 0.08, "phase": 0 },
-      "brightness.amount": { "kind": "video", "feature": "luma", "scale": 0.18, "smooth": 0.82 }
+      "brightness.amount": { "kind": "video", "feature": "luma", "scale": 0.12, "smooth": 0.82 }
     },
     "macros": [
       {
@@ -3085,7 +3092,7 @@
         "targets": [
           { "key": "matrixRain.rainSpeed", "min": 0.22, "max": 0.94 },
           { "key": "matrixRain.trailLength", "min": 0.32, "max": 0.9 },
-          { "key": "matrixRain.columnDensity", "min": 0.32, "max": 0.82 }
+          { "key": "matrixRain.columnDensity", "min": 0.24, "max": 0.72 }
         ]
       },
       {
@@ -3095,7 +3102,7 @@
         "targets": [
           { "key": "matrixRain.audioReact", "min": 0.12, "max": 0.9 },
           { "key": "matrixRain.rainSpeed", "min": 0.2, "max": 0.9 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.08, "max": 0.26 }
+          { "key": "glyphRender.mix", "min": 0.08, "max": 0.34 }
         ]
       },
       {
@@ -3103,9 +3110,9 @@
         "label": "Signal",
         "default": 0.48,
         "targets": [
-          { "key": "brightness.amount", "min": 0.04, "max": 0.28 },
-          { "key": "contrast.amount", "min": 0.8, "max": 1.08 },
-          { "key": "matrixRain.sourceColorBlend", "min": 0.72, "max": 1 }
+          { "key": "brightness.amount", "min": 0.08, "max": 0.34 },
+          { "key": "contrast.amount", "min": 0.86, "max": 1.12 },
+          { "key": "matrixRain.sourceColorBlend", "min": 0.58, "max": 0.94 }
         ]
       }
     ],
@@ -3141,60 +3148,53 @@
     "tagline": "Break highlights into soft dots, then let contour memory and bloom breathe through the printed texture.",
     "videoIntent": "Best on faces, costume detail, and practical lights where a halftone surface can remain elegant under feedback.",
     "audioIntent": "Longer gaussian grains should blur into a warm cloud while the shared delay mirrors the visual persistence.",
-    "operatorFocus": ["glyphRender", "structure", "feedback", "timeDisplace"],
+    "operatorFocus": ["glyphRender", "structure", "feedback", "brightness"],
     "chain": [
       "feedback",
       "timeDisplace",
       "structure",
       "glyphRender",
-      "glyphMotion",
+      "brightness",
       "saturate",
       "contrast"
     ],
     "render": {
       "look": "cine",
-      "quality": "cinema",
-      "lut": "amber",
-      "postPreset": "radialSmear",
+      "quality": "standard",
+      "lut": "neutral",
+      "postPreset": "none",
       "lensDirt": "bloomMist"
     },
     "values": {
       "clock.rate": 0.34,
-      "feedback.feedback": 0.68,
-      "timeDisplace.mix": 0.34,
-      "timeDisplace.depth": 0.72,
-      "timeDisplace.scan": 0.72,
-      "timeDisplace.smear": 0.24,
-      "timeDisplace.decay": 0.68,
-      "structure.mix": 0.42,
+      "feedback.feedback": 0.26,
+      "timeDisplace.mix": 0.08,
+      "timeDisplace.depth": 0.18,
+      "timeDisplace.scan": 0.4,
+      "timeDisplace.smear": 0.04,
+      "timeDisplace.decay": 0.24,
+      "structure.mix": 0.14,
       "structure.mode": 0.58,
-      "structure.threshold": 0.16,
-      "structure.softness": 0.22,
-      "structure.displace": 0.18,
-      "structure.memory": 0.44,
-      "structure.glow": 0.56,
-      "glyphRender.mix": 0.86,
+      "structure.threshold": 0.04,
+      "structure.softness": 0.42,
+      "structure.displace": 0.04,
+      "structure.memory": 0.08,
+      "structure.glow": 0.18,
+      "glyphRender.mix": 0.28,
       "glyphRender.mode": 3,
-      "glyphRender.cellSize": 12,
-      "glyphRender.density": 0.92,
-      "glyphRender.contrast": 1.22,
+      "glyphRender.cellSize": 8,
+      "glyphRender.density": 0.58,
+      "glyphRender.contrast": 0.94,
       "glyphRender.invert": 0,
-      "glyphRender.colorMode": 0,
-      "glyphMotion.mix": 0.22,
-      "glyphMotion.cellSize": 12,
-      "glyphMotion.bassPush": 0.28,
-      "glyphMotion.midRotate": 0.18,
-      "glyphMotion.highJitter": 0.08,
-      "glyphMotion.decay": 0.78,
-      "glyphMotion.ring": 0.24,
-      "glyphMotion.motionAmount": 0.18,
-      "saturate.amount": 1.2,
-      "contrast.amount": 1.12
+      "glyphRender.colorMode": 1,
+      "brightness.amount": 0.22,
+      "saturate.amount": 1.04,
+      "contrast.amount": 0.96
     },
     "automation": {
-      "structure.glow": { "kind": "video", "feature": "edge", "scale": 0.34, "smooth": 0.78 },
-      "glyphRender.cellSize": { "kind": "lfo", "rate": 0.05, "depth": 3, "phase": 0 },
-      "timeDisplace.smear": { "kind": "video", "feature": "flux", "scale": 0.28, "smooth": 0.82 }
+      "structure.glow": { "kind": "video", "feature": "edge", "scale": 0.1, "smooth": 0.78 },
+      "glyphRender.cellSize": { "kind": "lfo", "rate": 0.05, "depth": 1, "phase": 0 },
+      "brightness.amount": { "kind": "video", "feature": "luma", "scale": 0.1, "smooth": 0.82 }
     },
     "macros": [
       {
