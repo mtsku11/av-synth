@@ -145,6 +145,7 @@
   // MidiRouter directly into the granulator's ParamSink (and worklet trigger).
   let granulator = $state<Granulator | null>(null);
   let granulatorEnabled = $state(false);
+  let granulatorLoadedSrc: string | null = null;
   let granulatorEnvelope = $state<GranulatorEnvelope>('hann');
   let granulatorMode = $state<GranulatorMode>('classic');
   let granulatorQuality = $state<GranulatorQuality>('balanced');
@@ -165,6 +166,7 @@
   let midiDevices = $state<readonly WebMidiDevice[]>([]);
   let midiUnavailableReason = $state<string | null>(null);
   let selectedMidiSource = $state<string>('all');
+  const BUILT_IN_DEMO_PREVIEW_TIME_SEC = 1.5;
   const KEY_TO_NOTE: Readonly<Record<string, number>> = {
     a: 60,
     w: 61,
@@ -647,6 +649,25 @@
       video.addEventListener('error', onError, { once: true });
       video.currentTime = time;
     });
+  }
+
+  function resolveBuiltInDemoPreviewTime(video: HTMLVideoElement): number {
+    if (!Number.isFinite(video.duration) || video.duration <= 0)
+      return BUILT_IN_DEMO_PREVIEW_TIME_SEC;
+    return Math.min(BUILT_IN_DEMO_PREVIEW_TIME_SEC, Math.max(0, video.duration - 0.25));
+  }
+
+  async function primeBuiltInDemoVideo(video: HTMLVideoElement): Promise<void> {
+    await waitForVideoFrame(video);
+    const previewTime = resolveBuiltInDemoPreviewTime(video);
+    if (previewTime > 0) {
+      try {
+        await waitForVideoSeek(video, previewTime);
+      } catch {
+        // Leave the clip usable even if the browser refuses a preview seek.
+      }
+    }
+    if (sourceKind !== 'video') setSourceKind('video');
   }
 
   async function probeClipFrameRate(video: HTMLVideoElement): Promise<number | null> {
@@ -1391,11 +1412,17 @@
 
   async function ensureGranulatorClipLoaded(): Promise<boolean> {
     if (!granulator || !videoEl?.src || !audio.isInitialised) return false;
+    if (granulatorLoadedSrc === videoEl.src) {
+      granulator.setEnabled(true);
+      granulatorEnabled = true;
+      return true;
+    }
     try {
       const ab = await fetch(videoEl.src).then((r) => r.arrayBuffer());
       await granulator.loadFromArrayBuffer(audio.ctx, ab);
       granulator.setEnabled(true);
       granulatorEnabled = true;
+      granulatorLoadedSrc = videoEl.src;
       return true;
     } catch {
       return false;
@@ -1743,6 +1770,7 @@
         return ok;
       },
       startTransport: async () => {
+        demoStarted = true;
         await onStart();
         await tick();
         return true;
@@ -2064,7 +2092,7 @@
       vid.loop = true;
       loadedVideoName = 'built-in cello demo';
       const onLoaded = () => {
-        if (sourceKind !== 'video') setSourceKind('video');
+        void primeBuiltInDemoVideo(vid);
       };
       if (vid.readyState >= 2) {
         onLoaded();
@@ -2154,6 +2182,7 @@
       const ab = await file.arrayBuffer();
       await granulator.loadFromArrayBuffer(audio.ctx, ab);
       granulator.setEnabled(granulatorEnabled);
+      granulatorLoadedSrc = videoEl?.src ?? loadedVideoName;
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
     }
@@ -2640,6 +2669,7 @@
       } catch (e) {
         initError = e instanceof Error ? e.message : String(e);
       }
+      await ensureGranulatorClipLoaded();
     }
 
     await clock.start();
@@ -2664,6 +2694,7 @@
     grainDecodedSrc = null;
     grainDecodeStatus = null;
     grainVideoFps = null;
+    granulatorLoadedSrc = null;
     if (grainCompositeSource) {
       grainCompositeSource.dispose(renderer.gl);
       grainCompositeSource = null;

@@ -3050,3 +3050,20 @@ That recorder refresh exposed a capture-lifecycle bug: only the first WebM actua
 `stopCapture()` stopped it alongside the session-owned canvas track. Subsequent recorder sessions reused
 the ended audio track. Clone the shared audio track into each combined capture stream so session cleanup
 does not destroy the engine-owned destination track.
+
+## 2026-05-31 — Built-in preview frame and showcase preset salvage
+
+The bundled demo clip should not boot at media time `0`. In browser runtime the committed
+`placeholder.mp4` exposes valid pixels only after a small seek, and the first meaningful frame is also a
+better first impression than the opening black hold. Prime the hidden `<video>` to a representative paused
+preview frame (`1.5s`, capped against duration) before switching the shell source to `video`.
+
+`startTransport()` in the QA bridge should mirror a started demo shell closely enough that browser checks
+and capture scripts do not record the welcome overlay. Set `demoStarted = true` before running the normal
+transport start path.
+
+The cello demo is dark enough that some showcase presets were visually honest in isolation but collapsed
+into near-black public results when stacked together. `ASCII Ghost Delay` stays in the public bank, but it
+needs much lower slit/glyph wetness on the bundled clip. `Binary Bass Rain` and `Terminal Kaleidoscope`
+should favor source-preserving matrix-rain and light fold/brightness accents over full stacked glyph packs
+on first-run footage. Public presets win on legibility, not maximal operator count.

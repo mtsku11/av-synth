@@ -2945,35 +2945,35 @@
     },
     "values": {
       "clock.rate": 0.42,
-      "slitScan.mix": 0.64,
+      "slitScan.mix": 0.24,
       "slitScan.orientation": 2,
       "slitScan.slitX": 0.5,
       "slitScan.slitY": 0.5,
       "slitScan.scanSpeed": 0.52,
       "slitScan.depth": 0.08,
       "slitScan.delayAmount": 0.92,
-      "slitScan.smearWidth": 0.78,
-      "slitScan.feedbackBlend": 0.76,
+      "slitScan.smearWidth": 0.62,
+      "slitScan.feedbackBlend": 0.58,
       "slitScan.direction": 1,
       "slitScan.strobe": 0.08,
-      "feedback.feedback": 0.58,
-      "glyphRender.mix": 0.94,
+      "feedback.feedback": 0.12,
+      "glyphRender.mix": 0.22,
       "glyphRender.mode": 0,
-      "glyphRender.cellSize": 15,
-      "glyphRender.density": 0.88,
-      "glyphRender.contrast": 1.45,
+      "glyphRender.cellSize": 14,
+      "glyphRender.density": 0.72,
+      "glyphRender.contrast": 1.18,
       "glyphRender.invert": 0,
       "glyphRender.colorMode": 2,
-      "glyphMotion.mix": 0.5,
+      "glyphMotion.mix": 0.18,
       "glyphMotion.cellSize": 15,
       "glyphMotion.bassPush": 0.52,
       "glyphMotion.midRotate": 0.36,
       "glyphMotion.highJitter": 0.2,
       "glyphMotion.decay": 0.68,
       "glyphMotion.ring": 0.34,
-      "glyphMotion.motionAmount": 0.48,
+      "glyphMotion.motionAmount": 0.32,
       "chromaShift.amount": 0.006,
-      "contrast.amount": 1.18
+      "contrast.amount": 1.02
     },
     "automation": {
       "slitScan.slitX": { "kind": "lfo", "rate": 0.07, "depth": 0.08, "phase": 0 },
@@ -3044,58 +3044,38 @@
     "tagline": "Feed binary cells into falling terminal columns while bass energy kicks the grid outward.",
     "videoIntent": "Best on high-contrast clips, city lights, and graphic movement where the digital rain can borrow source colour without turning muddy.",
     "audioIntent": "Compact grains and a dark stereo delay should leave room for the bass-reactive visual columns.",
-    "operatorFocus": ["glyphRender", "glyphMotion", "matrixRain"],
-    "chain": ["glyphRender", "glyphMotion", "matrixRain", "feedback", "contrast", "saturate"],
+    "operatorFocus": ["matrixRain", "brightness", "saturate"],
+    "chain": ["matrixRain", "brightness", "contrast", "saturate"],
     "render": {
       "look": "clean",
       "quality": "standard",
-      "lut": "chrome",
+      "lut": "neutral",
       "postPreset": "none",
       "lensDirt": "none"
     },
     "values": {
       "clock.rate": 0.56,
-      "glyphRender.mix": 0.82,
-      "glyphRender.mode": 1,
-      "glyphRender.cellSize": 13,
-      "glyphRender.density": 0.82,
-      "glyphRender.contrast": 1.8,
-      "glyphRender.invert": 0,
-      "glyphRender.colorMode": 3,
-      "glyphMotion.mix": 0.72,
-      "glyphMotion.cellSize": 13,
-      "glyphMotion.bassPush": 1.12,
-      "glyphMotion.midRotate": 0.24,
-      "glyphMotion.highJitter": 0.38,
-      "glyphMotion.decay": 0.72,
-      "glyphMotion.ring": 0.58,
-      "glyphMotion.motionAmount": 0.3,
-      "matrixRain.mix": 0.72,
-      "matrixRain.rainSpeed": 0.56,
-      "matrixRain.columnDensity": 0.62,
-      "matrixRain.glyphChangeRate": 0.76,
-      "matrixRain.trailLength": 0.68,
-      "matrixRain.sourceColorBlend": 0.36,
-      "matrixRain.audioReact": 0.84,
-      "feedback.feedback": 0.48,
-      "contrast.amount": 1.28,
-      "saturate.amount": 1.08
+      "matrixRain.mix": 0.12,
+      "matrixRain.rainSpeed": 0.44,
+      "matrixRain.columnDensity": 0.38,
+      "matrixRain.glyphChangeRate": 0.62,
+      "matrixRain.trailLength": 0.56,
+      "matrixRain.sourceColorBlend": 0.92,
+      "matrixRain.audioReact": 0.32,
+      "brightness.amount": 0.16,
+      "contrast.amount": 0.9,
+      "saturate.amount": 1.02
     },
     "automation": {
       "matrixRain.rainSpeed": {
         "kind": "fft",
         "bin": 2,
-        "scale": 2.8,
+        "scale": 2.2,
         "smooth": 0.7,
         "cutoff": 0.04
       },
-      "glyphMotion.motionAmount": {
-        "kind": "video",
-        "feature": "motion",
-        "scale": 0.7,
-        "smooth": 0.74
-      },
-      "matrixRain.sourceColorBlend": { "kind": "lfo", "rate": 0.08, "depth": 0.16, "phase": 0 }
+      "matrixRain.sourceColorBlend": { "kind": "lfo", "rate": 0.08, "depth": 0.08, "phase": 0 },
+      "brightness.amount": { "kind": "video", "feature": "luma", "scale": 0.18, "smooth": 0.82 }
     },
     "macros": [
       {
@@ -3113,9 +3093,9 @@
         "label": "Bass",
         "default": 0.66,
         "targets": [
-          { "key": "glyphMotion.bassPush", "min": 0.28, "max": 1.72 },
-          { "key": "glyphMotion.ring", "min": 0.18, "max": 0.86 },
-          { "key": "matrixRain.audioReact", "min": 0.3, "max": 1 }
+          { "key": "matrixRain.audioReact", "min": 0.12, "max": 0.9 },
+          { "key": "matrixRain.rainSpeed", "min": 0.2, "max": 0.9 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.08, "max": 0.26 }
         ]
       },
       {
@@ -3123,9 +3103,9 @@
         "label": "Signal",
         "default": 0.48,
         "targets": [
-          { "key": "glyphRender.density", "min": 0.58, "max": 1 },
-          { "key": "glyphRender.contrast", "min": 1.1, "max": 2.5 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.1, "max": 0.34 }
+          { "key": "brightness.amount", "min": 0.04, "max": 0.28 },
+          { "key": "contrast.amount", "min": 0.8, "max": 1.08 },
+          { "key": "matrixRain.sourceColorBlend", "min": 0.72, "max": 1 }
         ]
       }
     ],
@@ -3537,78 +3517,50 @@
     "tagline": "Fold falling digital columns into a chrome terminal mandala, then let high-band energy keep the cells unstable.",
     "videoIntent": "Best on lights, signage, architecture, and strongly coloured clips where the terminal lattice can hold a clean mirrored geometry.",
     "audioIntent": "A bright but bounded cloud and ping-pong delay should mirror the crystalline repeat pattern.",
-    "operatorFocus": ["matrixRain", "glyphRender", "glyphMotion", "kaleid"],
-    "chain": [
-      "matrixRain",
-      "kaleid",
-      "glyphRender",
-      "glyphMotion",
-      "feedback",
-      "chromaShift",
-      "contrast"
-    ],
+    "operatorFocus": ["matrixRain", "kaleid", "brightness", "chromaShift"],
+    "chain": ["matrixRain", "kaleid", "brightness", "chromaShift", "contrast"],
     "render": {
-      "look": "silver",
+      "look": "clean",
       "quality": "standard",
-      "lut": "silvered",
-      "postPreset": "glassWarp",
+      "lut": "neutral",
+      "postPreset": "none",
       "lensDirt": "none"
     },
     "values": {
       "clock.rate": 0.62,
-      "matrixRain.mix": 0.76,
-      "matrixRain.rainSpeed": 0.48,
-      "matrixRain.columnDensity": 0.54,
-      "matrixRain.glyphChangeRate": 0.7,
-      "matrixRain.trailLength": 0.58,
-      "matrixRain.sourceColorBlend": 0.58,
-      "matrixRain.audioReact": 0.62,
-      "kaleid.nSides": 6,
-      "kaleid.drive": 0.32,
-      "kaleid.tone": 0.58,
-      "kaleid.mix": 0.9,
-      "glyphRender.mix": 0.7,
-      "glyphRender.mode": 1,
-      "glyphRender.cellSize": 12,
-      "glyphRender.density": 0.86,
-      "glyphRender.contrast": 1.72,
-      "glyphRender.invert": 0,
-      "glyphRender.colorMode": 3,
-      "glyphMotion.mix": 0.64,
-      "glyphMotion.cellSize": 12,
-      "glyphMotion.bassPush": 0.42,
-      "glyphMotion.midRotate": 0.52,
-      "glyphMotion.highJitter": 0.88,
-      "glyphMotion.decay": 0.66,
-      "glyphMotion.ring": 0.38,
-      "glyphMotion.motionAmount": 0.24,
-      "feedback.feedback": 0.56,
-      "chromaShift.amount": 0.008,
-      "contrast.amount": 1.24
+      "matrixRain.mix": 0.06,
+      "matrixRain.rainSpeed": 0.42,
+      "matrixRain.columnDensity": 0.32,
+      "matrixRain.glyphChangeRate": 0.48,
+      "matrixRain.trailLength": 0.46,
+      "matrixRain.sourceColorBlend": 0.96,
+      "matrixRain.audioReact": 0.14,
+      "kaleid.nSides": 5,
+      "kaleid.drive": 0.08,
+      "kaleid.tone": 0.42,
+      "kaleid.mix": 0.12,
+      "brightness.amount": 0.12,
+      "chromaShift.amount": 0.006,
+      "contrast.amount": 0.9
     },
     "automation": {
       "kaleid.nSides": {
         "kind": "sequence",
-        "values": [4, 6, 8, 6],
-        "fast": 0.22,
+        "values": [4, 5, 6, 5],
+        "fast": 0.14,
         "smooth": 0.14,
         "ease": "easeInOutCubic",
         "offset": 0,
         "invert": false
       },
-      "glyphMotion.highJitter": {
+      "matrixRain.rainSpeed": {
         "kind": "fft",
         "bin": 28,
-        "scale": 4.8,
-        "smooth": 0.68,
+        "scale": 1.8,
+        "smooth": 0.72,
         "cutoff": 0.025
       },
-      "matrixRain.sourceColorBlend": {
-        "kind": "video",
-        "feature": "luma",
-        "scale": 0.28,
-        "smooth": 0.8
-      }
+      "brightness.amount": { "kind": "video", "feature": "luma", "scale": 0.16, "smooth": 0.84 }
     },
     "macros": [
       {
@@ -3617,8 +3569,8 @@
         "default": 0.56,
         "targets": [
           { "key": "kaleid.nSides", "min": 4, "max": 12 },
-          { "key": "kaleid.drive", "min": 0.08, "max": 0.62 },
-          { "key": "feedback.feedback", "min": 0.36, "max": 0.76 }
+          { "key": "kaleid.drive", "min": 0.04, "max": 0.26 },
+          { "key": "kaleid.mix", "min": 0.04, "max": 0.24 }
         ]
       },
       {
@@ -3626,9 +3578,9 @@
         "label": "Terminal",
         "default": 0.58,
         "targets": [
-          { "key": "matrixRain.columnDensity", "min": 0.28, "max": 0.84 },
-          { "key": "matrixRain.trailLength", "min": 0.26, "max": 0.86 },
-          { "key": "glyphRender.contrast", "min": 1.1, "max": 2.4 }
+          { "key": "matrixRain.columnDensity", "min": 0.2, "max": 0.68 },
+          { "key": "matrixRain.trailLength", "min": 0.18, "max": 0.74 },
+          { "key": "matrixRain.sourceColorBlend", "min": 0.76, "max": 1 }
         ]
       },
       {
@@ -3636,8 +3588,8 @@
         "label": "Spark",
         "default": 0.48,
         "targets": [
-          { "key": "glyphMotion.highJitter", "min": 0.18, "max": 1.5 },
-          { "key": "matrixRain.audioReact", "min": 0.2, "max": 1 },
+          { "key": "brightness.amount", "min": 0.04, "max": 0.24 },
+          { "key": "matrixRain.audioReact", "min": 0.08, "max": 0.52 },
           { "key": "audio.granulator.pitchJitter", "min": 2, "max": 12 }
         ]
       }
