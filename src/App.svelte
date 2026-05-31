@@ -64,7 +64,10 @@
   import { createSourceInstance, type SourceInstance } from './core/sources';
   import { DEFAULT_CHAIN } from './ops';
   import {
+    COLOR_BAND_CROSSOVERS_HZ,
+    EMPTY_AUDIO_BANDS,
     EMPTY_VIDEO_FEATURES,
+    type AudioBandState,
     type CouplingContext,
     type VideoFeatureState,
   } from './core/coupling';
@@ -121,6 +124,7 @@
   let activeProgram = $state<string | null>(null);
   let activeProgramMacros = $state<Record<string, number>>({});
   let videoFeatures = $state<VideoFeatureState>({ ...EMPTY_VIDEO_FEATURES });
+  let audioBands = $state<AudioBandState>({ ...EMPTY_AUDIO_BANDS });
   let monitorBus = $state<BusIndex>(0);
   let previewMode = $state<PreviewMode>('single');
   type WorkspaceSurface = 'video' | 'audio' | 'lfo' | 'presets';
@@ -243,14 +247,12 @@
     'singularityBloom',
     'fractureRelay',
     'magneticCathedral',
-    'temporalBloomGhost',
-    'slitScanEcho',
-    'datamoshSmear',
-    'datamoshHold',
-    'flowMelt',
-    'kaleidoFeedbackTunnel',
-    'freezeFeedback',
-    'grainField',
+    'asciiGhostDelay',
+    'binaryBassRain',
+    'halftoneFeedbackBloom',
+    'slitScanHands',
+    'glyphVortex',
+    'terminalKaleidoscope',
   ]);
 
   const VIDEO_FEATURE_SAMPLE_WIDTH = 96;
@@ -276,6 +278,7 @@
     rate: clock.rate,
     lfoBank: clock.lfoBank,
     videoFeatures,
+    audioBands,
   });
 
   interface ControlView {
@@ -344,6 +347,7 @@
       clockRunning: boolean;
       audioInitialised: boolean;
       videoFeatures: VideoFeatureState;
+      audioBands: AudioBandState;
       video: {
         currentTime: number;
         paused: boolean;
@@ -561,6 +565,55 @@
     videoFeatures = { ...EMPTY_VIDEO_FEATURES };
   }
 
+  function resetAudioBands(): void {
+    if (!audioBands.available) return;
+    audioBands = { ...EMPTY_AUDIO_BANDS };
+  }
+
+  function readAudioBand(
+    fft: Float32Array,
+    sampleRate: number,
+    minHz: number,
+    maxHz: number,
+  ): number {
+    const binHz = sampleRate / 2 / fft.length;
+    const start = Math.max(0, Math.floor(minHz / binHz));
+    const end = Math.min(fft.length, Math.max(start + 1, Math.ceil(maxHz / binHz)));
+    let sum = 0;
+    for (let index = start; index < end; index += 1) {
+      const db = fft[index] ?? -120;
+      sum += Number.isFinite(db) ? 10 ** (db / 20) : 0;
+    }
+    return Math.min(1, Math.sqrt(sum / Math.max(end - start, 1)) * 3.2);
+  }
+
+  function sampleAudioBandSignals(): void {
+    const fft = audio.getFftMagnitudes();
+    if (!fft || !audio.isInitialised) {
+      resetAudioBands();
+      return;
+    }
+    const sampleRate = audio.ctx.sampleRate;
+    const next = {
+      bass: readAudioBand(fft, sampleRate, 0, COLOR_BAND_CROSSOVERS_HZ.lowMid),
+      mid: readAudioBand(
+        fft,
+        sampleRate,
+        COLOR_BAND_CROSSOVERS_HZ.lowMid,
+        COLOR_BAND_CROSSOVERS_HZ.midHigh,
+      ),
+      high: readAudioBand(fft, sampleRate, COLOR_BAND_CROSSOVERS_HZ.midHigh, sampleRate / 2),
+    };
+    audioBands = audioBands.available
+      ? {
+          available: true,
+          bass: smoothFeatureValue(audioBands.bass, next.bass),
+          mid: smoothFeatureValue(audioBands.mid, next.mid),
+          high: smoothFeatureValue(audioBands.high, next.high),
+        }
+      : { available: true, ...next };
+  }
+
   function routeVideoAudioThroughGraph(): void {
     if (!videoEl) return;
     videoEl.muted = false;
@@ -672,6 +725,7 @@
   }
 
   function sampleVideoFeatureSignals(): void {
+    sampleAudioBandSignals();
     if (
       typeof document === 'undefined' ||
       sourceKind !== 'video' ||
@@ -1523,6 +1577,7 @@
         clockRunning: clock.running,
         audioInitialised: audio.isInitialised,
         videoFeatures,
+        audioBands,
         video: videoEl
           ? {
               currentTime: videoEl.currentTime,

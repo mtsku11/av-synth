@@ -67,6 +67,8 @@ const NOISY_OPS: ReadonlySet<string> = new Set([
   'vortexPacket',
   'saddleField',
   'flow',
+  'glyphMotion',
+  'matrixRain',
   'timeDisplace',
   'structure',
   'feedback',

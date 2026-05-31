@@ -52,7 +52,7 @@ test.describe('release showcase shell', () => {
     await expect(page.getByRole('tab', { name: 'video' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'audio' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'lfo' })).toBeVisible();
-    await expect(page.locator('.experiment-grid .program-card')).toHaveCount(31);
+    await expect(page.locator('.experiment-grid .program-card')).toHaveCount(37);
 
     expect(consoleErrors).toEqual([]);
   });

@@ -22,6 +22,13 @@ export interface VideoFeatureState {
   motion: number;
 }
 
+export interface AudioBandState {
+  available: boolean;
+  bass: number;
+  mid: number;
+  high: number;
+}
+
 /** The four video-derived feature signals available as modulation sources. */
 export type VideoFeatureName = Exclude<keyof VideoFeatureState, 'available'>;
 
@@ -31,6 +38,13 @@ export const EMPTY_VIDEO_FEATURES: VideoFeatureState = {
   flux: 0,
   edge: 0,
   motion: 0,
+};
+
+export const EMPTY_AUDIO_BANDS: AudioBandState = {
+  available: false,
+  bass: 0,
+  mid: 0,
+  high: 0,
 };
 
 export interface CouplingContext {
@@ -55,6 +69,8 @@ export interface CouplingContext {
   lfoBank: readonly GlobalLfo[];
   /** Low-rate feature signals sampled from the active video input. */
   videoFeatures: VideoFeatureState;
+  /** Low-rate analyser summary for video operators that tint or move with audio. */
+  audioBands: AudioBandState;
 }
 
 export interface ParamCoupling {

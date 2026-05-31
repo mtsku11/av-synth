@@ -17,6 +17,9 @@ const EXPECTED_OPERATOR_IDS = [
   'feedback',
   'timeDisplace',
   'slitScan',
+  'glyphRender',
+  'glyphMotion',
+  'matrixRain',
   'structure',
   'flow',
   'dataMosh',
@@ -126,6 +129,9 @@ describe('operator UI metadata', () => {
     expect(getOperatorUiMeta('gyreField').family).toBe('Feedback');
     expect(getOperatorUiMeta('turbulenceWarp').family).toBe('Feedback');
     expect(getOperatorUiMeta('magneticDipole').family).toBe('Feedback');
+    expect(getOperatorUiMeta('glyphRender').family).toBe('Texture');
+    expect(getOperatorUiMeta('glyphMotion').family).toBe('Motion');
+    expect(getOperatorUiMeta('matrixRain').family).toBe('Texture');
   });
 
   it('surfaces curated core controls for node-card summaries', () => {

@@ -2981,3 +2981,36 @@ reactive update loop. The program now uses `easeInOutCubic`, and `ease()` falls 
 for malformed external preset data. Focused Playwright coverage applies all three programs serially,
 checks active recall, three-macro exposure, local frame-rate floor, visible output delta, bounded peak, and
 console cleanliness.
+
+## 2026-05-31 — Typographic / time-domain pack stays inside the WebGL2 resource model
+
+Added a bounded Advanced operator pack inspired by live video-to-glyph instruments without importing their
+larger architecture. The useful product vocabulary was cell rendering, band-reactive cell motion, temporal
+echo, and digital rain. Segmentation, multiplayer, projector popups, recording changes, a font-atlas
+pipeline, heavy optical flow, and cell physics stay out of scope.
+
+The implementation adds three neutral-by-default fragment-pass operators:
+
+- `glyphRender`: analytical ASCII-ramp, binary, block, and halftone masks. The ASCII mode approximates
+  ` .:-=+*#%@` with small signed-distance glyph shapes rather than a font texture.
+- `glyphMotion`: cheap per-cell bass push, mid rotation, high jitter, decay/ring bounce, and displacement
+  from the existing shared low-resolution motion field.
+- `matrixRain`: procedural falling binary-cell columns with source-colour blend and audio-reactive
+  speed/brightness.
+
+`slitScan` was extended rather than duplicated. Existing vertical/horizontal presets keep their original
+defaults, while radial/spiral modes and `delayAmount` / `smearWidth` / `feedbackBlend` / `direction` /
+`strobe` controls reuse the eight-layer shared temporal-history texture.
+
+One small context extension was required for honest audio-reactive shaders: `CouplingContext.audioBands`
+now carries a smoothed low-rate bass/mid/high analyser summary. It is sampled from the existing post-limit
+analyser; no second analyser or public audio engine was added.
+
+Six authored programs ship behind Advanced pending hosted-device visual review: `ASCII Ghost Delay`,
+`Binary Bass Rain`, `Halftone Feedback Bloom`, `Slit-Scan Hands`, `Glyph Vortex`, and
+`Terminal Kaleidoscope`. The public first-run allowlist intentionally remains at 11.
+
+Performance boundary: every new op is one bounded fragment pass with O(1) texture work per output pixel.
+There are no allocations or new FBOs per frame. The known motion limitation is still the existing
+half-resolution, single-scale Lucas-Kanade approximation; large or low-texture movement can flatten the
+field, and `glyphMotion` inherits that ceiling.

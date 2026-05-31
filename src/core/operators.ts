@@ -183,9 +183,27 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
   },
   slitScan: {
     family: 'Feedback',
-    blurb: 'vertical or horizontal slit-scan with adjustable slit position and scan speed',
+    blurb: 'vertical, horizontal, radial, or spiral slit-scan over shared frame history',
     intents: ['feedback', 'motion trails', 'video texture'],
-    coreParams: ['mix', 'orientation', 'slitX', 'slitY', 'scanSpeed'],
+    coreParams: ['mix', 'orientation', 'delayAmount', 'smearWidth', 'feedbackBlend'],
+  },
+  glyphRender: {
+    family: 'Texture',
+    blurb: 'procedural ascii, binary, block, and halftone cell rendering',
+    intents: ['video texture', 'audio-reactive', 'typography'],
+    coreParams: ['mix', 'mode', 'cellSize', 'density', 'colorMode'],
+  },
+  glyphMotion: {
+    family: 'Motion',
+    blurb: 'band-reactive cell displacement, rotation, jitter, and shared-motion drift',
+    intents: ['motion', 'audio-reactive', 'video texture'],
+    coreParams: ['mix', 'bassPush', 'midRotate', 'highJitter', 'motionAmount'],
+  },
+  matrixRain: {
+    family: 'Texture',
+    blurb: 'falling digital-cell columns with source-colour and audio-reactive blending',
+    intents: ['video texture', 'audio-reactive', 'glitch'],
+    coreParams: ['mix', 'rainSpeed', 'columnDensity', 'trailLength', 'audioReact'],
   },
   structure: {
     family: 'Feedback',

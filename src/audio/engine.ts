@@ -10,6 +10,7 @@ import { clock } from '../core/clock.svelte';
 import { SilentSource, type AudioSourceStage } from './sources';
 import { ensureAudioWorklets } from './worklets';
 import {
+  EMPTY_AUDIO_BANDS,
   EMPTY_VIDEO_FEATURES,
   type CouplingContext,
   type VideoFeatureState,
@@ -217,6 +218,7 @@ export class AudioEngine {
       rate: clock.rate,
       lfoBank: clock.lfoBank,
       videoFeatures: this.#videoFeatures,
+      audioBands: EMPTY_AUDIO_BANDS,
     };
     this.#source?.setParams?.(this.#sourceParams, ctx);
   }

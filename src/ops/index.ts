@@ -4,6 +4,9 @@ import { registerOp } from '../core/operators';
 import { feedbackDef } from './feedback';
 import { timeDisplaceDef } from './timeDisplace';
 import { slitScanDef } from './slitScan';
+import { glyphRenderDef } from './glyphRender';
+import { glyphMotionDef } from './glyphMotion';
+import { matrixRainDef } from './matrixRain';
 import { dataMoshDef } from './dataMosh';
 import { pixelSortDef } from './pixelSort';
 import { fieldSortDef } from './fieldSort';
@@ -72,6 +75,9 @@ export function registerAllOps(): void {
   registerOp(feedbackDef);
   registerOp(timeDisplaceDef);
   registerOp(slitScanDef);
+  registerOp(glyphRenderDef);
+  registerOp(glyphMotionDef);
+  registerOp(matrixRainDef);
   registerOp(structureDef);
   registerOp(flowDef);
   registerOp(dataMoshDef);
@@ -151,6 +157,9 @@ export const DEFAULT_CHAIN: readonly string[] = [
   'feedback',
   'timeDisplace',
   'slitScan',
+  'glyphRender',
+  'glyphMotion',
+  'matrixRain',
   'structure',
   'flow',
   'dataMosh',

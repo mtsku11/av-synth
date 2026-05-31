@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { EMPTY_VIDEO_FEATURES, evaluateVideoParams } from './coupling';
+import { EMPTY_AUDIO_BANDS, EMPTY_VIDEO_FEATURES, evaluateVideoParams } from './coupling';
 import { createDefaultGlobalLfoBank } from './mod-bank';
 import type { OperatorInstance } from './operators';
 import { isNeutralInstance } from './operators';
@@ -32,6 +32,7 @@ const ctx = {
   rate: 0.5,
   lfoBank: createDefaultGlobalLfoBank(),
   videoFeatures: EMPTY_VIDEO_FEATURES,
+  audioBands: EMPTY_AUDIO_BANDS,
 };
 
 describe('evaluateVideoParams', () => {

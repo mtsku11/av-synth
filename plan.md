@@ -465,6 +465,12 @@ Release policy:
 - Additional post/presentation-stack expansion is now explicitly late/optional. New finish presets, extra bloom/halation variants, and similar polish-only work should stay behind renderer-system work, flagship-program authoring, and release-gate sign-off unless a concrete launch bug promotes them.
 - Staging deploy can be used to evaluate these effects on real machines; public v1 should wait for quality sign-off or a written scope reduction.
 
+### 10.5.1 Typographic / time-domain pack
+
+✅ **Landed 2026-05-31 as an Advanced pack.** `glyphRender`, `glyphMotion`, and `matrixRain` add a compact live-video-to-glyph vocabulary without changing the renderer architecture. `glyphRender` uses analytical cell masks for ASCII-ramp, binary, block, and halftone modes rather than a font atlas; `glyphMotion` reuses the shared low-resolution motion field and low-rate bass/mid/high analyser bands for bounded cell push/rotation/jitter; `matrixRain` is a single-pass digital-column treatment with source-colour blending. Existing `slitScan` now also supports radial and spiral fields plus delay amount, smear width, feedback blend, direction, and freeze/strobe controls over the existing eight-frame history ring.
+
+Six authored programs ship behind Advanced: `ASCII Ghost Delay`, `Binary Bass Rain`, `Halftone Feedback Bloom`, `Slit-Scan Hands`, `Glyph Vortex`, and `Terminal Kaleidoscope`. They deliberately do not expand the public 11-program release slate until hosted-device review confirms which, if any, deserve promotion. The pack adds no font texture, new FBO subsystem, physics engine, segmentation dependency, collaboration layer, recording/export change, or public audio engine.
+
 ### 10.5.3 Audit recommendations (2026-05-28 + 2026-05-29)
 
 ✅ All audit items R1–R7 and S1–S8 closed 2026-05-29. Full item-by-item status in `todo.md`. R8 (real-device latency/CPU measurement) remains open — requires physical hardware access at staging time. Dated change-log subsections moved to `docs/archive/build-log.md` 2026-05-28; open design tensions (`timeDisplace` source-anchored history, `flow` motion-estimator ceiling) tracked in `todo.md` "Deferred / open follow-ups".

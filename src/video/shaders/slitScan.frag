@@ -13,6 +13,11 @@ uniform float u_orientation;   // 0 = vertical slit (scan across X), 1 = horizon
 uniform float u_slit_x;
 uniform float u_slit_y;
 uniform float u_scan_speed;    // scan rate (0–1 mapped to UV/frame); sign unused
+uniform float u_delay_amount;
+uniform float u_smear_width;
+uniform float u_feedback_blend;
+uniform float u_direction;
+uniform float u_strobe;
 uniform float u_history_capacity;
 uniform float u_history_valid;
 uniform float u_history_write_index;
@@ -32,6 +37,17 @@ void main() {
 
   float axis    = (u_orientation < 0.5) ? v_uv.x : v_uv.y;
   float slitPos = (u_orientation < 0.5) ? u_slit_x : u_slit_y;
+  vec2 centre = vec2(u_slit_x, u_slit_y);
+  vec2 delta = v_uv - centre;
+  float radius = length(delta) / 0.70710678118;
+  float angle = atan(delta.y, delta.x) / 6.28318530718 + 0.5;
+  if (u_orientation > 1.5 && u_orientation < 2.5) {
+    axis = radius;
+    slitPos = 0.0;
+  } else if (u_orientation > 2.5) {
+    axis = fract(radius + angle);
+    slitPos = 0.0;
+  }
   // u_depth is the full slit width as a fraction of the axis (0–1).
   float halfW   = clamp(u_depth * 0.5, 0.0, 0.5);
 
@@ -46,17 +62,33 @@ void main() {
   // at a UV coordinate shifted one step toward the slit. Each frame the
   // content moves one step, so the trail grows outward from the slit over time
   // — the classic slit-scan accumulation effect.
-  float speed = abs(u_scan_speed) * 0.01;   // UV units per frame at full speed
+  float speed = abs(u_scan_speed) * 0.01 * sign(u_direction);   // UV units per frame at full speed
   bool leftOfSlit = (axis < slitPos - halfW);
   float shiftDir  = leftOfSlit ? 1.0 : -1.0; // always shift toward slit
   float newAxis   = clamp(axis + shiftDir * speed, 0.0, 1.0);
 
-  vec2 shiftedUv = (u_orientation < 0.5)
-    ? vec2(newAxis, v_uv.y)
-    : vec2(v_uv.x, newAxis);
+  vec2 shiftedUv;
+  if (u_orientation < 0.5) {
+    shiftedUv = vec2(newAxis, v_uv.y);
+  } else if (u_orientation < 1.5) {
+    shiftedUv = vec2(v_uv.x, newAxis);
+  } else {
+    vec2 radial = length(delta) > 1e-5 ? normalize(delta) : vec2(0.0);
+    vec2 tangent = vec2(-radial.y, radial.x);
+    vec2 field = u_orientation < 2.5 ? -radial : normalize(-radial + tangent * 0.72);
+    shiftedUv = v_uv + field * speed;
+  }
 
   float newest = wrapLayer(u_history_write_index - 1.0, u_history_capacity);
-  vec3 scanned = texture(u_history_tex, vec3(shiftedUv, newest)).rgb;
+  float ageSpan = max(u_history_valid - 1.0, 0.0) * clamp(u_delay_amount, 0.0, 1.0);
+  float distanceFromSlit = abs(axis - slitPos);
+  float age = ageSpan * clamp(distanceFromSlit * clamp(u_smear_width, 0.0, 1.0), 0.0, 1.0);
+  float strobeStep = mix(1.0, max(ageSpan, 1.0), clamp(u_strobe, 0.0, 1.0));
+  age = floor(age / strobeStep + 0.5) * strobeStep;
+  float layer = wrapLayer(newest - min(age, ageSpan), u_history_capacity);
+  vec3 propagated = texture(u_history_tex, vec3(clamp(shiftedUv, 0.0, 1.0), newest)).rgb;
+  vec3 delayed = texture(u_history_tex, vec3(clamp(shiftedUv, 0.0, 1.0), layer)).rgb;
+  vec3 scanned = mix(propagated, delayed, clamp(u_feedback_blend, 0.0, 1.0));
 
   o_color = vec4(clamp(mix(current, scanned, u_mix), 0.0, 1.0), 1.0);
 }
