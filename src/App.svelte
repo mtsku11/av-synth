@@ -1269,6 +1269,7 @@
 
   async function startDemo(): Promise<void> {
     if (!renderer) return;
+    if (videoEl?.src && sourceKind !== 'video') setSourceKind('video');
     onProgram(FLAGSHIP_PROGRAM_KEY);
     activeWorkspaceSurface = 'presets';
     demoStarted = true;
@@ -2091,6 +2092,7 @@
       vid.src = `${import.meta.env.BASE_URL}placeholder.mp4`;
       vid.loop = true;
       loadedVideoName = 'built-in cello demo';
+      setSourceKind('video');
       const onLoaded = () => {
         void primeBuiltInDemoVideo(vid);
       };
@@ -2662,6 +2664,7 @@
     await audio.init();
     await ensureGranulatorPipeline();
 
+    let granulatorClipLoad: Promise<boolean> | null = null;
     if (sourceKind === 'video' && videoEl && videoEl.src) {
       try {
         routeVideoAudioThroughGraph();
@@ -2669,11 +2672,12 @@
       } catch (e) {
         initError = e instanceof Error ? e.message : String(e);
       }
-      await ensureGranulatorClipLoaded();
+      granulatorClipLoad = ensureGranulatorClipLoaded();
     }
 
     await clock.start();
     await playActiveVideoSource();
+    await granulatorClipLoad;
   }
 
   async function onStop() {

@@ -3067,3 +3067,15 @@ into near-black public results when stacked together. `ASCII Ghost Delay` stays 
 needs much lower slit/glyph wetness on the bundled clip. `Binary Bass Rain` and `Terminal Kaleidoscope`
 should favor source-preserving matrix-rain and light fold/brightness accents over full stacked glyph packs
 on first-run footage. Public presets win on legibility, not maximal operator count.
+
+The built-in demo source should also become the active renderer source as soon as the hidden `<video>`
+element is wired, not only after later preset or transport actions. Keeping startup dependent on a slower
+demo transition path leaves too much room for the placeholder shader to win visible frames on slower
+loads. `startDemo()` should also explicitly reassert `video` before applying the flagship preset, and
+`onStart()` should let the clock/video begin before waiting for the granulator clip decode so the showcase
+does not open on a frozen frame while audio prep catches up.
+
+`Terminal Kaleidoscope` had a second quality bug beyond aesthetics: its authored `kaleid.drive` default
+and macro range fell below the operator's supported raw range (`1..4`). That made the preset behave
+differently from what the JSON claimed. Keep public preset values inside real operator ranges, especially
+for authored macro targets that bypass TypeScript validation.

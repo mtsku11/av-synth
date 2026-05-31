@@ -3514,11 +3514,11 @@
   },
   "terminalKaleidoscope": {
     "title": "Terminal Kaleidoscope",
-    "tagline": "Fold falling digital columns into a chrome terminal mandala, then let high-band energy keep the cells unstable.",
-    "videoIntent": "Best on lights, signage, architecture, and strongly coloured clips where the terminal lattice can hold a clean mirrored geometry.",
+    "tagline": "Layer binary cells and digital rain over the clip, then fold the result into a restrained terminal mandala.",
+    "videoIntent": "Best on portraits, hands, signage, and stage footage where the source should stay legible while the terminal lattice takes over the midtones.",
     "audioIntent": "A bright but bounded cloud and ping-pong delay should mirror the crystalline repeat pattern.",
-    "operatorFocus": ["matrixRain", "kaleid", "brightness", "chromaShift"],
-    "chain": ["matrixRain", "kaleid", "brightness", "chromaShift", "contrast"],
+    "operatorFocus": ["matrixRain", "glyphRender", "kaleid", "chromaShift"],
+    "chain": ["matrixRain", "glyphRender", "kaleid", "brightness", "contrast", "chromaShift"],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -3528,26 +3528,36 @@
     },
     "values": {
       "clock.rate": 0.62,
-      "matrixRain.mix": 0.06,
-      "matrixRain.rainSpeed": 0.42,
-      "matrixRain.columnDensity": 0.32,
-      "matrixRain.glyphChangeRate": 0.48,
-      "matrixRain.trailLength": 0.46,
-      "matrixRain.sourceColorBlend": 0.96,
-      "matrixRain.audioReact": 0.14,
-      "kaleid.nSides": 5,
-      "kaleid.drive": 0.08,
-      "kaleid.tone": 0.42,
-      "kaleid.mix": 0.12,
-      "brightness.amount": 0.12,
-      "chromaShift.amount": 0.006,
-      "contrast.amount": 0.9
+      "matrixRain.mix": 0.1,
+      "matrixRain.rainSpeed": 0.46,
+      "matrixRain.columnDensity": 0.36,
+      "matrixRain.glyphChangeRate": 0.56,
+      "matrixRain.trailLength": 0.58,
+      "matrixRain.sourceColorBlend": 0.9,
+      "matrixRain.audioReact": 0.2,
+      "glyphRender.mix": 0.14,
+      "glyphRender.mode": 1,
+      "glyphRender.cellSize": 12,
+      "glyphRender.density": 0.78,
+      "glyphRender.contrast": 1.42,
+      "glyphRender.invert": 0,
+      "glyphRender.colorMode": 2,
+      "kaleid.nSides": 4,
+      "kaleid.drive": 1.16,
+      "kaleid.symmetry": 0.08,
+      "kaleid.bias": 0.02,
+      "kaleid.tone": 0.5,
+      "kaleid.output": 0.94,
+      "kaleid.mix": 0.18,
+      "brightness.amount": 0.1,
+      "chromaShift.amount": 0.007,
+      "contrast.amount": 1.04
     },
     "automation": {
       "kaleid.nSides": {
         "kind": "sequence",
-        "values": [4, 5, 6, 5],
-        "fast": 0.14,
+        "values": [3, 4, 5, 4],
+        "fast": 0.12,
         "smooth": 0.14,
         "ease": "easeInOutCubic",
         "offset": 0,
@@ -3556,11 +3566,12 @@
       "matrixRain.rainSpeed": {
         "kind": "fft",
         "bin": 28,
-        "scale": 1.8,
+        "scale": 1.6,
         "smooth": 0.72,
         "cutoff": 0.025
       },
-      "brightness.amount": { "kind": "video", "feature": "luma", "scale": 0.16, "smooth": 0.84 }
+      "glyphRender.mix": { "kind": "video", "feature": "flux", "scale": 0.08, "smooth": 0.84 },
+      "brightness.amount": { "kind": "video", "feature": "luma", "scale": 0.14, "smooth": 0.84 }
     },
     "macros": [
       {
@@ -3568,9 +3579,9 @@
         "label": "Mirror",
         "default": 0.56,
         "targets": [
-          { "key": "kaleid.nSides", "min": 4, "max": 12 },
-          { "key": "kaleid.drive", "min": 0.04, "max": 0.26 },
-          { "key": "kaleid.mix", "min": 0.04, "max": 0.24 }
+          { "key": "kaleid.nSides", "min": 3, "max": 8 },
+          { "key": "kaleid.drive", "min": 1, "max": 1.7 },
+          { "key": "kaleid.mix", "min": 0.08, "max": 0.32 }
         ]
       },
       {
@@ -3578,9 +3589,9 @@
         "label": "Terminal",
         "default": 0.58,
         "targets": [
-          { "key": "matrixRain.columnDensity", "min": 0.2, "max": 0.68 },
-          { "key": "matrixRain.trailLength", "min": 0.18, "max": 0.74 },
-          { "key": "matrixRain.sourceColorBlend", "min": 0.76, "max": 1 }
+          { "key": "glyphRender.mix", "min": 0.04, "max": 0.26 },
+          { "key": "matrixRain.columnDensity", "min": 0.22, "max": 0.72 },
+          { "key": "matrixRain.trailLength", "min": 0.26, "max": 0.84 }
         ]
       },
       {
@@ -3589,8 +3600,8 @@
         "default": 0.48,
         "targets": [
           { "key": "brightness.amount", "min": 0.04, "max": 0.24 },
-          { "key": "matrixRain.audioReact", "min": 0.08, "max": 0.52 },
-          { "key": "audio.granulator.pitchJitter", "min": 2, "max": 12 }
+          { "key": "matrixRain.audioReact", "min": 0.08, "max": 0.58 },
+          { "key": "chromaShift.amount", "min": 0.002, "max": 0.018 }
         ]
       }
     ],
