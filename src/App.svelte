@@ -1247,7 +1247,6 @@
 
   async function startDemo(): Promise<void> {
     if (!renderer) return;
-    setSourceKind('placeholder');
     onProgram(FLAGSHIP_PROGRAM_KEY);
     activeWorkspaceSurface = 'presets';
     demoStarted = true;
@@ -2045,13 +2044,14 @@
       // now leads toward uploaded video rather than procedural generation.
       setSourceKind('placeholder');
       // Auto-load the bundled demo clip so the canvas shows real footage on
-      // first visit without requiring a file upload.
+      // first visit without requiring a file upload. Wait for the first frame
+      // before switching source so the canvas never shows black.
       if (videoEl) {
         videoEl.src = `${import.meta.env.BASE_URL}placeholder.mp4`;
         videoEl.loop = true;
         videoEl.preload = 'auto';
         loadedVideoName = 'cello';
-        setSourceKind('video');
+        void waitForVideoFrame(videoEl).then(() => setSourceKind('video'));
       }
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
