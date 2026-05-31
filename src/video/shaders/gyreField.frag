@@ -34,10 +34,10 @@ void main() {
   vel += u_bias * vec2(-sy, cx) * 0.012;
   vel = clamp(vel * u_strength, vec2(-0.3), vec2(0.3));
   vec2 src_uv = fract(v_uv - vel);
-  float advect = clamp(u_advect, 0.0, 0.95);
+  float advect = clamp(u_advect, 0.0, 1.0);
   vec3 live = texture(u_tex, src_uv).rgb;
   vec3 carried = texture(u_prev_frame, src_uv).rgb;
-  float inject = mix(0.42, 0.08, advect);
+  float inject = (1.0 - advect) * 0.5;
   vec3 displaced = advect > 0.0001 ? mix(carried, live, inject) : live;
   vec3 current = texture(u_tex, v_uv).rgb;
   o_color = vec4(mix(current, displaced, clamp(u_mix, 0.0, 1.0)), 1.0);

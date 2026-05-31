@@ -206,7 +206,7 @@ export const saddleFieldDef: OperatorDef = {
         spec: {
           id: 'advect',
           label: 'advect',
-          range: [0, 0.95],
+          range: [0, 1],
           default: 0,
           curve: 'lin',
           unit: 'norm',
