@@ -1245,6 +1245,13 @@
     if (!advancedOpen) activeWorkspaceSurface = 'presets';
   }
 
+  function onPlaceholderVideoLoaded(): void {
+    // Fires via onloadeddata on the <video> element when placeholder.mp4 is ready.
+    if (!renderer || sourceKind === 'video') return;
+    loadedVideoName = 'cello';
+    setSourceKind('video');
+  }
+
   async function startDemo(): Promise<void> {
     if (!renderer) return;
     onProgram(FLAGSHIP_PROGRAM_KEY);
@@ -2043,15 +2050,11 @@
       // Cold boot stays stable on the placeholder, but the product-facing UX
       // now leads toward uploaded video rather than procedural generation.
       setSourceKind('placeholder');
-      // Auto-load the bundled demo clip so the canvas shows real footage on
-      // first visit without requiring a file upload. Wait for the first frame
-      // before switching source so the canvas never shows black.
-      if (videoEl) {
-        videoEl.src = `${import.meta.env.BASE_URL}placeholder.mp4`;
-        videoEl.loop = true;
-        videoEl.preload = 'auto';
+      // If the placeholder video has already loaded (cached), switch now.
+      // Otherwise onPlaceholderVideoLoaded() fires when loadeddata arrives.
+      if (videoEl && videoEl.readyState >= 2) {
         loadedVideoName = 'cello';
-        void waitForVideoFrame(videoEl).then(() => setSourceKind('video'));
+        setSourceKind('video');
       }
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
@@ -2751,7 +2754,11 @@
 </script>
 
 <svelte:window onkeydown={onKeyDown} onkeyup={onKeyUp} />
-<video bind:this={videoEl} style="display:none" playsinline></video>
+<video bind:this={videoEl} style="display:none" playsinline
+  src="{import.meta.env.BASE_URL}placeholder.mp4"
+  loop preload="auto"
+  onloadeddata={onPlaceholderVideoLoaded}
+></video>
 <video bind:this={videoElB} style="display:none" playsinline muted></video>
 
 <main class="shell">
