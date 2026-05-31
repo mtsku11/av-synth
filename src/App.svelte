@@ -2044,6 +2044,15 @@
       // Cold boot stays stable on the placeholder, but the product-facing UX
       // now leads toward uploaded video rather than procedural generation.
       setSourceKind('placeholder');
+      // Auto-load the bundled demo clip so the canvas shows real footage on
+      // first visit without requiring a file upload.
+      if (videoEl) {
+        videoEl.src = `${import.meta.env.BASE_URL}placeholder.mp4`;
+        videoEl.loop = true;
+        videoEl.preload = 'auto';
+        loadedVideoName = 'cello';
+        setSourceKind('video');
+      }
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
       return;
