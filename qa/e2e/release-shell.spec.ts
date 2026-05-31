@@ -22,7 +22,37 @@ test.describe('release showcase shell', () => {
 
     await expect(page).toHaveTitle('av-synth — video-first audiovisual effects');
     await expect(page.locator('.welcome-card')).toBeVisible();
-    await expect(page.locator('.program-card')).toHaveCount(11);
+    await page.waitForFunction(
+      () =>
+        ((
+          window as Window & {
+            __AV_SYNTH_QA__?: {
+              getState(): {
+                sourceKind: string;
+                video: { paused: boolean; readyState: number } | null;
+              };
+            };
+          }
+        ).__AV_SYNTH_QA__?.getState().video?.readyState ?? 0) >= 2,
+    );
+    const coldStartState = await page.evaluate(() =>
+      (
+        window as Window & {
+          __AV_SYNTH_QA__?: {
+            getState(): {
+              sourceKind: string;
+              video: { paused: boolean; readyState: number } | null;
+            };
+          };
+        }
+      ).__AV_SYNTH_QA__?.getState(),
+    );
+    expect(coldStartState).toMatchObject({
+      sourceKind: 'video',
+      video: { paused: true },
+    });
+    expect(coldStartState?.video?.readyState).toBeGreaterThanOrEqual(2);
+    await expect(page.locator('.program-card')).toHaveCount(9);
     await expect(page.locator('.experiment-grid')).toHaveCount(0);
     await expect(page.locator('[data-qa="runtime-diagnostics"]')).toContainText(
       'crossOriginIsolated: yes',
@@ -52,7 +82,7 @@ test.describe('release showcase shell', () => {
     await expect(page.getByRole('tab', { name: 'video' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'audio' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'lfo' })).toBeVisible();
-    await expect(page.locator('.experiment-grid .program-card')).toHaveCount(37);
+    await expect(page.locator('.experiment-grid .program-card')).toHaveCount(39);
 
     expect(consoleErrors).toEqual([]);
   });

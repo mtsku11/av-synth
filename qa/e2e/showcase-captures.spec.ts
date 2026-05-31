@@ -9,14 +9,12 @@ const PUBLIC_PROGRAMS = [
   'singularityBloom',
   'fractureRelay',
   'magneticCathedral',
-  'temporalBloomGhost',
-  'grainField',
-  'slitScanEcho',
-  'datamoshSmear',
-  'datamoshHold',
-  'flowMelt',
-  'kaleidoFeedbackTunnel',
-  'freezeFeedback',
+  'asciiGhostDelay',
+  'binaryBassRain',
+  'halftoneFeedbackBloom',
+  'slitScanHands',
+  'glyphVortex',
+  'terminalKaleidoscope',
 ] as const;
 
 interface CaptureResult {
@@ -74,16 +72,23 @@ test.describe('showcase capture slate', () => {
       expect(applied).toBe(true);
       await page.waitForTimeout(CAPTURE_MS);
 
-      const capture = await page.evaluate(async () => {
+      const { capture, audioTrackStates } = await page.evaluate(async () => {
         const bridge = (
           window as Window & {
-            __AV_SYNTH_QA__?: { stopCapture(): Promise<CaptureResult | null> };
+            __AV_SYNTH_QA__?: {
+              stopCapture(): Promise<CaptureResult | null>;
+              getCaptureState(): { audioTrackStates: ('live' | 'ended')[] };
+            };
           }
         ).__AV_SYNTH_QA__;
-        return (await bridge?.stopCapture()) ?? null;
+        return {
+          capture: (await bridge?.stopCapture()) ?? null,
+          audioTrackStates: bridge?.getCaptureState().audioTrackStates ?? [],
+        };
       });
       expect(capture).not.toBeNull();
       expect(capture?.bytes ?? 0).toBeGreaterThan(1_024);
+      expect(audioTrackStates).toEqual(['live']);
 
       const downloadPromise = page.waitForEvent('download');
       const exported = await page.evaluate(async () => {

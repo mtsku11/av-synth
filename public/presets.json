@@ -2500,7 +2500,7 @@
     "render": {
       "look": "clean",
       "quality": "standard",
-      "lut": "none",
+      "lut": "neutral",
       "postPreset": "none",
       "lensDirt": "none"
     },
@@ -2582,7 +2582,7 @@
     "render": {
       "look": "clean",
       "quality": "standard",
-      "lut": "none",
+      "lut": "neutral",
       "postPreset": "none",
       "lensDirt": "none"
     },
@@ -2665,7 +2665,7 @@
     "render": {
       "look": "clean",
       "quality": "standard",
-      "lut": "none",
+      "lut": "neutral",
       "postPreset": "none",
       "lensDirt": "none"
     },
@@ -2749,7 +2749,7 @@
     "render": {
       "look": "clean",
       "quality": "standard",
-      "lut": "none",
+      "lut": "neutral",
       "postPreset": "none",
       "lensDirt": "none"
     },
@@ -2838,7 +2838,7 @@
       "contrast"
     ],
     "render": {
-      "look": "kinetic",
+      "look": "clean",
       "quality": "standard",
       "lut": "neutral",
       "postPreset": "none",
@@ -3420,7 +3420,7 @@
       "contrast"
     ],
     "render": {
-      "look": "kinetic",
+      "look": "clean",
       "quality": "standard",
       "lut": "chrome",
       "postPreset": "glassWarp",
@@ -4115,7 +4115,7 @@
       ]
     },
     "render": {
-      "look": "kinetic",
+      "look": "clean",
       "quality": "cinema",
       "lut": "chrome",
       "postPreset": "glassWarp",

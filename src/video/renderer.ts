@@ -121,6 +121,7 @@ interface PresentationQualityConfig {
   bloomLevels: number;
   bloomWeights: [number, number, number, number];
   bloomStrength: number;
+  motionFieldScale: number;
   halationStrength: number;
   grainAmount: number;
   aberrationScale: number;
@@ -241,6 +242,7 @@ export const PRESENTATION_QUALITIES = {
     bloomLevels: 2,
     bloomWeights: [0.62, 0.38, 0, 0],
     bloomStrength: 0.72,
+    motionFieldScale: 0.375,
     halationStrength: 0.58,
     grainAmount: 0.012,
     aberrationScale: 0.72,
@@ -255,6 +257,7 @@ export const PRESENTATION_QUALITIES = {
     bloomLevels: 4,
     bloomWeights: [0.05, 0.15, 0.3, 0.5],
     bloomStrength: 0.66,
+    motionFieldScale: 0.625,
     halationStrength: 0.46,
     grainAmount: 0.0,
     aberrationScale: 0.62,
@@ -269,6 +272,7 @@ export const PRESENTATION_QUALITIES = {
     bloomLevels: 4,
     bloomWeights: [0.22, 0.24, 0.26, 0.28],
     bloomStrength: 1.0,
+    motionFieldScale: 0.75,
     halationStrength: 0.96,
     grainAmount: 0.022,
     aberrationScale: 1.0,
@@ -680,8 +684,6 @@ export type PreviewMode = 'single' | 'quad';
 
 const BLOOM_PYRAMID_SCALES = [0.5, 0.25, 0.125, 0.0625] as const;
 const TEMPORAL_HISTORY_CAPACITY = 8;
-const MOTION_FIELD_SCALE = 0.5;
-
 function scaledDimension(size: number, scale: number): number {
   return Math.max(1, Math.round(size * scale));
 }
@@ -872,6 +874,7 @@ export class VideoRenderer {
   #couplingCtx: CouplingContext;
   #presentationLook: PresentationLookName = 'cine';
   #presentationQuality: PresentationQualityName = 'standard';
+  #motionFieldScale = PRESENTATION_QUALITIES.standard.motionFieldScale;
   #presentationLut: PresentationLutSelection = 'neutral';
   #presentationPostPreset: PresentationPostPresetName = 'none';
   #presentationLensDirt: PresentationLensDirtName = 'none';
@@ -903,8 +906,8 @@ export class VideoRenderer {
 
     const w = canvas.width;
     const h = canvas.height;
-    const motionWidth = scaledDimension(w, MOTION_FIELD_SCALE);
-    const motionHeight = scaledDimension(h, MOTION_FIELD_SCALE);
+    const motionWidth = scaledDimension(w, this.#motionFieldScale);
+    const motionHeight = scaledDimension(h, this.#motionFieldScale);
     this.#sourceTarget = createTarget(gl, w, h, internalFormat);
     this.#displacementTarget = createTarget(gl, w, h, internalFormat);
     this.#emptyTarget = createTarget(gl, w, h, internalFormat);
@@ -1242,6 +1245,7 @@ export class VideoRenderer {
 
   setPresentationQuality(name: PresentationQualityName): void {
     this.#presentationQuality = name;
+    this.#resizeMotionField(PRESENTATION_QUALITIES[name].motionFieldScale);
   }
 
   setPresentationLut(name: PresentationLutSelection): void {
@@ -1364,7 +1368,7 @@ export class VideoRenderer {
           height: 0,
         },
         structureAnalysis: { textureUnit: 4, width: 0, height: 0 },
-        motionField: { textureUnit: 5, width: 0, height: 0, scale: MOTION_FIELD_SCALE },
+        motionField: { textureUnit: 5, width: 0, height: 0, scale: this.#motionFieldScale },
         ownedState: null,
       };
       this.#instanceScratch.set(step.id, { raw, eval: ev, resources, ownedStateScratch });
@@ -1664,6 +1668,7 @@ export class VideoRenderer {
         const mf = res.motionField!;
         mf.width = this.#motionFieldTarget.width;
         mf.height = this.#motionFieldTarget.height;
+        mf.scale = this.#motionFieldScale;
         if (ownedState) {
           const os = stepScratch.ownedStateScratch;
           os.width = ownedState.width;
@@ -2282,14 +2287,14 @@ export class VideoRenderer {
     this.#structureAnalysisTarget = createTarget(this.gl, width, height, this.gl.RGBA8);
     this.#motionFieldTarget = createTarget(
       this.gl,
-      scaledDimension(width, MOTION_FIELD_SCALE),
-      scaledDimension(height, MOTION_FIELD_SCALE),
+      scaledDimension(width, this.#motionFieldScale),
+      scaledDimension(height, this.#motionFieldScale),
       this.gl.RGBA8,
     );
     this.#prevMotionFieldTarget = createTarget(
       this.gl,
-      scaledDimension(width, MOTION_FIELD_SCALE),
-      scaledDimension(height, MOTION_FIELD_SCALE),
+      scaledDimension(width, this.#motionFieldScale),
+      scaledDimension(height, this.#motionFieldScale),
       this.gl.RGBA8,
     );
     this.#rebuildMotionReadbackBuffer();
@@ -2311,6 +2316,28 @@ export class VideoRenderer {
     this.#clearTarget(this.#prevMotionFieldTarget);
     this.resetTemporalState();
     this.#syncNodeTargets();
+  }
+
+  #resizeMotionField(scale: number): void {
+    if (scale === this.#motionFieldScale) return;
+    this.#motionFieldScale = scale;
+    this.#deleteTarget(this.#motionFieldTarget);
+    this.#deleteTarget(this.#prevMotionFieldTarget);
+    this.#motionFieldTarget = createTarget(
+      this.gl,
+      scaledDimension(this.canvas.width, scale),
+      scaledDimension(this.canvas.height, scale),
+      this.gl.RGBA8,
+    );
+    this.#prevMotionFieldTarget = createTarget(
+      this.gl,
+      scaledDimension(this.canvas.width, scale),
+      scaledDimension(this.canvas.height, scale),
+      this.gl.RGBA8,
+    );
+    this.#clearTarget(this.#motionFieldTarget);
+    this.#clearTarget(this.#prevMotionFieldTarget);
+    this.#rebuildMotionReadbackBuffer();
   }
 
   resetTemporalState(): void {

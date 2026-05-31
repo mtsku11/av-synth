@@ -3006,11 +3006,47 @@ One small context extension was required for honest audio-reactive shaders: `Cou
 now carries a smoothed low-rate bass/mid/high analyser summary. It is sampled from the existing post-limit
 analyser; no second analyser or public audio engine was added.
 
-Six authored programs ship behind Advanced pending hosted-device visual review: `ASCII Ghost Delay`,
-`Binary Bass Rain`, `Halftone Feedback Bloom`, `Slit-Scan Hands`, `Glyph Vortex`, and
-`Terminal Kaleidoscope`. The public first-run allowlist intentionally remains at 11.
+Six authored programs join the public slate: `ASCII Ghost Delay`, `Binary Bass Rain`,
+`Halftone Feedback Bloom`, `Slit-Scan Hands`, `Glyph Vortex`, and `Terminal Kaleidoscope`. With the three
+graph-authored lead programs, the focused public first-run allowlist is now nine.
 
 Performance boundary: every new op is one bounded fragment pass with O(1) texture work per output pixel.
 There are no allocations or new FBOs per frame. The known motion limitation is still the existing
 half-resolution, single-scale Lucas-Kanade approximation; large or low-texture movement can flatten the
 field, and `glyphMotion` inherits that ceiling.
+
+## 2026-05-31 — First-run footage and bounded motion/history polish
+
+The committed `public/placeholder.mp4` is the right first-run source: a 10-second 854×480 H.264 clip with
+stereo AAC audio at roughly 574 KB. Keep it paused on the canvas until `Start Demo`; that gesture applies
+`Singularity Bloom`, initialises audio, connects the clip's attached audio, and starts transport. The
+welcome overlay must depend on `demoStarted`, not `sourceLoaded`, because source decode is expected before
+the gesture.
+
+The stateful-system quality pass stays bounded. The motion texture now scales by presentation tier:
+`0.375×` for Safe Mode, `0.625×` standard, and `0.75×` cinema. The existing single-scale 5×5
+Lucas-Kanade shader confidence-gates low-structure estimates before temporal smoothing so static/noisy
+cells decay rather than inject direction jitter. This improves measured-field consumers without claiming
+multi-scale optical flow.
+
+The temporal-history ring stays at eight frames. `slitScan` now interpolates fractional history ages and
+uses a shaped age distribution, which makes the existing buffer read more fluidly before spending GPU
+memory on a larger ring. A longer or source-anchored ring remains a separate, evidence-driven decision.
+
+The shell audit also reconciled stale showcase bookkeeping: the implementation exposes nine public programs
+and 39 Advanced experiments. The recorder slate and browser assertions now follow that actual bank.
+
+The direct glyph-pack browser run exposed stale authored render tokens that TypeScript cannot protect inside
+`presets.json`: three `look: "kinetic"` values and four `lut: "none"` values referenced presentation
+styles that do not exist. They are normalized to existing `clean` and `neutral` styles so public
+`Glyph Vortex` and the affected Advanced experiments cannot leave presentation uniforms undefined.
+
+The refreshed local recorder slate exported nine non-empty VP9/Opus WebM files. `ASCII Ghost Delay` is
+notably low entropy at 158 KB for the eight-second fixture capture; keep that as an explicit hosted visual
+review item rather than treating non-empty export alone as a quality sign-off.
+
+That recorder refresh exposed a capture-lifecycle bug: only the first WebM actually carried Opus audio.
+`createCaptureStream()` added the shared `MediaStreamAudioDestinationNode` track directly, then
+`stopCapture()` stopped it alongside the session-owned canvas track. Subsequent recorder sessions reused
+the ended audio track. Clone the shared audio track into each combined capture stream so session cleanup
+does not destroy the engine-owned destination track.

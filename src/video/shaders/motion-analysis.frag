@@ -81,11 +81,18 @@ void main() {
   float trace = Ixx + Iyy + 1e-8;
   float confidence = clamp(det / (trace * trace) * 400.0, 0.0, 1.0);
 
-  // Temporal smoothing (same style as before — blend toward new reading
-  // faster when motion is large).
+  // Reject low-structure estimates before they reach motion-aware effects.
+  // Static or noisy cells decay smoothly instead of injecting direction jitter.
+  float confidenceGate = smoothstep(0.08, 0.34, confidence);
+  float gatedMag = normMag * confidenceGate;
+
   vec4 prevMotion   = texture(u_prev_motion_tex, v_uv);
-  vec2 smoothedDir  = mix(decodeMotion(prevMotion.xy), dir, 0.35 + normMag * 0.45);
-  float smoothedMag = mix(prevMotion.b * 0.82, normMag, 0.35 + normMag * 0.4);
+  vec2 smoothedDir  = mix(
+    decodeMotion(prevMotion.xy),
+    dir,
+    (0.18 + gatedMag * 0.62) * confidenceGate
+  );
+  float smoothedMag = mix(prevMotion.b * 0.76, gatedMag, 0.22 + gatedMag * 0.58);
   float smoothedConf = mix(prevMotion.a * 0.8, confidence, 0.4 + confidence * 0.3);
   vec2 finalDir = length(smoothedDir) > 1e-5 ? normalize(smoothedDir) : vec2(0.0);
 

@@ -469,7 +469,7 @@ Release policy:
 
 ✅ **Landed 2026-05-31 as an Advanced pack.** `glyphRender`, `glyphMotion`, and `matrixRain` add a compact live-video-to-glyph vocabulary without changing the renderer architecture. `glyphRender` uses analytical cell masks for ASCII-ramp, binary, block, and halftone modes rather than a font atlas; `glyphMotion` reuses the shared low-resolution motion field and low-rate bass/mid/high analyser bands for bounded cell push/rotation/jitter; `matrixRain` is a single-pass digital-column treatment with source-colour blending. Existing `slitScan` now also supports radial and spiral fields plus delay amount, smear width, feedback blend, direction, and freeze/strobe controls over the existing eight-frame history ring.
 
-Six authored programs ship behind Advanced: `ASCII Ghost Delay`, `Binary Bass Rain`, `Halftone Feedback Bloom`, `Slit-Scan Hands`, `Glyph Vortex`, and `Terminal Kaleidoscope`. They deliberately do not expand the public 11-program release slate until hosted-device review confirms which, if any, deserve promotion. The pack adds no font texture, new FBO subsystem, physics engine, segmentation dependency, collaboration layer, recording/export change, or public audio engine.
+Six authored programs join the public slate: `ASCII Ghost Delay`, `Binary Bass Rain`, `Halftone Feedback Bloom`, `Slit-Scan Hands`, `Glyph Vortex`, and `Terminal Kaleidoscope`. Together with the graph-authored lead trio, they form the focused nine-program first-run bank. The pack adds no font texture, new FBO subsystem, physics engine, segmentation dependency, collaboration layer, recording/export change, or public audio engine.
 
 ### 10.5.3 Audit recommendations (2026-05-28 + 2026-05-29)
 
@@ -550,10 +550,16 @@ The repo now has three explicit release tracks:
 2. **Staging RC** — private evaluation target. Goal: deploy the best current quality-sprint slice to a private/staging URL for real browser, device, visual, and listening validation. Required: QA/audit green on the implemented surface, final human audible/visual sign-off on the documented manual cases, a deploy workflow/runbook, and a post-deploy smoke pass against the staging URL.
 3. **Public v1** — the first broadly shareable release. Goal: ship the current video-first product honestly, without implying unfinished Hydra parity. Required beyond staging: quality-sprint scope complete or explicitly narrowed, issues discovered during staging absorbed, and public positioning anchored to "video-first AV effects" rather than "general AV synth." Remaining public-surface Color work (`sum`, `.r .g .b .a`) should be implemented only if it is still a real launch requirement after quality sign-off.
 
-The showcase shell leads with the built-in `Singularity Bloom` demo and an 11-program public allowlist.
+The showcase shell leads with the built-in `Singularity Bloom` demo and a nine-program public allowlist.
 `Singularity Bloom`, `Fracture Relay`, and `Magnetic Cathedral` are the sophisticated graph-authored lead
 programs; patch editing, secondary video input, mode switching, and the exploratory bank remain available
 under **Advanced**. This is a presentation boundary, not an engine fork.
+
+The first-run canvas uses the committed 10-second stereo footage clip while transport remains paused behind
+the explicit `Start Demo` gesture. Stateful effects keep the existing shared eight-frame history ring.
+`slitScan` samples fractional, non-linearly distributed ages from that ring, while the shared single-scale
+motion field uses low-structure confidence gating and quality-tier resolution: `0.375×` in Safe Mode,
+`0.625×` standard, and `0.75×` cinema. Multi-scale flow remains a deliberately deferred architectural step.
 
 What is intentionally **not** a blocker for the current release track unless the user explicitly changes product scope:
 

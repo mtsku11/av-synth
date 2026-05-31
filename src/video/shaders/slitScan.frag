@@ -27,6 +27,20 @@ float wrapLayer(float layer, float capacity) {
   return w < 0.0 ? w + capacity : w;
 }
 
+vec3 sampleHistoryLayer(vec2 uv, float age) {
+  float newest = u_history_write_index - 1.0;
+  float layer = wrapLayer(newest - age, u_history_capacity);
+  return texture(u_history_tex, vec3(clamp(uv, 0.0, 1.0), layer)).rgb;
+}
+
+vec3 sampleHistoryAge(vec2 uv, float age) {
+  float maxAge = max(u_history_valid - 1.0, 0.0);
+  float clampedAge = clamp(age, 0.0, maxAge);
+  float lo = floor(clampedAge);
+  float hi = min(lo + 1.0, maxAge);
+  return mix(sampleHistoryLayer(uv, lo), sampleHistoryLayer(uv, hi), clampedAge - lo);
+}
+
 void main() {
   vec3 current = texture(u_tex, v_uv).rgb;
 
@@ -79,15 +93,14 @@ void main() {
     shiftedUv = v_uv + field * speed;
   }
 
-  float newest = wrapLayer(u_history_write_index - 1.0, u_history_capacity);
   float ageSpan = max(u_history_valid - 1.0, 0.0) * clamp(u_delay_amount, 0.0, 1.0);
   float distanceFromSlit = abs(axis - slitPos);
-  float age = ageSpan * clamp(distanceFromSlit * clamp(u_smear_width, 0.0, 1.0), 0.0, 1.0);
+  float agePosition = clamp(distanceFromSlit * clamp(u_smear_width, 0.0, 1.0), 0.0, 1.0);
+  float age = ageSpan * pow(agePosition, mix(1.55, 0.72, clamp(u_feedback_blend, 0.0, 1.0)));
   float strobeStep = mix(1.0, max(ageSpan, 1.0), clamp(u_strobe, 0.0, 1.0));
   age = floor(age / strobeStep + 0.5) * strobeStep;
-  float layer = wrapLayer(newest - min(age, ageSpan), u_history_capacity);
-  vec3 propagated = texture(u_history_tex, vec3(clamp(shiftedUv, 0.0, 1.0), newest)).rgb;
-  vec3 delayed = texture(u_history_tex, vec3(clamp(shiftedUv, 0.0, 1.0), layer)).rgb;
+  vec3 propagated = sampleHistoryAge(shiftedUv, 0.0);
+  vec3 delayed = sampleHistoryAge(shiftedUv, min(age, ageSpan));
   vec3 scanned = mix(propagated, delayed, clamp(u_feedback_blend, 0.0, 1.0));
 
   o_color = vec4(clamp(mix(current, scanned, u_mix), 0.0, 1.0), 1.0);

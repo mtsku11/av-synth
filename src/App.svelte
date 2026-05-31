@@ -387,6 +387,7 @@
       bytes: number;
       filename: string | null;
       mimeType: string | null;
+      audioTrackStates: ('live' | 'ended')[];
     };
     setSourceKind(kind: string): Promise<boolean>;
     setOperatorParam(
@@ -1245,13 +1246,6 @@
     if (!advancedOpen) activeWorkspaceSurface = 'presets';
   }
 
-  function onPlaceholderVideoLoaded(): void {
-    // Fires via onloadeddata on the <video> element when placeholder.mp4 is ready.
-    if (!renderer || sourceKind === 'video') return;
-    loadedVideoName = 'cello';
-    setSourceKind('video');
-  }
-
   async function startDemo(): Promise<void> {
     if (!renderer) return;
     onProgram(FLAGSHIP_PROGRAM_KEY);
@@ -1604,6 +1598,11 @@
         bytes: latestCapture?.bytes ?? 0,
         filename: latestCapture?.filename ?? null,
         mimeType: latestCapture?.mimeType ?? null,
+        audioTrackStates:
+          audio
+            .getCaptureStream()
+            ?.getAudioTracks()
+            .map((track) => track.readyState) ?? [],
       }),
       setSourceKind: async (kind) => {
         if (!renderer) return false;
@@ -1914,7 +1913,7 @@
     if (!audioStream) return null;
     const stream = new MediaStream();
     for (const track of canvasStream.getVideoTracks()) stream.addTrack(track);
-    for (const track of audioStream.getAudioTracks()) stream.addTrack(track);
+    for (const track of audioStream.getAudioTracks()) stream.addTrack(track.clone());
     return stream;
   }
 
@@ -2050,16 +2049,30 @@
       // Cold boot stays stable on the placeholder, but the product-facing UX
       // now leads toward uploaded video rather than procedural generation.
       setSourceKind('placeholder');
-      // If the placeholder video has already loaded (cached), switch now.
-      // Otherwise onPlaceholderVideoLoaded() fires when loadeddata arrives.
-      if (videoEl && videoEl.readyState >= 2) {
-        loadedVideoName = 'cello';
-        setSourceKind('video');
-      }
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
       return;
     }
+
+    // tick() flushes Svelte's pending DOM updates so bind:this is guaranteed
+    // to have populated videoEl before we touch it.
+    await tick();
+
+    if (videoEl) {
+      const vid = videoEl;
+      vid.src = `${import.meta.env.BASE_URL}placeholder.mp4`;
+      vid.loop = true;
+      loadedVideoName = 'built-in cello demo';
+      const onLoaded = () => {
+        if (sourceKind !== 'video') setSourceKind('video');
+      };
+      if (vid.readyState >= 2) {
+        onLoaded();
+      } else {
+        vid.addEventListener('loadeddata', onLoaded, { once: true });
+      }
+    }
+
     try {
       programs = await loadPrograms();
     } catch (e) {
@@ -2754,11 +2767,7 @@
 </script>
 
 <svelte:window onkeydown={onKeyDown} onkeyup={onKeyUp} />
-<video bind:this={videoEl} style="display:none" playsinline
-  src="{import.meta.env.BASE_URL}placeholder.mp4"
-  loop preload="auto"
-  onloadeddata={onPlaceholderVideoLoaded}
-></video>
+<video bind:this={videoEl} style="display:none" playsinline></video>
 <video bind:this={videoElB} style="display:none" playsinline muted></video>
 
 <main class="shell">
@@ -2928,13 +2937,13 @@
           <div class="error">init failed: {initError}</div>
         {/if}
         <canvas bind:this={canvasEl} width="1280" height="720"></canvas>
-        {#if !demoStarted && !sourceLoaded}
+        {#if !demoStarted}
           <section class="welcome-card" aria-label="Start av-synth demo">
             <span class="sec-label">private staging rc</span>
             <h2>Shape a short video clip into a coupled audiovisual performance.</h2>
             <p>
-              Start with the built-in visual demo, then load your own clip to unlock its attached
-              audio and the granulator-first showcase path.
+              Start with the built-in footage demo and its attached audio, then load your own clip
+              for the granulator-first showcase path.
             </p>
             <div class="welcome-actions">
               <button type="button" class="primary-action" onclick={startDemo}>start demo</button>
