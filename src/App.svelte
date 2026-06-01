@@ -129,9 +129,6 @@
   let previewMode = $state<PreviewMode>('single');
   type WorkspaceSurface = 'video' | 'audio' | 'lfo' | 'presets';
   let activeWorkspaceSurface = $state<WorkspaceSurface>('video');
-  let advancedOpen = $state(true);
-  let demoStarted = $state(true);
-  let safeMode = $state(false);
 
   // Source kind: 'video' = external <video> element, 'placeholder' = built-in
   // plasma, or a registered procedural source name (e.g. 'osc').
@@ -620,6 +617,15 @@
     if (!videoEl) return;
     videoEl.muted = false;
     videoEl.volume = 1;
+  }
+
+  function syncVideoSourceDryGain(): void {
+    if (!audio.isInitialised) return;
+    const currentSrc = videoEl?.src ?? null;
+    const granulatorReady =
+      !!granulator && granulatorEnabled && !!currentSrc && granulatorLoadedSrc === currentSrc;
+    const mix = granulatorReady ? Math.max(0, Math.min(1, granulatorRawParams.mix)) : 0;
+    audio.setSourceGain(1 - mix);
   }
 
   async function waitForVideoFrame(video: HTMLVideoElement): Promise<void> {
@@ -1241,7 +1247,7 @@
     monitorBus = 0;
     previewMode = 'single';
     presentationLook = 'cine';
-    presentationQuality = safeMode ? 'performance' : 'standard';
+    presentationQuality = 'standard';
     presentationLut = 'neutral';
     presentationPostPreset = 'none';
     presentationLensDirt = 'none';
@@ -1253,30 +1259,9 @@
     await clock.stop();
   }
 
-  function setSafeMode(next: boolean): void {
-    safeMode = next;
-    presentationQuality = next ? 'performance' : 'standard';
-    previewMode = 'single';
-    setGranulatorQuality(next ? 'eco' : 'balanced');
-    setGranulatorAdaptiveQuality(next);
-  }
-
-  function toggleAdvanced(): void {
-    advancedOpen = !advancedOpen;
-    if (!advancedOpen) activeWorkspaceSurface = 'presets';
-  }
-
-  async function startDemo(): Promise<void> {
-    if (!renderer) return;
-    if (videoEl?.src && sourceKind !== 'video') setSourceKind('video');
-    onProgram(FLAGSHIP_PROGRAM_KEY);
-    activeWorkspaceSurface = 'presets';
-    demoStarted = true;
-    await onStart();
-  }
-
   function setGranulatorParam(name: GranulatorSliderParam, value: number): void {
     granulatorRawParams = { ...granulatorRawParams, [name]: value };
+    if (name === 'mix') syncVideoSourceDryGain();
     if (
       name === 'position' &&
       videoEl &&
@@ -1348,6 +1333,7 @@
   function setGranulatorEnabled(next: boolean): void {
     granulatorEnabled = next;
     granulator?.setEnabled(next);
+    syncVideoSourceDryGain();
     if (!next && sourceKind === 'grain-composite') {
       setSourceKind('video');
       grainSourceMessage = 'Enable the granulator to use the grain source.';
@@ -1415,6 +1401,7 @@
     if (granulatorLoadedSrc === videoEl.src) {
       granulator.setEnabled(true);
       granulatorEnabled = true;
+      syncVideoSourceDryGain();
       return true;
     }
     try {
@@ -1423,10 +1410,31 @@
       granulator.setEnabled(true);
       granulatorEnabled = true;
       granulatorLoadedSrc = videoEl.src;
+      syncVideoSourceDryGain();
       return true;
     } catch {
       return false;
     }
+  }
+
+  async function selectProgramFromUi(name: string): Promise<void> {
+    onProgram(name);
+    await onStart();
+  }
+
+  async function activateGrainCompositeSource(): Promise<void> {
+    if (!videoEl?.src) {
+      setSourceKind('grain-composite');
+      return;
+    }
+    await onStart();
+    const loaded = await ensureGranulatorClipLoaded();
+    if (!loaded) {
+      grainSourceMessage = 'Grain source not ready yet — wait for the clip to finish loading.';
+      return;
+    }
+    setGranulatorEnabled(true);
+    setSourceKind('grain-composite');
   }
 
   function applyGranulatorLatencyProbeState(): boolean {
@@ -1770,7 +1778,6 @@
         return ok;
       },
       startTransport: async () => {
-        demoStarted = true;
         await onStart();
         await tick();
         return true;
@@ -2087,7 +2094,7 @@
       vid.src = `${import.meta.env.BASE_URL}placeholder.mp4`;
       vid.loop = true;
       vid.preload = 'auto';
-      loadedVideoName = 'built-in cello demo';
+      loadedVideoName = 'built-in footage';
       try {
         if (vid.readyState >= 2) {
           await primeBuiltInDemoVideo(vid);
@@ -2117,11 +2124,15 @@
 
     try {
       programs = await loadPrograms();
+      if (programs[FLAGSHIP_PROGRAM_KEY]) onProgram(FLAGSHIP_PROGRAM_KEY);
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
     }
     // Auto-play video on startup; audio init deferred until first user gesture.
-    void clock.start().then(() => playActiveVideoSource()).catch(() => {});
+    void clock
+      .start()
+      .then(() => playActiveVideoSource())
+      .catch(() => {});
     startVideoFeatureSampling();
     installQaBridge();
     startProgramAutomationLoop();
@@ -2158,6 +2169,7 @@
       g.setForceNoSpawn(granulatorForceNoSpawn);
       g.setEnableRuntimeSnapshotWrites(granulatorEnableRuntimeSnapshotWrites);
       pushGranulatorParams(granulatorRawParams);
+      syncVideoSourceDryGain();
       for (const [name, value] of Object.entries(feedbackDelayParams) as [
         FeedbackDelayParamName,
         number,
@@ -2199,6 +2211,7 @@
       await granulator.loadFromArrayBuffer(audio.ctx, ab);
       granulator.setEnabled(granulatorEnabled);
       granulatorLoadedSrc = videoEl?.src ?? loadedVideoName;
+      syncVideoSourceDryGain();
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
     }
@@ -2377,6 +2390,7 @@
       if (audio.isInitialised) {
         try {
           audio.setSource(new VideoElementAudioSource(audio.ctx, videoEl), {});
+          syncVideoSourceDryGain();
         } catch (e) {
           initError = e instanceof Error ? e.message : String(e);
         }
@@ -2683,6 +2697,7 @@
       try {
         routeVideoAudioThroughGraph();
         audio.setSource(new VideoElementAudioSource(audio.ctx, videoEl), {});
+        syncVideoSourceDryGain();
       } catch (e) {
         initError = e instanceof Error ? e.message : String(e);
       }
@@ -2692,6 +2707,7 @@
     await clock.start();
     await playActiveVideoSource();
     await granulatorClipLoad;
+    syncVideoSourceDryGain();
   }
 
   async function onStop() {
@@ -2704,7 +2720,6 @@
     const input = e.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     if (!file || !renderer || !videoEl) return;
-    demoStarted = true;
     // New clip invalidates any prior grain-buffer decode. Bumping the gen prevents any
     // in-flight decode from writing to UI state, and disposing the buffer forces
     // ensureGrainComposite() to reallocate against the new clip's dimensions on demand.
@@ -2739,6 +2754,7 @@
     void loadClipIntoGranulator(file);
     try {
       audio.setSource(new VideoElementAudioSource(audio.ctx, videoEl), {});
+      syncVideoSourceDryGain();
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
     }
@@ -2834,40 +2850,38 @@
       {#if sourceLoaded && loadedVideoName}
         <span class="src-status">{loadedVideoName}</span>
       {/if}
-      {#if advancedOpen}
-        <label class="file src-file">
-          load video B
-          <input
-            data-qa="source-b-file-input"
-            type="file"
-            accept="video/*"
-            onchange={onSourceBChange}
-          />
-        </label>
-        {#if sourceBLoaded && loadedVideoBName}
-          <span class="src-status">B: {loadedVideoBName}</span>
-        {/if}
-        {#if sourceBLoaded}
-          <button type="button" class="src-btn" onclick={clearSourceB}>clear B</button>
-        {/if}
-        <span class="src-divider">│</span>
-        <span class="src-mode-label">mode</span>
-        <button
-          type="button"
-          class="src-btn"
-          class:active={sourceKind === 'video'}
-          aria-pressed={sourceKind === 'video'}
-          onclick={() => setSourceKind('video')}>video</button
-        >
-        <button
-          type="button"
-          class="src-btn"
-          class:active={sourceKind === 'grain-composite'}
-          data-qa="source-kind-grain-composite"
-          aria-pressed={sourceKind === 'grain-composite'}
-          onclick={() => setSourceKind('grain-composite')}>grain</button
-        >
+      <label class="file src-file">
+        load video B
+        <input
+          data-qa="source-b-file-input"
+          type="file"
+          accept="video/*"
+          onchange={onSourceBChange}
+        />
+      </label>
+      {#if sourceBLoaded && loadedVideoBName}
+        <span class="src-status">B: {loadedVideoBName}</span>
       {/if}
+      {#if sourceBLoaded}
+        <button type="button" class="src-btn" onclick={clearSourceB}>clear B</button>
+      {/if}
+      <span class="src-divider">│</span>
+      <span class="src-mode-label">mode</span>
+      <button
+        type="button"
+        class="src-btn"
+        class:active={sourceKind === 'video'}
+        aria-pressed={sourceKind === 'video'}
+        onclick={() => setSourceKind('video')}>video</button
+      >
+      <button
+        type="button"
+        class="src-btn"
+        class:active={sourceKind === 'grain-composite'}
+        data-qa="source-kind-grain-composite"
+        aria-pressed={sourceKind === 'grain-composite'}
+        onclick={activateGrainCompositeSource}>grain</button
+      >
       {#if grainSourceMessage}
         <span class="src-msg" role="status" data-qa="grain-source-message"
           >{grainSourceMessage}</span
@@ -2881,102 +2895,85 @@
     </div>
 
     <div class="release-actions" aria-label="Recovery controls">
-      <button type="button" class="src-btn demo-btn" onclick={startDemo}>start demo</button>
       <button type="button" class="src-btn" onclick={resetVisuals}>reset visuals</button>
       <button type="button" class="src-btn" onclick={stopAudioOnly}>stop audio</button>
       <button type="button" class="src-btn" onclick={clearFeedback}>clear feedback</button>
-      <button
-        type="button"
-        class="src-btn"
-        class:active={safeMode}
-        aria-pressed={safeMode}
-        onclick={() => setSafeMode(!safeMode)}>safe mode</button
-      >
-      <button
-        type="button"
-        class="src-btn"
-        class:active={advancedOpen}
-        aria-pressed={advancedOpen}
-        onclick={toggleAdvanced}>advanced</button
-      >
     </div>
 
-    {#if advancedOpen}
-      <div class="stage-controls">
-        <label class="stage-group">
-          <span class="rl">── monitor ──</span>
-          <div class="stage-toggle">
-            {#each BUS_INDICES as bus (bus)}
-              <button
-                class:active={monitorBus === bus}
-                type="button"
-                onclick={() => onSetMonitorBus(bus)}
-                title={sourceBLoaded && bus === 0
-                  ? 'monitor bus 0 — defaults to Source A'
-                  : sourceBLoaded && bus === 1
-                    ? 'monitor bus 1 — defaults to Source B'
-                    : `monitor bus ${bus}`}
-              >
-                o{bus}{#if sourceBLoaded && bus === 0}<span class="bus-source">·A</span
-                  >{:else if sourceBLoaded && bus === 1}<span class="bus-source">·B</span>{/if}
-              </button>
+    <div class="stage-controls">
+      <label class="stage-group">
+        <span class="rl">── monitor ──</span>
+        <div class="stage-toggle">
+          {#each BUS_INDICES as bus (bus)}
+            <button
+              class:active={monitorBus === bus}
+              type="button"
+              onclick={() => onSetMonitorBus(bus)}
+              title={sourceBLoaded && bus === 0
+                ? 'monitor bus 0 — defaults to Source A'
+                : sourceBLoaded && bus === 1
+                  ? 'monitor bus 1 — defaults to Source B'
+                  : `monitor bus ${bus}`}
+            >
+              o{bus}{#if sourceBLoaded && bus === 0}<span class="bus-source">·A</span
+                >{:else if sourceBLoaded && bus === 1}<span class="bus-source">·B</span>{/if}
+            </button>
+          {/each}
+        </div>
+      </label>
+      <label class="stage-group">
+        <span class="rl">── preview ──</span>
+        <div class="stage-toggle">
+          <button
+            class:active={previewMode === 'single'}
+            type="button"
+            onclick={() => onSetPreviewMode('single')}
+          >
+            single
+          </button>
+          <button
+            class:active={previewMode === 'quad'}
+            type="button"
+            onclick={() => onSetPreviewMode('quad')}
+          >
+            quad
+          </button>
+        </div>
+      </label>
+      <label class="stage-group">
+        <span class="rl">── midi ──</span>
+        <div class="midi-row">
+          <span class="midi-status" data-qa="midi-status">
+            {#if midiUnavailableReason}
+              {midiUnavailableReason}
+            {:else if selectedMidiSource === 'keyboard'}
+              keyboard
+            {:else if midiDevices.length === 0}
+              no devices
+            {:else if selectedMidiSource === 'all'}
+              {midiDevices.map((d) => d.name).join(', ')}
+            {:else}
+              {selectedMidiSource}
+            {/if}
+          </span>
+          <select
+            class="midi-source-select"
+            data-qa="midi-source-select"
+            value={selectedMidiSource}
+            onchange={(e) => {
+              selectedMidiSource = (e.currentTarget as HTMLSelectElement).value;
+            }}
+            disabled={!!midiUnavailableReason}
+          >
+            <option value="all">all devices</option>
+            <option value="keyboard">keyboard</option>
+            {#each midiDevices as device (device.id)}
+              <option value={device.name}>{device.name}</option>
             {/each}
-          </div>
-        </label>
-        <label class="stage-group">
-          <span class="rl">── preview ──</span>
-          <div class="stage-toggle">
-            <button
-              class:active={previewMode === 'single'}
-              type="button"
-              onclick={() => onSetPreviewMode('single')}
-            >
-              single
-            </button>
-            <button
-              class:active={previewMode === 'quad'}
-              type="button"
-              onclick={() => onSetPreviewMode('quad')}
-            >
-              quad
-            </button>
-          </div>
-        </label>
-        <label class="stage-group">
-          <span class="rl">── midi ──</span>
-          <div class="midi-row">
-            <span class="midi-status" data-qa="midi-status">
-              {#if midiUnavailableReason}
-                {midiUnavailableReason}
-              {:else if selectedMidiSource === 'keyboard'}
-                keyboard
-              {:else if midiDevices.length === 0}
-                no devices
-              {:else if selectedMidiSource === 'all'}
-                {midiDevices.map((d) => d.name).join(', ')}
-              {:else}
-                {selectedMidiSource}
-              {/if}
-            </span>
-            <select
-              class="midi-source-select"
-              data-qa="midi-source-select"
-              value={selectedMidiSource}
-              onchange={(e) => {
-                selectedMidiSource = (e.currentTarget as HTMLSelectElement).value;
-              }}
-              disabled={!!midiUnavailableReason}
-            >
-              <option value="all">all devices</option>
-              <option value="keyboard">keyboard</option>
-              {#each midiDevices as device (device.id)}
-                <option value={device.name}>{device.name}</option>
-              {/each}
-            </select>
-          </div>
-        </label>
-      </div>
-    {/if}
+          </select>
+        </div>
+      </label>
+    </div>
   </header>
 
   <section class="workspace">
@@ -2986,26 +2983,6 @@
           <div class="error">init failed: {initError}</div>
         {/if}
         <canvas bind:this={canvasEl} width="1280" height="720"></canvas>
-        {#if !demoStarted}
-          <section class="welcome-card" aria-label="Start av-synth demo">
-            <span class="sec-label">private staging rc</span>
-            <h2>Shape a short video clip into a coupled audiovisual performance.</h2>
-            <p>
-              Start with the built-in footage demo and its attached audio, then load your own clip
-              for the granulator-first showcase path.
-            </p>
-            <div class="welcome-actions">
-              <button type="button" class="primary-action" onclick={startDemo}>start demo</button>
-              <label class="file">
-                load your clip
-                <input type="file" accept="video/*" onchange={onFileChange} />
-              </label>
-              <a class="desktop-cta" href="#desktop-app" aria-disabled="true"
-                >desktop download · coming after staging sign-off</a
-              >
-            </div>
-          </section>
-        {/if}
         {#if previewMode === 'quad'}
           <div class="quad-monitor-overlay">
             {#each BUS_INDICES as bus (bus)}
@@ -3029,51 +3006,49 @@
 
     <aside class="patch-panel">
       <div class="patch-head">
-        <span class="sec-label">{advancedOpen ? '── workspace ──' : '── showcase ──'}</span>
-        {#if advancedOpen}
-          <div class="workspace-tabs" role="tablist" aria-label="Edit surface">
-            <button
-              class:active={activeWorkspaceSurface === 'video'}
-              class="workspace-tab"
-              type="button"
-              role="tab"
-              aria-selected={activeWorkspaceSurface === 'video'}
-              onclick={() => (activeWorkspaceSurface = 'video')}
-            >
-              video
-            </button>
-            <button
-              class:active={activeWorkspaceSurface === 'audio'}
-              class="workspace-tab"
-              type="button"
-              role="tab"
-              aria-selected={activeWorkspaceSurface === 'audio'}
-              onclick={() => (activeWorkspaceSurface = 'audio')}
-            >
-              audio
-            </button>
-            <button
-              class:active={activeWorkspaceSurface === 'lfo'}
-              class="workspace-tab"
-              type="button"
-              role="tab"
-              aria-selected={activeWorkspaceSurface === 'lfo'}
-              onclick={() => (activeWorkspaceSurface = 'lfo')}
-            >
-              lfo
-            </button>
-            <button
-              class:active={activeWorkspaceSurface === 'presets'}
-              class="workspace-tab"
-              type="button"
-              role="tab"
-              aria-selected={activeWorkspaceSurface === 'presets'}
-              onclick={() => (activeWorkspaceSurface = 'presets')}
-            >
-              presets
-            </button>
-          </div>
-        {/if}
+        <span class="sec-label">── workspace ──</span>
+        <div class="workspace-tabs" role="tablist" aria-label="Edit surface">
+          <button
+            class:active={activeWorkspaceSurface === 'video'}
+            class="workspace-tab"
+            type="button"
+            role="tab"
+            aria-selected={activeWorkspaceSurface === 'video'}
+            onclick={() => (activeWorkspaceSurface = 'video')}
+          >
+            video
+          </button>
+          <button
+            class:active={activeWorkspaceSurface === 'audio'}
+            class="workspace-tab"
+            type="button"
+            role="tab"
+            aria-selected={activeWorkspaceSurface === 'audio'}
+            onclick={() => (activeWorkspaceSurface = 'audio')}
+          >
+            audio
+          </button>
+          <button
+            class:active={activeWorkspaceSurface === 'lfo'}
+            class="workspace-tab"
+            type="button"
+            role="tab"
+            aria-selected={activeWorkspaceSurface === 'lfo'}
+            onclick={() => (activeWorkspaceSurface = 'lfo')}
+          >
+            lfo
+          </button>
+          <button
+            class:active={activeWorkspaceSurface === 'presets'}
+            class="workspace-tab"
+            type="button"
+            role="tab"
+            aria-selected={activeWorkspaceSurface === 'presets'}
+            onclick={() => (activeWorkspaceSurface = 'presets')}
+          >
+            presets
+          </button>
+        </div>
       </div>
       <div class="graph-shell">
         {#if activeWorkspaceSurface === 'video'}
@@ -3241,7 +3216,7 @@
                   class:active={activeProgram === name}
                   class="program-card"
                   title={program.tagline}
-                  onclick={() => onProgram(name)}
+                  onclick={() => void selectProgramFromUi(name)}
                 >
                   <span class="program-name">{program.title}</span>
                 </button>
@@ -3250,21 +3225,19 @@
                 <span class="muted">effect programs loading…</span>
               {/if}
             </div>
-            {#if advancedOpen}
-              <span class="sec-label">── experiments ──</span>
-              <div class="program-grid experiment-grid">
-                {#each experimentPrograms as [name, program] (name)}
-                  <button
-                    class:active={activeProgram === name}
-                    class="program-card"
-                    title={program.tagline}
-                    onclick={() => onProgram(name)}
-                  >
-                    <span class="program-name">{program.title}</span>
-                  </button>
-                {/each}
-              </div>
-            {/if}
+            <span class="sec-label">── experiments ──</span>
+            <div class="program-grid experiment-grid">
+              {#each experimentPrograms as [name, program] (name)}
+                <button
+                  class:active={activeProgram === name}
+                  class="program-card"
+                  title={program.tagline}
+                  onclick={() => void selectProgramFromUi(name)}
+                >
+                  <span class="program-name">{program.title}</span>
+                </button>
+              {/each}
+            </div>
           </div>
         {/if}
       </div>
@@ -3540,11 +3513,6 @@
     flex-wrap: wrap;
   }
 
-  .demo-btn {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
   .file {
     background: var(--bg);
     color: var(--accent);
@@ -3694,58 +3662,6 @@
     border: 1px solid var(--warn);
     padding: 0.5rem 0.75rem;
     font-size: 0.75rem;
-  }
-
-  .welcome-card {
-    position: absolute;
-    left: clamp(1.25rem, 6vw, 5rem);
-    bottom: clamp(1.25rem, 8vh, 5rem);
-    z-index: 2;
-    max-width: 38rem;
-    padding: 1rem 1.1rem;
-    border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
-    background: color-mix(in srgb, var(--bg) 90%, transparent);
-    backdrop-filter: blur(12px);
-  }
-
-  .welcome-card h2 {
-    margin: 0.45rem 0;
-    color: var(--fg);
-    font-size: clamp(1.1rem, 2vw, 1.55rem);
-    line-height: 1.15;
-  }
-
-  .welcome-card p {
-    margin: 0 0 0.8rem;
-    color: var(--muted);
-    font-size: 0.78rem;
-    line-height: 1.5;
-  }
-
-  .welcome-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
-  .primary-action {
-    background: var(--accent);
-    color: var(--bg);
-    border: 1px solid var(--accent);
-    padding: 0.32rem 0.62rem;
-    cursor: pointer;
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-  }
-
-  .desktop-cta {
-    color: var(--muted);
-    font-size: 0.68rem;
-    text-decoration: none;
   }
 
   .quad-monitor-overlay {

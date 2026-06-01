@@ -31,6 +31,7 @@ export class AudioEngine {
   #ctx: AudioContext | null = null;
   #initPromise: Promise<void> | null = null;
   #master: GainNode | null = null;
+  #sourceGain: GainNode | null = null;
   #analyser: AnalyserNode | null = null;
   #preLimitAnalyser: AnalyserNode | null = null;
   #capture: MediaStreamAudioDestinationNode | null = null;
@@ -60,7 +61,9 @@ export class AudioEngine {
       await ensureAudioWorklets(ctx);
 
       const master = ctx.createGain();
+      const sourceGain = ctx.createGain();
       master.gain.value = 0.7;
+      sourceGain.gain.value = 1;
 
       const softClip = ctx.createWaveShaper();
       softClip.curve = makeMasterSoftClipCurve();
@@ -85,6 +88,7 @@ export class AudioEngine {
 
       const capture = ctx.createMediaStreamDestination();
 
+      sourceGain.connect(master);
       master.connect(softClip);
       softClip.connect(preLimitAnalyser);
       softClip.connect(limiter);
@@ -94,13 +98,14 @@ export class AudioEngine {
 
       this.#ctx = ctx;
       this.#master = master;
+      this.#sourceGain = sourceGain;
       this.#analyser = analyser;
       this.#preLimitAnalyser = preLimitAnalyser;
       this.#capture = capture;
       this.#fftMagnitudes = new Float32Array(analyser.frequencyBinCount);
       this.#peakTimeDomain = new Float32Array(preLimitAnalyser.fftSize);
       this.#source = new SilentSource(ctx);
-      this.#source.output.connect(master);
+      this.#source.output.connect(sourceGain);
 
       clock.bindAudioContext(ctx);
       this.#startParamPoll();
@@ -114,12 +119,14 @@ export class AudioEngine {
    * Cannot be called before init().
    */
   setSource(source: AudioSourceStage, params?: Readonly<Record<string, number>>): void {
-    if (!this.#ctx || !this.#master) throw new Error('AudioEngine.setSource called before init()');
+    if (!this.#ctx || !this.#sourceGain) {
+      throw new Error('AudioEngine.setSource called before init()');
+    }
     const old = this.#source;
     old?.output.disconnect();
     this.#source = source;
     this.#sourceParams = params ?? {};
-    source.output.connect(this.#master);
+    source.output.connect(this.#sourceGain);
     old?.dispose();
   }
 
@@ -150,6 +157,11 @@ export class AudioEngine {
   setMasterGain(linear: number): void {
     if (!this.#master) return;
     this.#master.gain.setTargetAtTime(linear, this.ctx.currentTime, 0.01);
+  }
+
+  setSourceGain(linear: number): void {
+    if (!this.#sourceGain) return;
+    this.#sourceGain.gain.setTargetAtTime(linear, this.ctx.currentTime, 0.01);
   }
 
   updateVideoFeatures(features: VideoFeatureState): void {
@@ -188,6 +200,7 @@ export class AudioEngine {
     await this.#ctx.close();
     this.#ctx = null;
     this.#master = null;
+    this.#sourceGain = null;
     this.#analyser = null;
     this.#preLimitAnalyser = null;
     this.#capture = null;

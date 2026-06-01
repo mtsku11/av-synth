@@ -558,16 +558,18 @@ The repo now has three explicit release tracks:
 2. **Staging RC** — private evaluation target. Goal: deploy the best current quality-sprint slice to a private/staging URL for real browser, device, visual, and listening validation. Required: QA/audit green on the implemented surface, final human audible/visual sign-off on the documented manual cases, a deploy workflow/runbook, and a post-deploy smoke pass against the staging URL.
 3. **Public v1** — the first broadly shareable release. Goal: ship the current video-first product honestly, without implying unfinished Hydra parity. Required beyond staging: quality-sprint scope complete or explicitly narrowed, issues discovered during staging absorbed, and public positioning anchored to "video-first AV effects" rather than "general AV synth." Remaining public-surface Color work (`sum`, `.r .g .b .a`) should be implemented only if it is still a real launch requirement after quality sign-off.
 
-The showcase shell leads with the built-in `Singularity Bloom` demo and an eight-program public allowlist.
+The showcase shell leads with the built-in `Singularity Bloom` flagship program and an eight-program public allowlist.
 `Singularity Bloom`, `Fracture Relay`, and `Magnetic Cathedral` are the sophisticated graph-authored lead
 programs; patch editing, secondary video input, mode switching, and the exploratory bank remain available
-under **Advanced**. This is a presentation boundary, not an engine fork.
+directly through the workspace tabs and presets surface. This is a presentation boundary, not an engine fork.
 
-The first-run canvas uses the committed 10-second stereo footage clip while transport remains paused behind
-the explicit `Start Demo` gesture. Stateful effects keep the existing shared eight-frame history ring.
-`slitScan` samples fractional, non-linearly distributed ages from that ring, while the shared single-scale
-motion field uses low-structure confidence gating and quality-tier resolution: `0.375×` in Safe Mode,
-`0.625×` standard, and `0.75×` cinema. As of 2026-05-31, the field/advection operators also carry their
+The first-run canvas auto-loads the committed 10-second stereo footage clip and the flagship program, while
+audio context init still waits for a real user gesture. Preset selection and the explicit audio-start path
+are now the intended first gestures; there is no separate `Start Demo`, `Safe Mode`, or `Advanced` shell
+gate. Stateful effects keep the existing shared eight-frame history ring. `slitScan` samples fractional,
+non-linearly distributed ages from that ring, while the shared single-scale motion field uses low-structure
+confidence gating and quality-tier resolution: `0.375×` performance, `0.625×` standard, and `0.75×` cinema.
+As of 2026-05-31, the field/advection operators also carry their
 own persistent transport state instead of re-sampling the global previous composite frame, so `advect`
 means "transport this op's accumulated pixels through its velocity field" rather than "ghost against the
 last full-frame render." Multi-scale flow remains a deliberately deferred architectural step.

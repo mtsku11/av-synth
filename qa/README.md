@@ -57,11 +57,14 @@ This QA stack assumes Playwright reaches the app over HTTP. `file:///...` naviga
 - Attached-server path: start the app yourself, or use a staging deployment, then run `npm run qa:smoke:external` or `npm run qa:cases:external`.
 - Override target URL by setting `PLAYWRIGHT_BASE_URL`, for example `PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173 npm run qa:smoke:external` or `PLAYWRIGHT_BASE_URL=https://staging.example.com npm run qa:smoke:external`.
 
+Fresh local Playwright runs now default to starting their own server instead of silently reusing whatever Vite process is already on the fixed port. That avoids stale optimize-deps responses such as `504 Outdated Optimize Dep`, which otherwise present as a blank page and a missing `window.__AV_SYNTH_QA__` bridge. If you intentionally want to reuse an existing local server, set `PLAYWRIGHT_REUSE_SERVER=1`.
+
 `qa/playwright.config.ts` now supports three explicit server modes through environment variables:
 
 - `PLAYWRIGHT_SERVER_MODE=dev` — auto-start `npm run dev:http` on `http://127.0.0.1:4173` (default)
 - `PLAYWRIGHT_SERVER_MODE=preview` — auto-start `npm run preview:http` against the built app
 - `PLAYWRIGHT_SERVER_MODE=external` — do not start any server; attach to `PLAYWRIGHT_BASE_URL`
+- `PLAYWRIGHT_REUSE_SERVER=1` — opt back into reusing an already-running local dev/preview server on the target URL
 
 If your environment forbids local port binding, the repo-side fix is to use the attached-server path rather than `file:` URLs.
 
@@ -168,6 +171,7 @@ Artifacts land in `qa/results/playwright/`.
    - use `npm run qa:smoke` / `qa:cases` for the fast dev-server path
    - use `npm run qa:smoke:preview` / `qa:cases:preview` for the production-like built path
    - use `PLAYWRIGHT_BASE_URL=... npm run qa:smoke:external` when the server is already running or hosted elsewhere
+   - only use `PLAYWRIGHT_REUSE_SERVER=1` when you deliberately want Playwright to attach to an already-running local Vite server on the same URL
 3. Local Playwright runs now default to `3` workers across those family-grouped spec files; CI stays at `1` worker. Override with `PLAYWRIGHT_WORKERS=<n>` when you need a slower serial repro or a more aggressive local run.
 4. Playwright browser video is `retain-on-failure`, not `on`, because the app already exports its own per-case `.webm` capture. This keeps failure debugging intact without doubling steady-state recording load in parallel runs.
 5. Run `npm run qa:audit` for the pre-deploy gate, or `npm run qa:ci` for the broader local pipeline.

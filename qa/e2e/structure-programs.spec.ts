@@ -89,7 +89,6 @@ test.describe('structure flagship presets', () => {
     const baselineMetrics = await sampleMetrics(page);
     const baselinePixel = await readCenterPixel(page);
 
-    await page.getByRole('button', { name: 'advanced' }).click();
     await page.getByRole('tab', { name: 'presets' }).click();
     for (const title of ['Edge Feedback', 'Contour Bloom']) {
       await expect(page.getByRole('button', { name: title })).toBeVisible();

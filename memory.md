@@ -8,6 +8,63 @@ This file is project-scoped engineering memory, distinct from Claude's harness m
 
 ## Decisions
 
+### 2026-06-01 — The shell should not carry separate Safe Mode or Advanced toggles
+
+**Decision**: remove the top-level `safe mode` and `advanced` buttons from the shell. Keep the real workspace tabs visible at all times, keep the stage controls always present, and stop presenting performance quality or edit-surface exposure as separate shell modes.
+
+**Why**:
+- User feedback was explicit: those controls were not earning their space in the primary shell.
+- `advanced` was only a presentation toggle over surfaces that already represent the normal product workflow, so hiding them behind a mode switch added state without adding capability.
+- `safe mode` was a coarse quality bundle that changed preview mode and granulator behavior together; that is better treated as internal tuning/preset policy than as a front-and-center public button.
+
+**How to apply**:
+- The shell should expose `video`, `audio`, `lfo`, and `presets` directly without an `advanced` gate.
+- Keep the experiment preset bank reachable from the presets surface rather than tying it to a separate top-bar mode.
+- Performance quality tiers may remain in implementation/preset policy, but not as a dedicated top-level shell toggle unless product direction changes again.
+
+### 2026-06-01 — Playwright local runs should start fresh servers by default
+
+**Decision**: stop reusing an already-running local Vite server by default in `qa/playwright.config.ts`. Reuse is now opt-in through `PLAYWRIGHT_REUSE_SERVER=1`; the normal `dev` and `preview` modes should start fresh servers unless the caller explicitly asks otherwise.
+
+**Why**:
+- A failing local shell run looked like a broken browser/assertion path at first, but the Playwright trace showed the real issue: the reused Vite server answered `GET /node_modules/.vite/deps/svelte.js?...` with `504 Outdated Optimize Dep`.
+- That failure mode renders as a blank page, no `window.__AV_SYNTH_QA__`, and a misleading timeout in the first `waitForFunction`, so it wastes time in the wrong layer unless the trace is inspected.
+- The explicit attached-server path (`PLAYWRIGHT_SERVER_MODE=external`) already exists for the cases where the caller really does want to bind Playwright to a long-lived manual server or a hosted URL.
+
+**How to apply**:
+- Treat `npm run qa:smoke`, `qa:cases`, and the preview variants as fresh-server commands.
+- Use `PLAYWRIGHT_SERVER_MODE=external` when the server is already running somewhere else.
+- Use `PLAYWRIGHT_REUSE_SERVER=1` only for deliberate local-server reuse, and prefer a restart if Vite serves a blank page or `Outdated Optimize Dep`.
+
+### 2026-06-01 — Remove the explicit Start Demo gate; let presets and grain mode be the natural first gestures
+
+**Decision**: drop the separate `Start Demo` overlay/button flow from the shell. The built-in footage clip and flagship program should auto-load visually on first run, preset clicks should be allowed to start audio/granulator naturally, and clicking the `grain` source should attempt to bring up the granulator path instead of quietly failing back to plain video.
+
+**Why**:
+- User feedback was clear: the explicit hand-holding path was unnecessary friction. In this product, choosing a preset is already the obvious first action.
+- The old shell flow created secondary bugs in practice: audio felt like it "really started" only after `Start Demo`, and the grain-composite source button could appear inert because it depended on prior hidden setup.
+- Removing the dedicated demo gate lets the staged product behave more like the intended instrument: visuals are present immediately, audio still respects browser gesture rules, and the first meaningful gesture can be a preset choice rather than a separate onboarding button.
+
+**How to apply**:
+- Keep the built-in footage clip as the first-run visual source, but do not reintroduce a welcome overlay that blocks the shell until a demo-only button is pressed.
+- Preset-selection UI should remain a valid audio-start gesture path as long as browsers require user interaction for `AudioContext.resume()`.
+- Grain-composite source activation should either complete the needed setup or show a concrete refusal message; it should not look like a dead button.
+- The granulator `mix` control is part of the public dry/wet story: when the wet side is at `1.0`, the direct source audio must be fully attenuated rather than remaining audible in parallel.
+
+### 2026-06-01 — Root README is the public repo entrypoint; local capture clutter is not durable project state
+
+**Decision**: add a real root `README.md` for the staging/release-candidate product surface, and treat root-level PNG/JPG dumps plus `.ci-repro/` as disposable local artifacts rather than meaningful repo content.
+
+**Why**:
+- The repo had strong internal planning docs (`plan.md`, `todo.md`, `deploy.md`, `RELEASE_VERDICT.md`) but no obvious public entrypoint for a collaborator, reviewer, or future public reader.
+- Local QA/debugging had started to spill one-off screenshots and reproduction snapshots into the repo root, which makes the project look less intentional than it is and obscures the real release docs.
+- The versioned screenshot material already has better homes: `screenshots/`, `.screenshots/`, and `qa/results/` depending on whether the asset is curated, internal review, or generated QA output.
+
+**How to apply**:
+- Keep the root README aligned with the actual release direction and real npm scripts.
+- Do not treat root-level capture files as durable context; if they matter, move them into a named screenshots or QA location with an explicit purpose.
+- `.ci-repro/` is scratch, not product history.
+
 ### 2026-05-16 — Build stack chosen
 
 **Decision**: Vite + TypeScript + Svelte for the shell; raw WebGL2 for video; Web Audio API + custom AudioWorklets for audio.

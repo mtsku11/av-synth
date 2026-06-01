@@ -35,6 +35,10 @@ scratch/
 .claude/
 cello2.mp4
 av-synth-*.png
+/.ci-repro/
+/*.png
+/*.jpg
+/*.jpeg
 
 # Playwright local screenshots
 .playwright-mcp/

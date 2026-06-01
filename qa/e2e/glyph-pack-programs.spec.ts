@@ -22,9 +22,7 @@ function pixelDelta(left: RgbSample | null, right: RgbSample | null): number {
 }
 
 test.describe('typographic and time-domain pack', () => {
-  test('advanced programs compile, recall, animate, and hold the local fps floor', async ({
-    page,
-  }) => {
+  test('programs compile, recall, animate, and hold the local fps floor', async ({ page }) => {
     test.setTimeout(120_000);
     const consoleErrors: string[] = [];
     page.on('pageerror', (error) => consoleErrors.push(error.message));
@@ -86,7 +84,6 @@ test.describe('typographic and time-domain pack', () => {
       );
     });
 
-    await page.getByRole('button', { name: 'advanced' }).click();
     await page.getByRole('tab', { name: 'presets' }).click();
 
     for (const [programId, title] of GLYPH_PACK_PROGRAMS) {

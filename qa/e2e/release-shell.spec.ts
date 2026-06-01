@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('release showcase shell', () => {
-  test('cold start exposes diagnostics, flagship demo, recovery controls, and advanced boundary', async ({
+  test('cold start exposes diagnostics, flagship program, recovery controls, and workspace surfaces', async ({
     page,
   }) => {
     const consoleErrors: string[] = [];
@@ -21,7 +21,6 @@ test.describe('release showcase shell', () => {
     );
 
     await expect(page).toHaveTitle('av-synth — video-first audiovisual effects');
-    await expect(page.locator('.welcome-card')).toBeVisible();
     await page.waitForFunction(
       () =>
         ((
@@ -47,13 +46,14 @@ test.describe('release showcase shell', () => {
         }
       ).__AV_SYNTH_QA__?.getState(),
     );
-    expect(coldStartState).toMatchObject({
-      sourceKind: 'video',
-      video: { paused: true },
-    });
+    expect(coldStartState?.sourceKind).toBe('video');
+    expect(coldStartState?.video).not.toBeNull();
     expect(coldStartState?.video?.readyState).toBeGreaterThanOrEqual(2);
-    await expect(page.locator('.program-card')).toHaveCount(8);
-    await expect(page.locator('.experiment-grid')).toHaveCount(0);
+    await expect(page.locator('.welcome-card')).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'video' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'audio' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'lfo' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'presets' })).toBeVisible();
     await expect(page.locator('[data-qa="runtime-diagnostics"]')).toContainText(
       'crossOriginIsolated: yes',
     );
@@ -66,23 +66,14 @@ test.describe('release showcase shell', () => {
     await expect(page.locator('[data-qa="runtime-diagnostics"]')).toContainText('WebGL2: yes');
     await expect(page.locator('[data-qa="runtime-diagnostics"]')).toContainText('recording: yes');
 
-    await page.locator('.welcome-card').getByRole('button', { name: 'start demo' }).click();
-    await expect(page.locator('.welcome-card')).toHaveCount(0);
+    await page.getByRole('tab', { name: 'presets' }).click();
+    await expect(
+      page.locator('.presets-tab > .program-grid:not(.experiment-grid) .program-card'),
+    ).toHaveCount(8);
+    await expect(page.locator('.experiment-grid .program-card')).toHaveCount(40);
     await expect(page.locator('.presets-active strong')).toHaveText('Singularity Bloom');
     await expect(page.locator('[data-qa^="program-macro-"]')).toHaveCount(3);
-
-    await page.getByRole('button', { name: 'safe mode' }).click();
-    await expect(page.getByRole('button', { name: 'safe mode' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
     await page.getByRole('button', { name: 'clear feedback' }).click();
-
-    await page.getByRole('button', { name: 'advanced' }).click();
-    await expect(page.getByRole('tab', { name: 'video' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'audio' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'lfo' })).toBeVisible();
-    await expect(page.locator('.experiment-grid .program-card')).toHaveCount(39);
 
     expect(consoleErrors).toEqual([]);
   });

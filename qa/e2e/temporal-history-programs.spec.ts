@@ -89,7 +89,6 @@ test.describe('temporal-history flagship presets', () => {
     const baselineTemporalDiff = baseline?.video?.temporalDiff ?? 0;
     const baselinePixel = await readCenterPixel(page);
 
-    await page.getByRole('button', { name: 'advanced' }).click();
     await page.getByRole('tab', { name: 'presets' }).click();
     let maxTemporalDelta = 0;
     for (const [programId, title] of [

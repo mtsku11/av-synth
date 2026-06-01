@@ -3,6 +3,7 @@ import { defineConfig } from '@playwright/test';
 const isCI = !!process.env.CI;
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:4173';
 const serverMode = process.env.PLAYWRIGHT_SERVER_MODE ?? 'dev';
+const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
 const requestedWorkers = Number.parseInt(process.env.PLAYWRIGHT_WORKERS ?? '', 10);
 const workers =
   Number.isFinite(requestedWorkers) && requestedWorkers > 0 ? requestedWorkers : isCI ? 1 : 3;
@@ -20,7 +21,9 @@ function resolveWebServer():
     command: serverMode === 'preview' ? 'npm run preview:http' : 'npm run dev:http',
     url: baseURL,
     timeout: 120_000,
-    reuseExistingServer: !process.env.CI,
+    // Reusing an old Vite server is convenient, but it can serve stale optimized
+    // deps after source churn and leave Playwright staring at a blank page.
+    reuseExistingServer,
   };
 }
 

@@ -48,6 +48,30 @@ Behavior:
 
 The workflow is intentionally manual. Automatic public deployment is not enabled by default.
 
+## First staging deployment plan
+
+Treat the first Cloudflare deployment as a controlled release-candidate pass, not a publicity event.
+
+1. Confirm local readiness:
+   - `npm run check`
+   - `npm run lint`
+   - `npm run test:run`
+   - `npm run build`
+2. Confirm release blockers and manual gates:
+   - verify the current state in `RELEASE_VERDICT.md`
+   - review open blockers in `todo.md`
+   - keep D3 listening, D4 hardware latency, showcase review, and reference-hardware CPU measurement visible as explicit remaining work
+3. Deploy to Cloudflare Pages staging through the workflow.
+4. Record the canonical staging URL in this file.
+5. Run `npm run qa:smoke:external` against that URL.
+6. Review:
+   - COOP / COEP / CORP headers
+   - boot and media-load behavior
+   - audio start / grain behavior
+   - real-browser performance
+   - 6–12 showcase captures from the hosted build
+7. Only after the hosted pass is stable should public-release packaging or announcement work proceed.
+
 ## Cross-origin isolation headers
 
 [`public/_headers`](./public/_headers) is copied into `dist/` by Vite and interpreted by Cloudflare Pages
