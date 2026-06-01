@@ -72,6 +72,7 @@ const NOISY_OPS: ReadonlySet<string> = new Set([
   'timeDisplace',
   'structure',
   'feedback',
+  'voidEater',
   'modulate',
   'modulateRouted',
   'modulateDisplace',

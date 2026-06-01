@@ -1614,7 +1614,7 @@ export class VideoRenderer {
           const os = stepScratch.ownedStateScratch;
           os.width = ownedState.width;
           os.height = ownedState.height;
-          os.initialized = ownedState.framesWritten > 0;
+          os.initialized = ownedState.framesWritten > 1;
           res.ownedState = os;
         } else {
           res.ownedState = null;

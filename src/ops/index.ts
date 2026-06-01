@@ -24,6 +24,7 @@ import { spiralFieldDef } from './spiralField';
 import { domainFoldDef } from './domainFold';
 import { gyreFieldDef } from './gyreField';
 import { turbulenceWarpDef } from './turbulenceWarp';
+import { voidEaterDef } from './voidEater';
 import { magneticDipoleDef } from './magneticDipole';
 import { aDef, bDef, gDef, rDef } from './channel';
 import { grainDef } from './grain';
@@ -103,6 +104,7 @@ export function registerAllOps(): void {
   registerOp(domainFoldDef);
   registerOp(gyreFieldDef);
   registerOp(turbulenceWarpDef);
+  registerOp(voidEaterDef);
   registerOp(magneticDipoleDef);
   registerOp(rDef);
   registerOp(gDef);
@@ -193,6 +195,7 @@ export const DEFAULT_CHAIN: readonly string[] = [
   'domainFold',
   'gyreField',
   'turbulenceWarp',
+  'voidEater',
   'magneticDipole',
   'r',
   'g',

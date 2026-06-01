@@ -8,6 +8,20 @@ This file is project-scoped engineering memory, distinct from Claude's harness m
 
 ## Decisions
 
+### 2026-06-01 — `voidEater` should stay a bounded single-pass owned-state operator
+
+**Decision**: land `voidEater` as a normal `OperatorDef`/`VideoStage` feedback operator that uses one per-instance `ownedState` ping-pong buffer, not as a renderer-level preset path or a new temporal subsystem.
+
+**Why**:
+- The requested TouchDesigner-style look is fundamentally "edge seed + warped accumulation," which the existing owned-state contract already covers.
+- Keeping it inside the current WebGL2 operator path preserves neutral-default bypass, normal coupling/LFO metadata, and the existing QA sweep infrastructure.
+- A reusable erosion primitive is more valuable than a one-off authored program, so the implementation should expose the growth/spread/twirl thresholds directly instead of hiding them behind preset logic.
+
+**How to apply**:
+- `voidEater` reads `u_tex` plus `u_owned_state`, guards the uninitialised state path, and writes its next state in the same pass.
+- Twirl/pixel-snap/edge-growth controls stay ordinary coupled params so the op can sit anywhere the feedback family already can.
+- If the effect ever needs a more elaborate mask/simulation path later, prove that the current single-pass owned-state version is insufficient before changing renderer architecture.
+
 ### 2026-06-01 — The shell should not carry separate Safe Mode or Advanced toggles
 
 **Decision**: remove the top-level `safe mode` and `advanced` buttons from the shell. Keep the real workspace tabs visible at all times, keep the stage controls always present, and stop presenting performance quality or edit-surface exposure as separate shell modes.

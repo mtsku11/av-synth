@@ -326,6 +326,12 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['feedback', 'video texture', 'motion'],
     coreParams: ['mix', 'strength', 'scale', 'octaves', 'phase', 'drift'],
   },
+  voidEater: {
+    family: 'Feedback',
+    blurb: 'edge-seeded black erosion inside a twirled owned-state feedback loop',
+    intents: ['feedback', 'contours', 'glitch', 'video texture'],
+    coreParams: ['mix', 'feedback', 'edgeGain', 'growth', 'twirl', 'ink'],
+  },
   magneticDipole: {
     family: 'Feedback',
     blurb: 'two-pole attraction/repulsion field — asymmetric dipole drag around a centre',

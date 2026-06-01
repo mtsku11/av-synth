@@ -37,6 +37,7 @@ const EXPECTED_OPERATOR_IDS = [
   'domainFold',
   'gyreField',
   'turbulenceWarp',
+  'voidEater',
   'magneticDipole',
   'r',
   'g',
@@ -136,6 +137,7 @@ describe('operator UI metadata', () => {
     expect(getOperatorUiMeta('domainFold').family).toBe('Feedback');
     expect(getOperatorUiMeta('gyreField').family).toBe('Feedback');
     expect(getOperatorUiMeta('turbulenceWarp').family).toBe('Feedback');
+    expect(getOperatorUiMeta('voidEater').family).toBe('Feedback');
     expect(getOperatorUiMeta('magneticDipole').family).toBe('Feedback');
     expect(getOperatorUiMeta('fluidSim').family).toBe('Feedback');
     expect(getOperatorUiMeta('glyphRender').family).toBe('Texture');
