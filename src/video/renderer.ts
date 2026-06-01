@@ -424,57 +424,6 @@ function buildLensDirtData(config: PresentationLensDirtConfig, size = 160): Uint
   return data;
 }
 
-export const PRESENTATION_LUTS = {
-  neutral: {
-    defaultMix: 0.0,
-    sample: (color) => [color[0], color[1], color[2]],
-  },
-  amber: {
-    defaultMix: 0.72,
-    sample: (input) => {
-      const warmed = [
-        clampUnit(input[0] * 1.04 + input[1] * 0.02),
-        clampUnit(input[1] * 0.99 + input[0] * 0.01),
-        clampUnit(input[2] * 0.92),
-      ] as [number, number, number];
-      return adjustContrast(adjustSaturation(warmed, 1.08), 1.06);
-    },
-  },
-  chrome: {
-    defaultMix: 0.68,
-    sample: (input) => {
-      const cooled = [
-        clampUnit(input[0] * 0.96),
-        clampUnit(input[1] * 1.01),
-        clampUnit(input[2] * 1.08 + input[1] * 0.01),
-      ] as [number, number, number];
-      return adjustContrast(adjustSaturation(cooled, 0.92), 1.1);
-    },
-  },
-  silvered: {
-    defaultMix: 0.58,
-    sample: (input) => {
-      const mono = input[0] * 0.3 + input[1] * 0.58 + input[2] * 0.12;
-      const toned = mixColor([mono, mono, mono], [mono * 1.02, mono * 1.01, mono * 0.98], 0.65);
-      return adjustContrast(toned, 1.08);
-    },
-  },
-  bleachBypass: {
-    defaultMix: 0.64,
-    sample: (input) => {
-      const flattened = adjustContrast(input, 1.18);
-      return adjustSaturation(
-        [
-          clampUnit(flattened[0] * 1.03),
-          clampUnit(flattened[1] * 1.0),
-          clampUnit(flattened[2] * 0.94),
-        ],
-        0.76,
-      );
-    },
-  },
-} satisfies Record<string, PresentationLutConfig>;
-
 export const PRESENTATION_POST_PRESETS = {
   none: {
     warpAmountPx: 0,
@@ -2080,7 +2029,6 @@ export class VideoRenderer {
     ownedState.framesWritten = 1;
   }
 
-  // Seed the velocity buffer at rest: rg=0.5 (zero velocity packed), b=0, a=1.
   #primeOwnedState2(ownedState2: OwnedStateBuffer): void {
     glBindOwnedState2AndClear(this.gl, ownedState2);
     ownedState2.framesWritten = 1;
