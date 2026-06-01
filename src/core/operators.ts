@@ -525,6 +525,12 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['finishing', 'video texture'],
     coreParams: ['amount'],
   },
+  chromaFract: {
+    family: 'Texture',
+    blurb: 'compression-artifact visualiser — isolates chroma deviation, amplifies and quantises it into dense colour bands',
+    intents: ['glitch', 'video texture', 'finishing'],
+    coreParams: ['mix', 'scale'],
+  },
   brightness: {
     family: 'Color',
     blurb: 'lift or darken the signal',

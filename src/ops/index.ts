@@ -55,6 +55,7 @@ import { repeatYDef } from './repeatY';
 import { pixelateDef } from './pixelate';
 import { kaleidDef } from './kaleid';
 import { chromaShiftDef } from './chromaShift';
+import { chromaFractDef } from './chromaFract';
 import { brightnessDef } from './brightness';
 import { contrastDef } from './contrast';
 import { colorDef } from './color';
@@ -130,6 +131,7 @@ export function registerAllOps(): void {
   registerOp(pixelateDef);
   registerOp(kaleidDef);
   registerOp(chromaShiftDef);
+  registerOp(chromaFractDef);
   registerOp(brightnessDef);
   registerOp(contrastDef);
   registerOp(colorDef);
@@ -211,6 +213,7 @@ export const DEFAULT_CHAIN: readonly string[] = [
   'modulateKaleid',
   'kaleid',
   'chromaShift',
+  'chromaFract',
   'brightness',
   'contrast',
   'color',
