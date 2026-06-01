@@ -66,6 +66,11 @@ import { lumaDef } from './luma';
 import { threshDef } from './thresh';
 import { hueDef } from './hue';
 import { coloramaDef } from './colorama';
+import { filmGradeDef } from './filmGrade';
+import { clarityDef } from './clarity';
+import { gradeLUTDef } from './gradeLUT';
+import { debandDitherDef } from './debandDither';
+import { retroDisplayDef } from './retroDisplay';
 import { addDef, blendDef, diffDef, layerDef, maskDef, multDef, subDef } from './blend';
 import { sumDef } from './sum';
 
@@ -142,6 +147,11 @@ export function registerAllOps(): void {
   registerOp(threshDef);
   registerOp(hueDef);
   registerOp(coloramaDef);
+  registerOp(filmGradeDef);
+  registerOp(clarityDef);
+  registerOp(gradeLUTDef);
+  registerOp(debandDitherDef);
+  registerOp(retroDisplayDef);
   registerOp(sumDef);
   registerOp(addDef);
   registerOp(subDef);
@@ -226,4 +236,9 @@ export const DEFAULT_CHAIN: readonly string[] = [
   'modulateHueRouted',
   'hue',
   'colorama',
+  'filmGrade',
+  'clarity',
+  'gradeLUT',
+  'debandDither',
+  'retroDisplay',
 ];

@@ -94,6 +94,7 @@ const NOISY_OPS: ReadonlySet<string> = new Set([
   'rotate',
   'grain',
   'selfMod',
+  'retroDisplay',
 ]);
 
 test.describe('Op characterisation sweeps', () => {

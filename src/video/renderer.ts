@@ -33,6 +33,7 @@ import {
 } from '../core/graph.svelte';
 import type { GraphExecutionPlan } from '../core/patch-graph';
 import { PlaceholderSource, type VideoSourceStage } from './sources';
+import { PRESENTATION_LUTS, buildLutData, type PresentationLutConfig } from './presentation-luts';
 import bloomPrefilterFs from './shaders/bloom-prefilter.frag?raw';
 import blurFs from './shaders/blur.frag?raw';
 import displacementFs from './shaders/displacement.frag?raw';
@@ -131,11 +132,6 @@ interface PresentationQualityConfig {
   prefilterBlackLevel: number;
   prefilterGamma: number;
   prefilterBrightness: number;
-}
-
-interface PresentationLutConfig {
-  defaultMix: number;
-  sample: (color: readonly [number, number, number]) => [number, number, number];
 }
 
 interface PresentationPostPresetConfig {
@@ -285,41 +281,10 @@ export const PRESENTATION_QUALITIES = {
   },
 } satisfies Record<string, PresentationQualityConfig>;
 
+export { PRESENTATION_LUTS } from './presentation-luts';
+
 function clampUnit(value: number): number {
   return Math.min(1, Math.max(0, value));
-}
-
-function mixScalar(a: number, b: number, amount: number): number {
-  return a + (b - a) * amount;
-}
-
-function mixColor(
-  left: readonly [number, number, number],
-  right: readonly [number, number, number],
-  amount: number,
-): [number, number, number] {
-  return [
-    mixScalar(left[0], right[0], amount),
-    mixScalar(left[1], right[1], amount),
-    mixScalar(left[2], right[2], amount),
-  ];
-}
-
-function adjustContrast(color: readonly [number, number, number], contrast: number) {
-  return color.map((channel) => clampUnit((channel - 0.5) * contrast + 0.5)) as [
-    number,
-    number,
-    number,
-  ];
-}
-
-function adjustSaturation(color: readonly [number, number, number], amount: number) {
-  const luma = color[0] * 0.2126 + color[1] * 0.7152 + color[2] * 0.0722;
-  return color.map((channel) => clampUnit(mixScalar(luma, channel, amount))) as [
-    number,
-    number,
-    number,
-  ];
 }
 
 function fract(value: number): number {
@@ -328,23 +293,6 @@ function fract(value: number): number {
 
 function hashScalar(seed: number, x: number, y: number): number {
   return fract(Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453123);
-}
-
-function buildLutData(config: PresentationLutConfig, size = 16): Uint8Array {
-  const data = new Uint8Array(size * size * size * 3);
-  let cursor = 0;
-  for (let blue = 0; blue < size; blue += 1) {
-    for (let green = 0; green < size; green += 1) {
-      for (let red = 0; red < size; red += 1) {
-        const sampled = config.sample([red / (size - 1), green / (size - 1), blue / (size - 1)]);
-        data[cursor] = Math.round(clampUnit(sampled[0]) * 255);
-        data[cursor + 1] = Math.round(clampUnit(sampled[1]) * 255);
-        data[cursor + 2] = Math.round(clampUnit(sampled[2]) * 255);
-        cursor += 3;
-      }
-    }
-  }
-  return data;
 }
 
 export function parseCubeLut(source: string, label = 'imported', mix = 1): ImportedPresentationLut {

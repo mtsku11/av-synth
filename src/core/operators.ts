@@ -297,7 +297,8 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
   },
   fluidSim: {
     family: 'Feedback',
-    blurb: 'Flockaroo-style rotational CFD — video colour is injected as dye into a self-advecting velocity field; geometric field types continuously steer the flow',
+    blurb:
+      'Flockaroo-style rotational CFD — video colour is injected as dye into a self-advecting velocity field; geometric field types continuously steer the flow',
     intents: ['feedback', 'fluid', 'motion trails', 'video texture'],
     coreParams: ['mix', 'inject', 'viscosity', 'fieldType'],
   },
@@ -330,6 +331,36 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'two-pole attraction/repulsion field — asymmetric dipole drag around a centre',
     intents: ['feedback', 'video texture', 'motion'],
     coreParams: ['mix', 'strength', 'separation', 'angle', 'balance', 'drift'],
+  },
+  filmGrade: {
+    family: 'Finish',
+    blurb: 'single-pass filmic exposure, tone, white-balance, saturation, and vignette finish',
+    intents: ['finish', 'colour', 'grading'],
+    coreParams: ['mix', 'exposure', 'contrast', 'saturation', 'shoulder'],
+  },
+  clarity: {
+    family: 'Finish',
+    blurb: 'restrained local-contrast sharpening with halo protection',
+    intents: ['finish', 'detail', 'sharpen'],
+    coreParams: ['mix', 'sharpness', 'scale', 'edgeProtect'],
+  },
+  gradeLUT: {
+    family: 'Finish',
+    blurb: 'bundled LUT grading with separate luma and chroma adoption',
+    intents: ['finish', 'colour', 'grading'],
+    coreParams: ['mix', 'lutIndex', 'chroma', 'luma'],
+  },
+  debandDither: {
+    family: 'Finish',
+    blurb: 'bounded flat-region debanding with subtle finishing noise',
+    intents: ['finish', 'cleanup', 'grain'],
+    coreParams: ['mix', 'radius', 'threshold', 'iterations', 'grain'],
+  },
+  retroDisplay: {
+    family: 'Finish',
+    blurb: 'clean-room CRT-style display finish with scanlines, mask, bleed, and phosphor trail',
+    intents: ['finish', 'display', 'nostalgia'],
+    coreParams: ['mix', 'scanlines', 'mask', 'bleed', 'phosphor'],
   },
   r: {
     family: 'Finish',
@@ -527,7 +558,8 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
   },
   chromaFract: {
     family: 'Texture',
-    blurb: 'compression-artifact visualiser — isolates chroma deviation, amplifies and quantises it into dense colour bands',
+    blurb:
+      'compression-artifact visualiser — isolates chroma deviation, amplifies and quantises it into dense colour bands',
     intents: ['glitch', 'video texture', 'finishing'],
     coreParams: ['mix', 'scale'],
   },

@@ -32,6 +32,7 @@ const EXPECTED_OPERATOR_IDS = [
   'pinchBulge',
   'polarRipple',
   'sinkSourceField',
+  'fluidSim',
   'spiralField',
   'domainFold',
   'gyreField',
@@ -70,6 +71,7 @@ const EXPECTED_OPERATOR_IDS = [
   'pixelate',
   'kaleid',
   'chromaShift',
+  'chromaFract',
   'brightness',
   'contrast',
   'color',
@@ -80,6 +82,11 @@ const EXPECTED_OPERATOR_IDS = [
   'thresh',
   'hue',
   'colorama',
+  'filmGrade',
+  'clarity',
+  'gradeLUT',
+  'debandDither',
+  'retroDisplay',
   'sum',
   'add',
   'sub',
@@ -129,9 +136,15 @@ describe('operator UI metadata', () => {
     expect(getOperatorUiMeta('gyreField').family).toBe('Feedback');
     expect(getOperatorUiMeta('turbulenceWarp').family).toBe('Feedback');
     expect(getOperatorUiMeta('magneticDipole').family).toBe('Feedback');
+    expect(getOperatorUiMeta('fluidSim').family).toBe('Feedback');
     expect(getOperatorUiMeta('glyphRender').family).toBe('Texture');
     expect(getOperatorUiMeta('glyphMotion').family).toBe('Motion');
     expect(getOperatorUiMeta('matrixRain').family).toBe('Texture');
+    expect(getOperatorUiMeta('filmGrade').family).toBe('Finish');
+    expect(getOperatorUiMeta('clarity').family).toBe('Finish');
+    expect(getOperatorUiMeta('gradeLUT').family).toBe('Finish');
+    expect(getOperatorUiMeta('debandDither').family).toBe('Finish');
+    expect(getOperatorUiMeta('retroDisplay').family).toBe('Finish');
   });
 
   it('surfaces curated core controls for node-card summaries', () => {
@@ -142,6 +155,13 @@ describe('operator UI metadata', () => {
       'threshold',
       'tolerance',
       'invert',
+    ]);
+    expect(getOperatorUiMeta('filmGrade').coreParams).toEqual([
+      'mix',
+      'exposure',
+      'contrast',
+      'saturation',
+      'shoulder',
     ]);
   });
 

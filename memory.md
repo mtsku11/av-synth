@@ -3131,3 +3131,23 @@ amount of fresh live video each frame. This is still lightweight and single-pass
 from a one-frame ghost blend into persistent transport. The remaining hard limit is still the shared
 single-scale motion estimator; true multi-scale flow is a later architectural step, not part of this
 release-hardening pass.
+
+## 2026-06-01 — ReShade-inspired finishing pack must stay native, license-safe, and bounded
+
+The right product move is a small pack of native finish operators, not any form of ReShade runtime
+integration. AV Synth now carries five new finish-family ops — `filmGrade`, `clarity`, `gradeLUT`,
+`debandDither`, and `retroDisplay` — but the implementation boundary is strict: no ReShade FX compiler,
+no injector/runtime/add-on system, no `.ini` preset compatibility, and no game depth-buffer effects.
+
+The licensing split is equally important. `SweetFX` and `prod80` provide permissive MIT references for
+grading/sharpening ideas, and `reshade-shaders/Shaders/Deband.fx` carries an MIT notice in-file, so those
+can inform clean-room AV Synth ports. `reshade-shaders/Shaders/LUT.fx` is not a safe copy source from the
+inspected path, so `gradeLUT` should reuse AV Synth's own procedural presentation LUTs instead of pulling
+in third-party LUT code or textures. The obvious CRT reference (`SweetFX/CRT.fx`) is GPL, so
+`retroDisplay` must remain handwritten inspiration only.
+
+Implementation discipline for this pack: keep `filmGrade`, `clarity`, `gradeLUT`, and `debandDither`
+single-pass; avoid new renderer subsystems; allocate no per-frame JS objects; expose params through the
+existing operator/modulation registry; and document the candidate/attribution boundary in-repo so the
+decision survives compaction. This is a release-hardening polish slice, not the start of a shader-pack
+import surface.

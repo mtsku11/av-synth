@@ -101,6 +101,7 @@ const NOISY_OPS: ReadonlySet<string> = new Set([
   'rotate',
   'grain',
   'selfMod',
+  'retroDisplay',
 ]);
 
 // Optional thorough-sweep subset filter so the smoke test can run end-to-end

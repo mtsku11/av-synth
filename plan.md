@@ -471,6 +471,14 @@ Release policy:
 
 Five authored programs join the public slate: `ASCII Ghost Delay`, `Binary Bass Rain`, `Halftone Feedback Bloom`, `Slit-Scan Hands`, and `Glyph Vortex`. Together with the graph-authored lead trio, they form the focused eight-program first-run bank. The pack adds no font texture, new FBO subsystem, physics engine, segmentation dependency, collaboration layer, recording/export change, or public audio engine.
 
+### 10.5.2 ReShade-inspired native finishing pack
+
+✅ **Landed 2026-06-01 as native AV Synth operators, not ReShade compatibility.** The release-safe scope is five tightly bounded finish passes: `filmGrade`, `clarity`, `gradeLUT`, `debandDither`, and `retroDisplay`. They register through the normal video-op path, serialize like any other operator, and inherit the existing modulation/LFO surface without new UI architecture.
+
+The boundary matters more than the effect count. AV Synth does **not** embed the ReShade runtime, injector, FX compiler, preset system, add-on model, or depth-buffer effects. External shader repos are used only where the license is clearly permissive and the algorithm can be reduced to an idiomatic single-pass AV Synth operator. `gradeLUT` deliberately reuses the existing built-in LUT infrastructure and ships no third-party LUT textures. `retroDisplay` is clean-room only because the obvious CRT references are GPL or otherwise unsuitable to copy directly.
+
+Candidate selection, licensing, and defer/reject rationale live in `docs/RESHADER_PORT_CANDIDATES.md`. Attribution notes for the permissive reference material used in the clean-room ports live in `docs/RESHADER_PORT_NOTICES.md`. Do not let this pack drift into runtime-compatibility work during release hardening.
+
 ### 10.5.3 Audit recommendations (2026-05-28 + 2026-05-29)
 
 ✅ All audit items R1–R7 and S1–S8 closed 2026-05-29. Full item-by-item status in `todo.md`. R8 (real-device latency/CPU measurement) remains open — requires physical hardware access at staging time. Dated change-log subsections moved to `docs/archive/build-log.md` 2026-05-28; open design tensions (`timeDisplace` source-anchored history, `flow` motion-estimator ceiling) tracked in `todo.md` "Deferred / open follow-ups".
