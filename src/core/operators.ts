@@ -358,9 +358,9 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
   },
   retroDisplay: {
     family: 'Finish',
-    blurb: 'clean-room CRT-style display finish with scanlines, mask, bleed, and phosphor trail',
-    intents: ['finish', 'display', 'nostalgia'],
-    coreParams: ['mix', 'scanlines', 'mask', 'bleed', 'phosphor'],
+    blurb: 'CRT display finish with scanlines, phosphor trail, and optional VHS tape-wave and scan-line distortion artifacts',
+    intents: ['finish', 'display', 'nostalgia', 'vhs', 'tape'],
+    coreParams: ['mix', 'scanlines', 'vhsDist', 'vhsTape', 'bleed', 'phosphor'],
   },
   r: {
     family: 'Finish',

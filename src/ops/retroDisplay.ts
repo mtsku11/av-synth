@@ -38,6 +38,8 @@ class RetroDisplayVideoStage implements VideoStage {
   #uPhosphor: WebGLUniformLocation;
   #uNoise: WebGLUniformLocation;
   #uRoll: WebGLUniformLocation;
+  #uVhsDist: WebGLUniformLocation;
+  #uVhsTape: WebGLUniformLocation;
   #uMix: WebGLUniformLocation;
 
   constructor(gl: WebGL2RenderingContext) {
@@ -53,6 +55,8 @@ class RetroDisplayVideoStage implements VideoStage {
     this.#uPhosphor = reqUniform(gl, this.program, 'u_phosphor', 'retroDisplay');
     this.#uNoise = reqUniform(gl, this.program, 'u_noise', 'retroDisplay');
     this.#uRoll = reqUniform(gl, this.program, 'u_roll', 'retroDisplay');
+    this.#uVhsDist = reqUniform(gl, this.program, 'u_vhs_dist', 'retroDisplay');
+    this.#uVhsTape = reqUniform(gl, this.program, 'u_vhs_tape', 'retroDisplay');
     this.#uMix = reqUniform(gl, this.program, 'u_mix', 'retroDisplay');
   }
 
@@ -76,6 +80,8 @@ class RetroDisplayVideoStage implements VideoStage {
     gl.uniform1f(this.#uPhosphor, params['phosphor'] ?? 0.3);
     gl.uniform1f(this.#uNoise, params['noise'] ?? 0.12);
     gl.uniform1f(this.#uRoll, params['roll'] ?? 0);
+    gl.uniform1f(this.#uVhsDist, params['vhsDist'] ?? 0);
+    gl.uniform1f(this.#uVhsTape, params['vhsTape'] ?? 0);
     gl.uniform1f(this.#uMix, params['mix'] ?? 0);
   }
 
@@ -86,7 +92,7 @@ class RetroDisplayVideoStage implements VideoStage {
 
 export const retroDisplayDef: OperatorDef = {
   op: 'retroDisplay',
-  paramOrder: ['mix', 'scanlines', 'mask', 'warp', 'bleed', 'phosphor', 'noise', 'roll'],
+  paramOrder: ['mix', 'scanlines', 'mask', 'warp', 'bleed', 'phosphor', 'noise', 'roll', 'vhsDist', 'vhsTape'],
   defaults: {
     mix: 0,
     scanlines: 0.65,
@@ -96,6 +102,8 @@ export const retroDisplayDef: OperatorDef = {
     phosphor: 0.3,
     noise: 0.12,
     roll: 0,
+    vhsDist: 0,
+    vhsTape: 0,
   },
   coupling: {
     op: 'retroDisplay',
@@ -108,6 +116,8 @@ export const retroDisplayDef: OperatorDef = {
       phosphor: param('phosphor', 'phosphor', [0, 1], 0.3, 'glow and previous-frame persistence'),
       noise: param('noise', 'noise', [0, 1], 0.12, 'display hiss and phosphor grain'),
       roll: param('roll', 'roll', [-1, 1], 0, 'vertical roll speed'),
+      vhsDist: param('vhsDist', 'vhs dist', [0, 1], 0, 'VHS horizontal scan-line distortion and vertical roll artifacts'),
+      vhsTape: param('vhsTape', 'vhs tape', [0, 1], 0, 'tape wave, crease, switching noise at bottom edge, chroma bloom, and AC beat'),
     },
   },
   createVideoStage(gl) {
