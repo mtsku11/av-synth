@@ -51,6 +51,20 @@ This file is project-scoped engineering memory, distinct from Claude's harness m
 - Grain-composite source activation should either complete the needed setup or show a concrete refusal message; it should not look like a dead button.
 - The granulator `mix` control is part of the public dry/wet story: when the wet side is at `1.0`, the direct source audio must be fully attenuated rather than remaining audible in parallel.
 
+### 2026-06-01 — Neutral cold start beats auto-loading a flagship program
+
+**Decision**: keep the built-in footage clip as the first-run visual source, but stop auto-applying any preset or program on boot. The shell should open on plain source video with an empty chain and no active preset card.
+
+**Why**:
+- User feedback was explicit: the forced flagship state made the app feel like it had already made creative choices for them and obscured whether the grain source was actually working.
+- The targeted grain-composite browser probe still passes, which points away from a global renderer failure and toward startup state masking the behavior. A neutral cold start makes the source/grain transition legible again.
+- The built-in clip is enough to keep the shell from looking empty; the extra preset boot state added more confusion than value.
+
+**How to apply**:
+- Built-in footage may still auto-load and autoplay visually, but it should start at its normal beginning rather than jumping to a curated preview seek.
+- Presets remain the main authored-on-ramp, but they should be user-invoked from the presets tab.
+- Cold-start QA should expect no `.presets-active` section until the user selects a program.
+
 ### 2026-06-01 — Root README is the public repo entrypoint; local capture clutter is not durable project state
 
 **Decision**: add a real root `README.md` for the staging/release-candidate product surface, and treat root-level PNG/JPG dumps plus `.ci-repro/` as disposable local artifacts rather than meaningful repo content.

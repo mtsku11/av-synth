@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('release showcase shell', () => {
-  test('cold start exposes diagnostics, flagship program, recovery controls, and workspace surfaces', async ({
+  test('cold start exposes diagnostics, a neutral source shell, and workspace surfaces', async ({
     page,
   }) => {
     const consoleErrors: string[] = [];
@@ -71,8 +71,8 @@ test.describe('release showcase shell', () => {
       page.locator('.presets-tab > .program-grid:not(.experiment-grid) .program-card'),
     ).toHaveCount(8);
     await expect(page.locator('.experiment-grid .program-card')).toHaveCount(40);
-    await expect(page.locator('.presets-active strong')).toHaveText('Singularity Bloom');
-    await expect(page.locator('[data-qa^="program-macro-"]')).toHaveCount(3);
+    await expect(page.locator('.presets-active')).toHaveCount(0);
+    await expect(page.locator('[data-qa^="program-macro-"]')).toHaveCount(0);
     await page.getByRole('button', { name: 'clear feedback' }).click();
 
     expect(consoleErrors).toEqual([]);

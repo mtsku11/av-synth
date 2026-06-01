@@ -163,7 +163,6 @@
   let midiDevices = $state<readonly WebMidiDevice[]>([]);
   let midiUnavailableReason = $state<string | null>(null);
   let selectedMidiSource = $state<string>('all');
-  const BUILT_IN_DEMO_PREVIEW_TIME_SEC = 1.5;
   const KEY_TO_NOTE: Readonly<Record<string, number>> = {
     a: 60,
     w: 61,
@@ -241,7 +240,6 @@
   ) as PresentationLensDirtName[];
   let presentationLensDirt = $state<PresentationLensDirtName>('none');
   let bloomStrengthAssignment = $state<ParamLfoAssignment>(createParamLfoAssignment());
-  const FLAGSHIP_PROGRAM_KEY = 'singularityBloom';
   const PUBLIC_PROGRAM_KEYS = new Set([
     'singularityBloom',
     'fractureRelay',
@@ -654,25 +652,6 @@
       video.addEventListener('error', onError, { once: true });
       video.currentTime = time;
     });
-  }
-
-  function resolveBuiltInDemoPreviewTime(video: HTMLVideoElement): number {
-    if (!Number.isFinite(video.duration) || video.duration <= 0)
-      return BUILT_IN_DEMO_PREVIEW_TIME_SEC;
-    return Math.min(BUILT_IN_DEMO_PREVIEW_TIME_SEC, Math.max(0, video.duration - 0.25));
-  }
-
-  async function primeBuiltInDemoVideo(video: HTMLVideoElement): Promise<void> {
-    await waitForVideoFrame(video);
-    const previewTime = resolveBuiltInDemoPreviewTime(video);
-    if (previewTime > 0) {
-      try {
-        await waitForVideoSeek(video, previewTime);
-      } catch {
-        // Leave the clip usable even if the browser refuses a preview seek.
-      }
-    }
-    if (sourceKind !== 'video') setSourceKind('video');
   }
 
   async function probeClipFrameRate(video: HTMLVideoElement): Promise<number | null> {
@@ -2097,7 +2076,7 @@
       loadedVideoName = 'built-in footage';
       try {
         if (vid.readyState >= 2) {
-          await primeBuiltInDemoVideo(vid);
+          await waitForVideoFrame(vid);
         } else {
           await new Promise<void>((resolve, reject) => {
             const onLoaded = () => {
@@ -2111,8 +2090,9 @@
             vid.addEventListener('loadeddata', onLoaded, { once: true });
             vid.addEventListener('error', onError, { once: true });
           });
-          await primeBuiltInDemoVideo(vid);
+          await waitForVideoFrame(vid);
         }
+        setSourceKind('video');
       } catch (e) {
         initError = e instanceof Error ? e.message : String(e);
         setSourceKind('placeholder');
@@ -2124,7 +2104,6 @@
 
     try {
       programs = await loadPrograms();
-      if (programs[FLAGSHIP_PROGRAM_KEY]) onProgram(FLAGSHIP_PROGRAM_KEY);
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
     }
