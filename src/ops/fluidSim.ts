@@ -1,8 +1,7 @@
-// fluidSim — Flockaroo-style rotational CFD self-advection.
-// The ownedState buffer is the fluid (rg=velocity, b=dye). Each frame the
-// velocity field rotates itself via multi-scale curl sampling — no
-// divergence-free constraint or pressure solve required. Live video is
-// injected as dye; a geometric field type can continuously steer the flow.
+// fluidSim — true Flockaroo-style rotational CFD with separate velocity + dye.
+// Two ownedState FBOs (MRT):
+//   ownedState  → dye buffer (TEXTURE1, bindAsPrevFrame)    → composite output
+//   ownedState2 → velocity   (TEXTURE7, seeded at rest=0.5) → internal only
 
 import frag from '../video/shaders/fluidSim.frag?raw';
 import type { OperatorDef, VideoStage } from '../core/operators';
@@ -13,7 +12,8 @@ class FluidSimVideoStage implements VideoStage {
   readonly op = 'fluidSim';
   readonly program: WebGLProgram;
   #uTex: WebGLUniformLocation;
-  #uPrev: WebGLUniformLocation;
+  #uPrevDye: WebGLUniformLocation;
+  #uPrevVel: WebGLUniformLocation;
   #uMix: WebGLUniformLocation;
   #uInject: WebGLUniformLocation;
   #uViscosity: WebGLUniformLocation;
@@ -28,7 +28,8 @@ class FluidSimVideoStage implements VideoStage {
   constructor(gl: WebGL2RenderingContext) {
     this.program = compileProgram(gl, frag, 'fluidSim');
     this.#uTex       = reqUniform(gl, this.program, 'u_tex',       'fluidSim');
-    this.#uPrev      = reqUniform(gl, this.program, 'u_prev_frame','fluidSim');
+    this.#uPrevDye   = reqUniform(gl, this.program, 'u_prev_dye',  'fluidSim');
+    this.#uPrevVel   = reqUniform(gl, this.program, 'u_prev_vel',  'fluidSim');
     this.#uMix       = reqUniform(gl, this.program, 'u_mix',       'fluidSim');
     this.#uInject    = reqUniform(gl, this.program, 'u_inject',    'fluidSim');
     this.#uViscosity = reqUniform(gl, this.program, 'u_viscosity', 'fluidSim');
@@ -46,8 +47,9 @@ class FluidSimVideoStage implements VideoStage {
     params: Readonly<Record<string, number>>,
     _ctx: CouplingContext,
   ): void {
-    gl.uniform1i(this.#uTex,       0);
-    gl.uniform1i(this.#uPrev,      1);
+    gl.uniform1i(this.#uTex,       0); // TEXTURE0: live video
+    gl.uniform1i(this.#uPrevDye,   1); // TEXTURE1: previous dye (ownedState, bindAsPrevFrame)
+    gl.uniform1i(this.#uPrevVel,   7); // TEXTURE7: previous velocity (ownedState2)
     gl.uniform1f(this.#uMix,       params['mix']       ?? 0);
     gl.uniform1f(this.#uInject,    params['inject']    ?? 0.15);
     gl.uniform1f(this.#uViscosity, params['viscosity'] ?? 0.7);
@@ -67,9 +69,14 @@ class FluidSimVideoStage implements VideoStage {
 
 export const fluidSimDef: OperatorDef = {
   op: 'fluidSim',
+  // ownedState → dye buffer (bindAsPrevFrame binds it to TEXTURE1 as u_prev_dye)
   ownedState: {
-    uniform: 'u_prev_frame',
+    uniform: 'u_prev_dye',
     bindAsPrevFrame: true,
+  },
+  // ownedState2 → velocity buffer (seeded at rest; bound to TEXTURE7 as u_prev_vel)
+  ownedState2: {
+    uniform: 'u_prev_vel',
   },
   paramOrder: ['mix', 'inject', 'viscosity', 'scale', 'speed', 'fieldType', 'angle', 'cx', 'cy', 'seedStr'],
   defaults: { mix: 0, inject: 0.15, viscosity: 0.7, scale: 1.5, speed: 1.0, fieldType: 0, angle: 0, cx: 0.5, cy: 0.5, seedStr: 0.3 },
@@ -77,19 +84,19 @@ export const fluidSimDef: OperatorDef = {
     op: 'fluidSim',
     params: {
       mix: {
-        spec: { id: 'mix', label: 'mix', range: [0, 1], default: 0, curve: 'lin', unit: 'norm', hint: 'wet/dry — 0 bypasses the op entirely' },
+        spec: { id: 'mix', label: 'mix', range: [0, 1], default: 0, curve: 'lin', unit: 'norm', hint: 'wet/dry — 0 bypasses, velocity still evolves in background' },
         toVideo: (raw) => raw,
       },
       inject: {
-        spec: { id: 'inject', label: 'inject', range: [0, 1], default: 0.15, curve: 'lin', unit: 'norm', hint: 'rate at which live video is injected as dye each frame; also couples video colour to velocity' },
+        spec: { id: 'inject', label: 'inject', range: [0, 1], default: 0.15, curve: 'lin', unit: 'norm', hint: 'rate at which live video pixels are fed into the dye each frame' },
         toVideo: (raw) => raw,
       },
       viscosity: {
-        spec: { id: 'viscosity', label: 'viscosity', range: [0, 1], default: 0.7, curve: 'lin', unit: 'norm', hint: '0 = high drag (velocity decays quickly), 1 = frictionless (velocity persists)' },
+        spec: { id: 'viscosity', label: 'viscosity', range: [0, 1], default: 0.7, curve: 'lin', unit: 'norm', hint: '0 = high drag (velocity decays fast), 1 = frictionless (velocity persists)' },
         toVideo: (raw) => raw,
       },
       scale: {
-        spec: { id: 'scale', label: 'scale', range: [0.5, 4], default: 1.5, curve: 'lin', unit: 'norm', hint: 'spatial scale of the rotation sampling — larger values produce broader eddies' },
+        spec: { id: 'scale', label: 'scale', range: [0.5, 4], default: 1.5, curve: 'lin', unit: 'norm', hint: 'spatial scale of rotation sampling — larger gives broader, slower eddies' },
         toVideo: (raw) => raw,
       },
       speed: {
@@ -97,7 +104,7 @@ export const fluidSimDef: OperatorDef = {
         toVideo: (raw) => raw,
       },
       fieldType: {
-        spec: { id: 'fieldType', label: 'field', range: [0, 3], default: 0, curve: 'lin', unit: 'norm', hint: '0=none (pure CFD), 1=vortex, 2=linear flow, 3=curl noise — continuously steers velocity' },
+        spec: { id: 'fieldType', label: 'field', range: [0, 3], default: 0, curve: 'lin', unit: 'norm', hint: '0=none (pure CFD), 1=vortex, 2=linear, 3=curl — continuously steers velocity' },
         toVideo: (raw) => raw,
       },
       angle: {
@@ -113,7 +120,7 @@ export const fluidSimDef: OperatorDef = {
         toVideo: (raw) => raw,
       },
       seedStr: {
-        spec: { id: 'seedStr', label: 'seed str', range: [0, 1], default: 0.3, curve: 'lin', unit: 'norm', hint: 'strength of the continuous field forcing — 0 leaves CFD unsteered, 1 aggressively shapes the flow toward the chosen field type' },
+        spec: { id: 'seedStr', label: 'seed str', range: [0, 1], default: 0.3, curve: 'lin', unit: 'norm', hint: 'field forcing strength — 0 = pure self-advecting CFD, 1 = strongly shaped by field type' },
         toVideo: (raw) => raw,
       },
     },

@@ -128,9 +128,9 @@
   let monitorBus = $state<BusIndex>(0);
   let previewMode = $state<PreviewMode>('single');
   type WorkspaceSurface = 'video' | 'audio' | 'lfo' | 'presets';
-  let activeWorkspaceSurface = $state<WorkspaceSurface>('presets');
-  let advancedOpen = $state(false);
-  let demoStarted = $state(false);
+  let activeWorkspaceSurface = $state<WorkspaceSurface>('video');
+  let advancedOpen = $state(true);
+  let demoStarted = $state(true);
   let safeMode = $state(false);
 
   // Source kind: 'video' = external <video> element, 'placeholder' = built-in
@@ -2120,6 +2120,8 @@
     } catch (e) {
       initError = e instanceof Error ? e.message : String(e);
     }
+    // Auto-play video on startup; audio init deferred until first user gesture.
+    void clock.start().then(() => playActiveVideoSource()).catch(() => {});
     startVideoFeatureSampling();
     installQaBridge();
     startProgramAutomationLoop();

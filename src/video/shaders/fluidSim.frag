@@ -1,58 +1,61 @@
 #version 300 es
 precision highp float;
 
-// fluidSim — Flockaroo-style rotational CFD self-advection.
+// fluidSim — true Flockaroo-style rotational CFD with separate velocity + dye.
 //
-// The ownedState buffer stores the fluid: rg = velocity (0.5 = rest),
-// b = blue dye channel.  Each frame the velocity field self-advects via
-// multi-scale rotational sampling (no divergence-free constraint needed).
-// Live video is continuously injected as dye; a geometric field type can
-// steer the velocity with a small continuous forcing term.
+// Two ownedState FBOs (MRT):
+//   layout(location=0) → dye buffer  (ownedState,  TEXTURE1) — blitted to composite
+//   layout(location=1) → velocity    (ownedState2, TEXTURE7) — internal only
 //
-// Reference: Florian Berger (flockaroo), 2016 — shadertoy.com/view/MdlSzM
-// Key insight: sampling curl across ROT_NUM evenly-spaced directions and
-// averaging gives a stochastic approximation of the local rotation that
-// is self-consistent across scales without a pressure-solve step.
+// Each frame:
+//   1. Compute multi-scale rotation from the velocity buffer (Flockaroo method).
+//   2. Rotate + advect the velocity field (self-consistent, no div-free solve).
+//   3. Back-trace the DYE through the velocity to transport video pixels.
+//   4. Inject live video as fresh dye at rate u_inject.
+//
+// Reference: Florian Berger (flockaroo) 2016 — shadertoy.com/view/MdlSzM
 
 in vec2 v_uv;
-out vec4 o_color;
 
-uniform sampler2D u_tex;        // live video (injected as dye + initial field seed)
-uniform sampler2D u_prev_frame; // previous fluid state: rg=vel (0.5=rest), b=dye
+// MRT outputs
+layout(location = 0) out vec4 o_dye; // → composite (what downstream ops see)
+layout(location = 1) out vec4 o_vel; // → velocity buffer (internal)
 
-uniform float u_mix;       // wet/dry blend
-uniform float u_inject;    // dye injection rate [0,1] → actual rate u_inject * 0.08
-uniform float u_viscosity; // decay [0,1] → multiplier [0.994, 1.000]
+uniform sampler2D u_tex;      // TEXTURE0: live video — dye injection source
+uniform sampler2D u_prev_dye; // TEXTURE1: previous dye (ownedState, bindAsPrevFrame)
+uniform sampler2D u_prev_vel; // TEXTURE7: previous velocity  rg=[0,1] where 0.5=rest
+
+uniform float u_mix;
+uniform float u_inject;    // dye injection rate  [0,1] → actual rate * 0.06
+uniform float u_viscosity; // velocity decay      [0,1] → multiplier [0.993, 1.000]
 uniform float u_scale;     // rotation sample base radius [0.5, 4]
-uniform float u_speed;     // rotation amplification [0, 2]
-uniform float u_fieldType; // 0=none, 1=vortex, 2=linear, 3=curl  (float, rounded)
+uniform float u_speed;     // rotation amplification      [0, 2]
+uniform float u_fieldType; // 0=none, 1=vortex, 2=linear, 3=curl  (rounded to int)
 uniform float u_angle;     // linear field direction normalised [0,1]
-uniform float u_cx;        // vortex/curl centre x
-uniform float u_cy;        // vortex/curl centre y
-uniform float u_seedStr;   // continuous field forcing strength [0,1]
+uniform float u_cx;        // field centre x
+uniform float u_cy;        // field centre y
+uniform float u_seedStr;   // continuous field forcing strength  [0,1]
 
 const float TAU = 6.28318530718;
 #define ROT_NUM 3
 
-// 120° CCW rotation matrix (column-major: col0=(cos,sin), col1=(-sin,cos))
+// 120° CCW rotation matrix  (GLSL mat2 is column-major)
 const mat2 ROT_M = mat2(-0.5, 0.866025, -0.866025, -0.5);
 
-// Per-pixel hash for stochastic starting angle — removes directional bias
-// from the equally-spaced rotation samples without needing a noise texture.
+// Per-pixel hash — removes directional bias without needing a noise texture.
 float hash21(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
-// Flockaroo rotational sampling.
+// Flockaroo rotational curl sampling.
 // Samples ROT_NUM velocity vectors equally spaced around a circle of radius sc,
-// returns the mean signed curl (cross(v, p) / |p|^2) which is the local
-// rotation rate of the velocity field at uv.
+// returns the mean signed curl  cross(v, p) / |p|^2 — the local rotation rate.
 float getRot(vec2 uv, float sc) {
     float startAng = hash21(uv) * TAU / float(ROT_NUM);
     vec2 p = vec2(cos(startAng), sin(startAng)) * sc;
     float rot = 0.0;
     for (int i = 0; i < ROT_NUM; i++) {
-        vec2 v = texture(u_prev_frame, fract(uv + p)).rg - vec2(0.5);
+        vec2 v = texture(u_prev_vel, fract(uv + p)).rg - vec2(0.5);
         rot += (v.x * p.y - v.y * p.x) / max(dot(p, p), 1e-6);
         p = ROT_M * p;
     }
@@ -63,13 +66,14 @@ void main() {
     vec3 src = texture(u_tex, v_uv).rgb;
 
     if (u_mix < 0.0005) {
-        o_color = vec4(src, 1.0);
+        o_dye = vec4(src, 1.0);
+        o_vel = texture(u_prev_vel, v_uv); // pass velocity through unchanged
         return;
     }
 
     int ft = int(u_fieldType + 0.5);
 
-    // --- Multi-scale rotational CFD ---
+    // ── Flockaroo CFD: multi-scale rotational velocity update ──────────────
     float rot = 0.0;
     float sc = u_scale * 0.003;
     for (int i = 0; i < 4; i++) {
@@ -78,40 +82,35 @@ void main() {
     }
     rot *= u_speed * 0.3;
 
-    // Back-trace by current velocity to find where this pixel's fluid came from
-    vec2 vel = texture(u_prev_frame, v_uv).rg - vec2(0.5);
-    vec2 advUV = fract(v_uv - vel * u_scale * 0.006);
-    vec3 advState = texture(u_prev_frame, advUV).rgb;
+    // Read current velocity and advect the velocity field backwards.
+    vec2 vel = texture(u_prev_vel, v_uv).rg - vec2(0.5);
+    vec2 velAdvUV = fract(v_uv - vel * u_scale * 0.006);
+    vec2 advVel = texture(u_prev_vel, velAdvUV).rg - vec2(0.5);
 
-    // Rotate the advected velocity by the computed rotation angle
+    // Rotate velocity by computed rotation angle.
     float cosR = cos(rot);
     float sinR = sin(rot);
-    vec2 advVel = advState.rg - vec2(0.5);
     vec2 newVel = vec2(
         cosR * advVel.x - sinR * advVel.y,
         sinR * advVel.x + cosR * advVel.y
     );
 
-    // Viscosity decay toward rest (newVel→0, meaning packed value→0.5)
-    float visc = 0.994 + u_viscosity * 0.006;
+    // Viscosity decay toward rest.
+    float visc = 0.993 + u_viscosity * 0.007;
     newVel *= visc;
-    float newB = advState.b * visc;
 
-    // Continuous geometric field forcing (steers velocity without overriding CFD)
+    // Continuous geometric field forcing — steers without overriding CFD.
     if (ft > 0) {
         vec2 force = vec2(0.0);
         if (ft == 1) {
-            // Vortex around (u_cx, u_cy)
             vec2 d = v_uv - vec2(u_cx, u_cy);
             float r = length(d);
             float env = smoothstep(0.0, 0.15, r) * exp(-r * 2.5);
             force = r > 0.001 ? (vec2(-d.y, d.x) / r) * env * 0.35 : vec2(0.0);
         } else if (ft == 2) {
-            // Uniform linear flow in u_angle direction
             float a = u_angle * TAU;
             force = vec2(cos(a), sin(a)) * 0.35;
         } else if (ft == 3) {
-            // Analytic curl noise (static UV-based, always divergence-free)
             vec2 uv2 = v_uv - vec2(u_cx, u_cy);
             float nx = sin(uv2.x * 6.2 + 0.5) * cos(uv2.y * 5.1);
             float ny = cos(uv2.x * 5.1) * sin(uv2.y * 6.2 - 0.7);
@@ -120,16 +119,17 @@ void main() {
         newVel = mix(newVel, force, u_seedStr * 0.025);
     }
 
-    // Clamp velocity to prevent runaway accumulation
     newVel = clamp(newVel, vec2(-0.49), vec2(0.49));
+    o_vel = vec4(newVel + vec2(0.5), 0.0, 1.0);
 
-    // Assemble updated fluid state
-    vec3 newState = vec3(newVel + vec2(0.5), newB);
+    // ── Dye advection: back-trace video pixels through the velocity field ──
+    // Using the velocity at this pixel, find where the dye at v_uv came from.
+    vec2 dyeAdvUV = fract(v_uv - vel * u_scale * 0.008);
+    vec3 advDye = texture(u_prev_dye, dyeAdvUV).rgb;
 
-    // Inject live video as dye — also couples video colour into the velocity
-    // channels (rg), so the video content gradually sculpts the flow pattern
-    float injectRate = u_inject * 0.08;
-    newState = mix(newState, src, injectRate);
+    // Inject live video as fresh dye.
+    float injectRate = u_inject * 0.06;
+    vec3 newDye = mix(advDye, src, injectRate);
 
-    o_color = vec4(mix(src, newState, u_mix), 1.0);
+    o_dye = vec4(mix(src, newDye, u_mix), 1.0);
 }

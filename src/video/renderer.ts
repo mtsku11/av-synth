@@ -832,6 +832,7 @@ export class VideoRenderer {
   #displacementTarget: OffscreenTarget;
   #nodeTargets = new Map<string, OffscreenTarget>();
   #ownedStateBuffers = new Map<string, OwnedStateBuffer>();
+  #ownedState2Buffers = new Map<string, OwnedStateBuffer>();
   #busHistory = new Map<BusIndex, OffscreenTarget>();
   #emptyTarget: OffscreenTarget;
   #prevFrame: OffscreenTarget;
@@ -1509,6 +1510,8 @@ export class VideoRenderer {
     this.#nodeTargets.clear();
     for (const buf of this.#ownedStateBuffers.values()) this.#deleteOwnedStateBuffer(buf);
     this.#ownedStateBuffers.clear();
+    for (const buf of this.#ownedState2Buffers.values()) this.#deleteOwnedStateBuffer(buf);
+    this.#ownedState2Buffers.clear();
     for (const target of this.#busHistory.values()) this.#deleteTarget(target);
     this.#busHistory.clear();
     this.#deleteTarget(this.#emptyTarget);
@@ -1599,10 +1602,16 @@ export class VideoRenderer {
       const ownedState = instance.def.ownedState
         ? (this.#ownedStateBuffers.get(step.id) ?? null)
         : null;
+      const ownedState2 = instance.def.ownedState2
+        ? (this.#ownedState2Buffers.get(step.id) ?? null)
+        : null;
 
       if (ownedState) {
         if (ownedState.framesWritten === 0) {
           this.#primeOwnedState(primaryInput, ownedState);
+        }
+        if (ownedState2 && ownedState2.framesWritten === 0) {
+          this.#primeOwnedState2(ownedState2);
         }
         // Render into ownedState[next]; ownedState[current] is exposed to the
         // shader on TEXTURE6 as the previous-frame state.
@@ -1614,6 +1623,17 @@ export class VideoRenderer {
           ownedState.next,
           0,
         );
+        if (ownedState2) {
+          // MRT: attachment 1 → velocity buffer (internal, not composited).
+          gl.framebufferTexture2D(
+            gl.FRAMEBUFFER,
+            gl.COLOR_ATTACHMENT1,
+            gl.TEXTURE_2D,
+            ownedState2.next,
+            0,
+          );
+          gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+        }
         gl.viewport(0, 0, ownedState.width, ownedState.height);
       } else {
         gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
@@ -1651,6 +1671,10 @@ export class VideoRenderer {
       if (ownedState) {
         gl.activeTexture(gl.TEXTURE6);
         gl.bindTexture(gl.TEXTURE_2D, ownedState.current);
+      }
+      if (ownedState2) {
+        gl.activeTexture(gl.TEXTURE7);
+        gl.bindTexture(gl.TEXTURE_2D, ownedState2.current);
       }
 
       const stepScratch = this.#instanceScratch.get(step.id);
@@ -1692,8 +1716,14 @@ export class VideoRenderer {
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 
       if (ownedState) {
-        // Blit ownedState[next] → chain target so downstream ops see it.
+        if (ownedState2) {
+          // Reset MRT: detach velocity attachment and restore single-output mode.
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, null, 0);
+          gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+        }
+        // Blit ownedState[next] (dye, attachment 0) → chain target.
         gl.bindFramebuffer(gl.READ_FRAMEBUFFER, ownedState.fbo);
+        gl.readBuffer(gl.COLOR_ATTACHMENT0);
         gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, target.fbo);
         gl.blitFramebuffer(
           0,
@@ -1712,6 +1742,12 @@ export class VideoRenderer {
         ownedState.current = ownedState.next;
         ownedState.next = tmp;
         ownedState.framesWritten += 1;
+        if (ownedState2) {
+          const tmp2 = ownedState2.current;
+          ownedState2.current = ownedState2.next;
+          ownedState2.next = tmp2;
+          ownedState2.framesWritten += 1;
+        }
       }
     }
 
@@ -2096,6 +2132,12 @@ export class VideoRenderer {
     ownedState.framesWritten = 1;
   }
 
+  // Seed the velocity buffer at rest: rg=0.5 (zero velocity packed), b=0, a=1.
+  #primeOwnedState2(ownedState2: OwnedStateBuffer): void {
+    glBindOwnedState2AndClear(this.gl, ownedState2);
+    ownedState2.framesWritten = 1;
+  }
+
   #clearTarget(target: OffscreenTarget): void {
     const gl = this.gl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
@@ -2166,6 +2208,11 @@ export class VideoRenderer {
         .filter((step) => step.instance.def.ownedState != null)
         .map((step) => step.id),
     );
+    const owned2Ids = new Set(
+      this.#plan.steps
+        .filter((step) => step.instance.def.ownedState2 != null)
+        .map((step) => step.id),
+    );
     for (const [id, target] of this.#nodeTargets) {
       if (nextIds.has(id)) continue;
       this.#deleteTarget(target);
@@ -2176,6 +2223,11 @@ export class VideoRenderer {
       this.#deleteOwnedStateBuffer(buf);
       this.#ownedStateBuffers.delete(id);
     }
+    for (const [id, buf] of this.#ownedState2Buffers) {
+      if (owned2Ids.has(id)) continue;
+      this.#deleteOwnedStateBuffer(buf);
+      this.#ownedState2Buffers.delete(id);
+    }
     for (const id of nextIds) {
       if (this.#nodeTargets.has(id)) continue;
       this.#nodeTargets.set(id, createTarget(this.gl, width, height, this.#internalFormat));
@@ -2183,6 +2235,10 @@ export class VideoRenderer {
     for (const id of ownedIds) {
       if (this.#ownedStateBuffers.has(id)) continue;
       this.#ownedStateBuffers.set(id, this.#createOwnedStateBuffer(width, height));
+    }
+    for (const id of owned2Ids) {
+      if (this.#ownedState2Buffers.has(id)) continue;
+      this.#ownedState2Buffers.set(id, this.#createOwnedStateBuffer(width, height));
     }
   }
 
@@ -2317,6 +2373,8 @@ export class VideoRenderer {
     this.#nodeTargets.clear();
     for (const buf of this.#ownedStateBuffers.values()) this.#deleteOwnedStateBuffer(buf);
     this.#ownedStateBuffers.clear();
+    for (const buf of this.#ownedState2Buffers.values()) this.#deleteOwnedStateBuffer(buf);
+    this.#ownedState2Buffers.clear();
     for (const target of this.#busHistory.values()) this.#deleteTarget(target);
     this.#busHistory.clear();
     this.#deleteTarget(this.#emptyTarget);
@@ -2404,6 +2462,10 @@ export class VideoRenderer {
       glBindOwnedStateAndClear(this.gl, buffer);
       buffer.framesWritten = 0;
     }
+    for (const buffer of this.#ownedState2Buffers.values()) {
+      glBindOwnedState2AndClear(this.gl, buffer);
+      buffer.framesWritten = 0;
+    }
     this.#hasSourceHistory = false;
   }
 }
@@ -2413,6 +2475,18 @@ function glBindOwnedStateAndClear(gl: WebGL2RenderingContext, buffer: OwnedState
   gl.viewport(0, 0, buffer.width, buffer.height);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, buffer.current, 0);
   gl.clearColor(0, 0, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, buffer.next, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+// Velocity buffer: rg=0.5 (rest), b=0, a=1.
+function glBindOwnedState2AndClear(gl: WebGL2RenderingContext, buffer: OwnedStateBuffer): void {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, buffer.fbo);
+  gl.viewport(0, 0, buffer.width, buffer.height);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, buffer.current, 0);
+  gl.clearColor(0.5, 0.5, 0.0, 1.0);
   gl.clear(gl.COLOR_BUFFER_BIT);
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, buffer.next, 0);
   gl.clear(gl.COLOR_BUFFER_BIT);

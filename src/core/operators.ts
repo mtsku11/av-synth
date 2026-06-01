@@ -118,6 +118,17 @@ export interface OperatorDef {
    */
   readonly ownedState?: OwnedStateSpec;
   /**
+   * Optional second ownedState FBO for ops that require two independent
+   * ping-pong buffers (e.g. fluid simulation: one for dye, one for velocity).
+   * When both ownedState and ownedState2 are present the renderer uses MRT
+   * (gl.drawBuffers) so both are written in a single draw call:
+   *   layout(location=0) → ownedState.next  (dye — also blitted to composite)
+   *   layout(location=1) → ownedState2.next (velocity — internal only)
+   * ownedState2.current is bound to TEXTURE7. Velocity is seeded at rest
+   * (rg=0.5) rather than copied from the source video.
+   */
+  readonly ownedState2?: OwnedStateSpec;
+  /**
    * Optional authoring-audit metadata for alias/helper-driven operators.
    * Tests can use this to verify that the shader asset exists, the default
    * state stays neutral where expected, and QA coverage remains wired.
@@ -283,12 +294,6 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'radial sink/source field with optional spin — push or pull around a point',
     intents: ['feedback', 'video texture', 'motion'],
     coreParams: ['mix', 'strength', 'radius', 'falloff', 'spin', 'drift'],
-  },
-  fieldScan: {
-    family: 'Feedback',
-    blurb: 'multi-tap smear traced along a configurable vector field — like slitScan but the streak direction curves with the field',
-    intents: ['feedback', 'motion trails', 'video texture'],
-    coreParams: ['mix', 'strength', 'scan', 'twist'],
   },
   fluidSim: {
     family: 'Feedback',
