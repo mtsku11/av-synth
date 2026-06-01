@@ -30,17 +30,6 @@ vec2 warpUv(vec2 uv, float warp) {
   return centered * 0.5 + 0.5;
 }
 
-// ---- VHS Distortion helpers ----
-float vhsNoise(vec2 p) {
-  vec2 q = fract(p * 0.5 + vec2(u_time * 0.23, cos(u_time) * 0.17));
-  float s = hash12(floor(q * 64.0) / 64.0 + vec2(u_time * 0.31, 0.0));
-  return s * s;
-}
-
-float onOff(float a, float b, float c) {
-  return step(c, sin(u_time + a * cos(u_time * b)));
-}
-
 // ---- VHS Tape helpers ----
 float tapeHash(vec2 p) {
   return hash12(p * 0.3183099 + vec2(0.71, 0.113));
@@ -66,6 +55,17 @@ float tapNoise(vec2 v) {
     weight *= 0.5;
   }
   return sum;
+}
+
+// ---- VHS Distortion helpers ----
+float vhsNoise(vec2 p) {
+  vec2 q = p + vec2(1.0, 2.0 * cos(u_time)) * (u_time * 8.0) + vec2(1.0);
+  float s = iHash(q, vec2(32.0, 32.0));
+  return s * s;
+}
+
+float onOff(float a, float b, float c) {
+  return step(c, sin(u_time + a * cos(u_time * b)));
 }
 
 void main() {
@@ -152,7 +152,6 @@ void main() {
   // ---- CRT noise ----
   float noiseVal = hash12(floor(uv * u_resolution) + vec2(u_time * 31.0, u_time * 19.0)) - 0.5;
   color += vec3(noiseVal) * (u_noise * 0.06);
-  color *= inside;
 
   // ---- VHS Tape colour effects ----
   if (u_vhs_tape > 0.001) {
@@ -186,6 +185,8 @@ void main() {
     float stripe = (1.0 - stripeFact) * inside_strip * stripeNoise;
     color += vec3(stripe) * u_vhs_dist * 0.3;
   }
+
+  color *= inside;
 
   // ---- Final mix ----
   vec3 outColor = mix(src.rgb, clamp(color, 0.0, 1.0), clamp(u_mix, 0.0, 1.0));

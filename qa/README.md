@@ -86,6 +86,7 @@ Operator characterisation:
 - `npm run qa:opSweep:thorough:bless` — same, but writes the thorough baselines instead of comparing.
 - `npm run qa:opSweep:thorough:smoke` — ~90 s end-to-end wiring check (2 ops, 5 steps, 2 frames, 2 s temporal). Use after touching the spec to confirm it still runs before kicking off a half-day bless.
 - Thorough spec lives at `qa/e2e/op-characterisation-thorough.spec.ts`. Overridable via env: `OP_FILTER`, `SWEEP_STEPS`, `SOURCE_FRAMES`, `TEMPORAL_MS`, `SKIP_TEMPORAL=1`.
+- Artifact-specific canvas-truth probes live alongside the sweep harnesses for effects whose failure mode is more visual than statistical, including `qa/e2e/slit-scan-probe.spec.ts`, `qa/e2e/data-mosh-probe.spec.ts`, and `qa/e2e/retro-display-probe.spec.ts`.
 
 ## Directory layout
 
