@@ -302,6 +302,12 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['feedback', 'fluid', 'motion trails', 'video texture'],
     coreParams: ['mix', 'inject', 'viscosity', 'fieldType'],
   },
+  curlFlow: {
+    family: 'Feedback',
+    blurb: 'vector field simulation applied to live video — curl, divergence and Laplacian diffusion warp pixels using the video\'s own colour gradients as velocity',
+    intents: ['feedback', 'fluid', 'motion trails', 'video texture'],
+    coreParams: ['mix', 'strength', 'curl', 'inject'],
+  },
   spiralField: {
     family: 'Feedback',
     blurb: 'simple predictable spiral twist — a macro performance warp distinct from vortex flow',
