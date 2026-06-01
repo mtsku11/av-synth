@@ -290,6 +290,12 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['feedback', 'motion trails', 'video texture'],
     coreParams: ['mix', 'strength', 'scan', 'twist'],
   },
+  fluidSim: {
+    family: 'Feedback',
+    blurb: 'Flockaroo-style rotational CFD — video colour is injected as dye into a self-advecting velocity field; geometric field types continuously steer the flow',
+    intents: ['feedback', 'fluid', 'motion trails', 'video texture'],
+    coreParams: ['mix', 'inject', 'viscosity', 'fieldType'],
+  },
   spiralField: {
     family: 'Feedback',
     blurb: 'simple predictable spiral twist — a macro performance warp distinct from vortex flow',
