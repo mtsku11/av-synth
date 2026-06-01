@@ -219,6 +219,18 @@ export const PRESENTATION_LOOKS = {
     bloomTint: [0.88, 0.95, 1.0],
     halationTint: [0.84, 0.94, 1.02],
   },
+  ghostBloom: {
+    aberration: 0.72,
+    lift: [0.012, 0.012, 0.016],
+    gamma: [0.94, 0.95, 0.98],
+    gain: [1.05, 1.04, 1.02],
+    matrix: [1.03, 0.02, -0.02, 0.01, 1.03, 0.0, 0.02, 0.0, 0.98],
+    splitShadow: [0.9, 0.98, 1.08],
+    splitHighlight: [1.05, 1.0, 0.9],
+    splitAmount: 0.12,
+    bloomTint: [0.9, 0.97, 1.0],
+    halationTint: [0.82, 0.93, 1.02],
+  },
   bleach: {
     aberration: 1.35,
     lift: [0.012, 0.012, 0.014],

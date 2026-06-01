@@ -20,7 +20,6 @@ import { pinchBulgeDef } from './pinchBulge';
 import { polarRippleDef } from './polarRipple';
 import { sinkSourceFieldDef } from './sinkSourceField';
 import { fluidSimDef } from './fluidSim';
-import { curlFlowDef } from './curlFlow';
 import { spiralFieldDef } from './spiralField';
 import { domainFoldDef } from './domainFold';
 import { gyreFieldDef } from './gyreField';
@@ -57,6 +56,7 @@ import { pixelateDef } from './pixelate';
 import { kaleidDef } from './kaleid';
 import { chromaShiftDef } from './chromaShift';
 import { chromaFractDef } from './chromaFract';
+import { signalDamageDef } from './signalDamage';
 import { brightnessDef } from './brightness';
 import { contrastDef } from './contrast';
 import { colorDef } from './color';
@@ -99,7 +99,6 @@ export function registerAllOps(): void {
   registerOp(polarRippleDef);
   registerOp(sinkSourceFieldDef);
   registerOp(fluidSimDef);
-  registerOp(curlFlowDef);
   registerOp(spiralFieldDef);
   registerOp(domainFoldDef);
   registerOp(gyreFieldDef);
@@ -139,6 +138,7 @@ export function registerAllOps(): void {
   registerOp(kaleidDef);
   registerOp(chromaShiftDef);
   registerOp(chromaFractDef);
+  registerOp(signalDamageDef);
   registerOp(brightnessDef);
   registerOp(contrastDef);
   registerOp(colorDef);
@@ -189,7 +189,6 @@ export const DEFAULT_CHAIN: readonly string[] = [
   'polarRipple',
   'sinkSourceField',
   'fluidSim',
-  'curlFlow',
   'spiralField',
   'domainFold',
   'gyreField',
@@ -227,6 +226,7 @@ export const DEFAULT_CHAIN: readonly string[] = [
   'kaleid',
   'chromaShift',
   'chromaFract',
+  'signalDamage',
   'brightness',
   'contrast',
   'color',

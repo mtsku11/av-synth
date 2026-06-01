@@ -1,0 +1,75 @@
+{
+  "id": "audit-program-broadcast-ghost-bloom-video",
+  "title": "Broadcast Ghost Bloom lfscD7 approximation over loaded clip",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-program-broadcast-ghost-bloom-video",
+    "tailMs": 850
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "videoFeaturesActive": true,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "broadcast-ghost-baseline-hold",
+        "to": "broadcast-ghost-program-hold",
+        "domain": "video",
+        "metric": "meanLuma",
+        "op": "<",
+        "delta": -0.12,
+        "description": "Broadcast Ghost Bloom should materially darken the fixture into a low-level composite-damage treatment instead of reading like a bright or neutral pass-through"
+      },
+      {
+        "from": "broadcast-ghost-baseline-hold",
+        "to": "broadcast-ghost-program-hold",
+        "domain": "video",
+        "metric": "meanSaturation",
+        "op": "<",
+        "delta": -0.2,
+        "description": "Broadcast Ghost Bloom should desaturate the fixture into a cooler damaged-signal palette rather than preserving the raw colour bars"
+      }
+    ]
+  },
+  "audit": {
+    "family": "programs",
+    "operator": "signalDamage",
+    "kind": "smoke",
+    "path": "product",
+    "expectedVideo": [
+      "the clip should read as a cool composite-damaged signal with block-stable interference breakup and faint scanline shading rather than a generic blur or datamosh trail"
+    ],
+    "expectedAudio": [
+      "the sparse grain cloud and restrained delay should sit underneath the image breakup instead of washing it out"
+    ],
+    "manualChecks": [
+      "Does the look feel like unstable broadcast/composite damage rather than fluid feedback or motion-history smear?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "wait",
+      "ms": 600,
+      "screenshot": "broadcast-ghost-baseline-hold"
+    },
+    {
+      "type": "apply-program",
+      "name": "broadcastGhostBloom",
+      "screenshot": "broadcast-ghost-applied"
+    },
+    {
+      "type": "wait",
+      "ms": 800,
+      "screenshot": "broadcast-ghost-program-hold"
+    }
+  ]
+}

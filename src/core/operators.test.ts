@@ -72,6 +72,7 @@ const EXPECTED_OPERATOR_IDS = [
   'kaleid',
   'chromaShift',
   'chromaFract',
+  'signalDamage',
   'brightness',
   'contrast',
   'color',
@@ -140,6 +141,7 @@ describe('operator UI metadata', () => {
     expect(getOperatorUiMeta('glyphRender').family).toBe('Texture');
     expect(getOperatorUiMeta('glyphMotion').family).toBe('Motion');
     expect(getOperatorUiMeta('matrixRain').family).toBe('Texture');
+    expect(getOperatorUiMeta('signalDamage').family).toBe('Texture');
     expect(getOperatorUiMeta('filmGrade').family).toBe('Finish');
     expect(getOperatorUiMeta('clarity').family).toBe('Finish');
     expect(getOperatorUiMeta('gradeLUT').family).toBe('Finish');
@@ -162,6 +164,13 @@ describe('operator UI metadata', () => {
       'contrast',
       'saturation',
       'shoulder',
+    ]);
+    expect(getOperatorUiMeta('signalDamage').coreParams).toEqual([
+      'mix',
+      'displace',
+      'damage',
+      'quantize',
+      'jitter',
     ]);
   });
 

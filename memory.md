@@ -3151,3 +3151,88 @@ single-pass; avoid new renderer subsystems; allocate no per-frame JS objects; ex
 existing operator/modulation registry; and document the candidate/attribution boundary in-repo so the
 decision survives compaction. This is a release-hardening polish slice, not the start of a shader-pack
 import surface.
+
+## 2026-06-01 — Shadertoy `lfscD7` should land as one bounded damage op plus authored finishing, not as a direct port
+
+The saved `lfscD7` references under `references/shadertoy/` show a clear split: renderer-level separable
+bloom, one distinctive low-resolution interference/dither/quantisation look pass, and a light final
+composite/vignette stage. AV Synth already has its own renderer bloom stack, vignette, scanline/display
+finish, and general grading controls, so copying the Shadertoy pass graph literally would duplicate
+existing systems and widen scope for no product gain.
+
+The correct extraction plan is therefore:
+
+- keep bloom in the renderer/presentation path
+- keep vignette and any scanline flavour in `filmGrade` / `retroDisplay`
+- add at most one new reusable operator for the genuinely missing idea cluster: interference-driven signal
+  damage with ordered-dither corruption and conditional colour quantisation
+- optionally add a narrow `filmGrade.hueCurve` control only if the shader's small sinusoidal hue warp is
+  still needed after the first authored rebuild
+- ship the full look as a curated program, not as a monolithic one-off shader operator
+
+The public boundary matters. This repo is a video-first effects instrument, not a procedural Shadertoy
+scene browser. The saved snippets do not include the bodies for helpers like `Render(...)` or
+`Interfere(...)`, and even if they did, procedural scene-generation from those helpers is not the
+release-track goal. Extract reusable treatment ideas that work on loaded footage; leave unknown
+scene-generation logic out of the public scope unless the product direction changes.
+
+### 2026-06-01 — `lfscD7` step 1 landed as an experimental approximation program, not a fake parity claim
+
+**Decision**: ship the first `lfscD7` checkpoint as `broadcastGhostBloom` in `public/presets.json` using
+only the existing operator and renderer surface, and keep it in the experimental bank until the dedicated
+`signalDamage` operator exists.
+
+**Why**:
+
+- The saved shader fragments are enough to justify the effect family, but not enough to claim exact
+  reconstruction of the missing `Interfere(...)`, `OrderedDither(...)`, `Overlay(...)`, and `Render(...)`
+  kernels.
+- A current-stack approximation gives the repo a stable visual/audio baseline and a real QA target
+  (`qa/cases/audit-program-broadcast-ghost-bloom-video.json`) for the later `signalDamage` pass.
+- Promoting it to the public showcase before the missing operator lands would overstate how close the
+  current program is to the source shader's actual damage logic.
+
+### 2026-06-01 — `signalDamage` is the bounded lfscD7 extraction surface
+
+**Decision**: land the missing `lfscD7` idea cluster as one single-pass `signalDamage` Texture operator,
+then retune `broadcastGhostBloom` around that operator instead of keeping the earlier
+`turbulenceWarp` / `chromaFract` approximation stack.
+
+**Why**:
+
+- The saved shader snippets show current-frame interference, ordered-dither corruption, conditional
+  quantisation, and cool overlay tint as one inseparable treatment idea; exposing that as one operator
+  is more honest and more reusable than multiplying small stand-in ops.
+- Keeping the op current-frame only, with no `ownedState`, preserves the product boundary from the
+  extraction plan: no second bloom stack, no monolithic full-port shader, and no fake temporal parity.
+- The dedicated video QA sweep (`qa/cases/audit-signal-damage-video-sweep.json`) gives the extracted
+  operator its own regression surface instead of relying only on the authored program.
+
+### 2026-06-01 — `filmGrade.hueCurve` is the lfscD7 colour-shaping follow-up, not a new operator
+
+**Decision**: carry the shader's small sinusoidal hue remap inside `filmGrade` as one narrow
+`hueCurve` control instead of creating a separate hue-warp operator.
+
+**Why**:
+
+- The saved `lfscD7` snippet only exposes a tiny finishing contour:
+  `hsv.x += -sin((hsv.x + 0.05) * kTwoPi) * 0.07`.
+- That behaviour is materially different from plain `hue`, but too narrow to justify a new public
+  effect family or another lfscD7-specific one-off.
+- Folding it into `filmGrade` keeps the extraction bounded; presentation bloom/look tuning is now the
+  only remaining lfscD7 follow-up.
+
+### 2026-06-01 — lfscD7 renderer tuning should be a named presentation look, not a second bloom profile
+
+**Decision**: finish the lfscD7 extraction with a dedicated `ghostBloom` presentation look in the
+renderer and point `broadcastGhostBloom` at that look plus `bloomMist` lens dirt, instead of adding
+another bloom stack or a one-off post shader.
+
+**Why**:
+
+- The remaining source-shader character after `signalDamage` and `filmGrade.hueCurve` is mostly in bloom
+  tint, halation colour, and the soft final composite response the renderer already owns.
+- `PRESENTATION_LOOKS` is already the stable public surface for that class of behaviour, so the tuned
+  look stays reusable by other programs instead of hard-coding lfscD7 logic into one preset.
+- This closes the extraction plan without widening the renderer architecture or breaking the product
+  boundary around uploaded-video treatment.

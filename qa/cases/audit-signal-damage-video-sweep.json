@@ -1,0 +1,115 @@
+{
+  "id": "audit-signal-damage-video-sweep",
+  "title": "Signal Damage sweep on decoded media",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-signal-damage-video-sweep",
+    "tailMs": 850
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "signal-damage-mix-off-hold",
+        "to": "signal-damage-heavy-hold",
+        "domain": "video",
+        "metric": "meanLuma",
+        "op": "<",
+        "delta": -0.05,
+        "description": "Heavy signalDamage should darken the fixture into a composite-damage treatment instead of acting like a neutral UV wobble"
+      }
+    ]
+  },
+  "audit": {
+    "family": "color-tonal",
+    "operator": "signalDamage",
+    "kind": "sweep",
+    "path": "product",
+    "expectedVideo": [
+      "higher damage should read as unstable broadcast interference with chunky quantised breakup rather than as fluid warp or plain posterisation"
+    ],
+    "expectedAudio": [
+      "the loaded clip audio should stay present while the image treatment gets harsher"
+    ],
+    "manualChecks": [
+      "Do the damaged regions feel block-stable and transmission-like instead of random turbulence?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "signalDamage",
+      "paramId": "mix",
+      "value": 0,
+      "screenshot": "signal-damage-mix-off"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "signal-damage-mix-off-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "signalDamage",
+      "paramId": "mix",
+      "value": 1
+    },
+    {
+      "type": "set-operator-param",
+      "op": "signalDamage",
+      "paramId": "displace",
+      "value": 0.62
+    },
+    {
+      "type": "set-operator-param",
+      "op": "signalDamage",
+      "paramId": "block",
+      "value": 80
+    },
+    {
+      "type": "set-operator-param",
+      "op": "signalDamage",
+      "paramId": "damage",
+      "value": 0.76
+    },
+    {
+      "type": "set-operator-param",
+      "op": "signalDamage",
+      "paramId": "quantize",
+      "value": 0.66
+    },
+    {
+      "type": "set-operator-param",
+      "op": "signalDamage",
+      "paramId": "tint",
+      "value": 0.68
+    },
+    {
+      "type": "set-operator-param",
+      "op": "signalDamage",
+      "paramId": "overlay",
+      "value": 0.54
+    },
+    {
+      "type": "set-operator-param",
+      "op": "signalDamage",
+      "paramId": "jitter",
+      "value": 0.48,
+      "screenshot": "signal-damage-heavy"
+    },
+    {
+      "type": "wait",
+      "ms": 400,
+      "screenshot": "signal-damage-heavy-hold"
+    }
+  ]
+}

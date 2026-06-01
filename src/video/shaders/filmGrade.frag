@@ -11,6 +11,7 @@ uniform float u_contrast;
 uniform float u_saturation;
 uniform float u_temperature;
 uniform float u_tint;
+uniform float u_hueCurve;
 uniform float u_toe;
 uniform float u_shoulder;
 uniform float u_vignette;
@@ -40,11 +41,32 @@ float applyToneCurve(float value, float toe, float shoulder) {
   return clamp(mapped, 0.0, 1.0);
 }
 
+vec3 rgbToHsv(vec3 c) {
+  vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+  vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+  vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+  float d = q.x - min(q.w, q.y);
+  float e = 1.0e-10;
+  return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+vec3 hsvToRgb(vec3 c) {
+  vec3 rgb = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+  return c.z * mix(vec3(1.0), rgb, c.y);
+}
+
+vec3 applyHueCurve(vec3 color, float amount) {
+  vec3 hsv = rgbToHsv(clamp(color, 0.0, 1.0));
+  hsv.x = fract(hsv.x - sin((hsv.x + 0.05) * 6.283185307179586) * 0.07 * clamp(amount, 0.0, 1.0));
+  return hsvToRgb(hsv);
+}
+
 void main() {
   vec4 src = texture(u_tex, v_uv);
   vec3 graded = max(src.rgb, 0.0) * exp2(u_exposure);
   graded = max(applyWhiteBalance(graded, u_temperature, u_tint), 0.0);
   graded = pow(max(graded, 0.0), vec3(1.0 / max(u_gamma, 0.001)));
+  graded = applyHueCurve(graded, u_hueCurve);
 
   float preSatLuma = luma(graded);
   graded = mix(vec3(preSatLuma), graded, max(u_saturation, 0.0));

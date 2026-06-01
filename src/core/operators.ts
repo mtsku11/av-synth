@@ -302,12 +302,6 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['feedback', 'fluid', 'motion trails', 'video texture'],
     coreParams: ['mix', 'inject', 'viscosity', 'fieldType'],
   },
-  curlFlow: {
-    family: 'Feedback',
-    blurb: 'vector field simulation applied to live video — curl, divergence and Laplacian diffusion warp pixels using the video\'s own colour gradients as velocity',
-    intents: ['feedback', 'fluid', 'motion trails', 'video texture'],
-    coreParams: ['mix', 'strength', 'curl', 'inject'],
-  },
   spiralField: {
     family: 'Feedback',
     blurb: 'simple predictable spiral twist — a macro performance warp distinct from vortex flow',
@@ -568,6 +562,13 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
       'compression-artifact visualiser — isolates chroma deviation, amplifies and quantises it into dense colour bands',
     intents: ['glitch', 'video texture', 'finishing'],
     coreParams: ['mix', 'scale'],
+  },
+  signalDamage: {
+    family: 'Texture',
+    blurb:
+      'block-stable interference damage — displacement, ordered-dither quantisation, and cool composite tint in one current-frame pass',
+    intents: ['glitch', 'video texture', 'finishing'],
+    coreParams: ['mix', 'displace', 'damage', 'quantize', 'jitter'],
   },
   brightness: {
     family: 'Color',

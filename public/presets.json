@@ -4061,5 +4061,142 @@
         "gain": 0.52
       }
     }
+  },
+  "broadcastGhostBloom": {
+    "title": "Draft / Broadcast Ghost Bloom",
+    "tagline": "A current-frame interference-damage treatment with stepped breakup, cool tint wash, and restrained CRT finish tuned as the lfscD7 extraction baseline.",
+    "videoIntent": "Best on faces, hands, and broad contrast where the breakup reads like unstable composite transmission damage instead of fluid feedback or pure posterisation.",
+    "audioIntent": "A sparse gaussian grain cloud and restrained cross-fed delay should feel like captured fragments hovering under the image damage rather than a separate wash on top.",
+    "operatorFocus": [
+      "signalDamage",
+      "filmGrade",
+      "retroDisplay"
+    ],
+    "chain": [
+      "signalDamage",
+      "filmGrade",
+      "retroDisplay"
+    ],
+    "render": {
+      "look": "ghostBloom",
+      "quality": "cinema",
+      "lut": "silvered",
+      "postPreset": "none",
+      "lensDirt": "bloomMist"
+    },
+    "values": {
+      "clock.rate": 0.32,
+      "signalDamage.mix": 1.0,
+      "signalDamage.displace": 0.42,
+      "signalDamage.block": 92,
+      "signalDamage.damage": 0.58,
+      "signalDamage.quantize": 0.46,
+      "signalDamage.tint": 0.62,
+      "signalDamage.overlay": 0.38,
+      "signalDamage.jitter": 0.32,
+      "filmGrade.mix": 1.0,
+      "filmGrade.exposure": 0.12,
+      "filmGrade.gamma": 1.14,
+      "filmGrade.contrast": 1.14,
+      "filmGrade.saturation": 0.82,
+      "filmGrade.temperature": -0.22,
+      "filmGrade.tint": 0.1,
+      "filmGrade.hueCurve": 0.86,
+      "filmGrade.toe": 0.08,
+      "filmGrade.shoulder": 0.18,
+      "filmGrade.vignette": 0.44,
+      "retroDisplay.mix": 0.26,
+      "retroDisplay.scanlines": 0.28,
+      "retroDisplay.mask": 0.14,
+      "retroDisplay.warp": 0.08,
+      "retroDisplay.bleed": 0.22,
+      "retroDisplay.phosphor": 0.1,
+      "retroDisplay.noise": 0.16,
+      "retroDisplay.roll": 0.0
+    },
+    "automation": {
+      "signalDamage.damage": {
+        "kind": "video",
+        "feature": "motion",
+        "scale": 0.18,
+        "smooth": 0.82
+      },
+      "signalDamage.displace": {
+        "kind": "video",
+        "feature": "motion",
+        "scale": 0.14,
+        "smooth": 0.84
+      },
+      "signalDamage.jitter": {
+        "kind": "lfo",
+        "rate": 0.05,
+        "depth": 0.18,
+        "phase": 1.5707963268
+      },
+      "retroDisplay.roll": {
+        "kind": "lfo",
+        "rate": 0.02,
+        "depth": 0.08,
+        "phase": 1.5707963268
+      }
+    },
+    "macros": [
+      {
+        "id": "damage",
+        "label": "Damage",
+        "default": 0.56,
+        "targets": [
+          { "key": "signalDamage.damage", "min": 0.32, "max": 0.82 },
+          { "key": "signalDamage.quantize", "min": 0.18, "max": 0.78 },
+          { "key": "retroDisplay.noise", "min": 0.08, "max": 0.24 }
+        ]
+      },
+      {
+        "id": "signal",
+        "label": "Signal",
+        "default": 0.48,
+        "targets": [
+          { "key": "signalDamage.displace", "min": 0.18, "max": 0.7 },
+          { "key": "signalDamage.block", "min": 144, "max": 56 },
+          { "key": "retroDisplay.scanlines", "min": 0.12, "max": 0.48 }
+        ]
+      },
+      {
+        "id": "finish",
+        "label": "Finish",
+        "default": 0.5,
+        "targets": [
+          { "key": "filmGrade.vignette", "min": 0.18, "max": 0.62 },
+          { "key": "filmGrade.shoulder", "min": 0.08, "max": 0.34 },
+          { "key": "audio.feedbackDelay.mix", "min": 0.1, "max": 0.28 }
+        ]
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.31,
+        "feedback": 0.38,
+        "damping": 5200,
+        "cross": 0.6283185307,
+        "mix": 0.16
+      },
+      "granulator": {
+        "envelope": "gaussian",
+        "mode": "cloud",
+        "density": 16,
+        "duration": 110,
+        "durationJitter": 0.22,
+        "position": 0.48,
+        "positionJitter": 0.03,
+        "pitch": 0,
+        "pitchJitter": 4,
+        "panSpread": 0.42,
+        "ySpread": 0.22,
+        "reverseProbability": 0.1,
+        "distribution": 0.28,
+        "voiceCount": 18,
+        "gain": 0.48
+      }
+    }
   }
 }
