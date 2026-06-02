@@ -300,7 +300,7 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb:
       'Flockaroo-style rotational CFD — video colour is injected as dye into a self-advecting velocity field; geometric field types continuously steer the flow',
     intents: ['feedback', 'fluid', 'motion trails', 'video texture'],
-    coreParams: ['mix', 'inject', 'viscosity', 'fieldType'],
+    coreParams: ['mix', 'inject', 'trail', 'fieldType', 'drift'],
   },
   spiralField: {
     family: 'Feedback',

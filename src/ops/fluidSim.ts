@@ -24,6 +24,9 @@ class FluidSimVideoStage implements VideoStage {
   #uCx: WebGLUniformLocation;
   #uCy: WebGLUniformLocation;
   #uSeedStr: WebGLUniformLocation;
+  #uDrift: WebGLUniformLocation;
+  #uTrail: WebGLUniformLocation;
+  #uTime: WebGLUniformLocation;
 
   constructor(gl: WebGL2RenderingContext) {
     this.program = compileProgram(gl, frag, 'fluidSim');
@@ -40,18 +43,21 @@ class FluidSimVideoStage implements VideoStage {
     this.#uCx        = reqUniform(gl, this.program, 'u_cx',        'fluidSim');
     this.#uCy        = reqUniform(gl, this.program, 'u_cy',        'fluidSim');
     this.#uSeedStr   = reqUniform(gl, this.program, 'u_seedStr',   'fluidSim');
+    this.#uDrift     = reqUniform(gl, this.program, 'u_drift',     'fluidSim');
+    this.#uTrail     = reqUniform(gl, this.program, 'u_trail',     'fluidSim');
+    this.#uTime      = reqUniform(gl, this.program, 'u_time',      'fluidSim');
   }
 
   setUniforms(
     gl: WebGL2RenderingContext,
     params: Readonly<Record<string, number>>,
-    _ctx: CouplingContext,
+    ctx: CouplingContext,
   ): void {
     gl.uniform1i(this.#uTex,       0); // TEXTURE0: live video
     gl.uniform1i(this.#uPrevDye,   1); // TEXTURE1: previous dye (ownedState, bindAsPrevFrame)
     gl.uniform1i(this.#uPrevVel,   7); // TEXTURE7: previous velocity (ownedState2)
     gl.uniform1f(this.#uMix,       params['mix']       ?? 0);
-    gl.uniform1f(this.#uInject,    params['inject']    ?? 0.15);
+    gl.uniform1f(this.#uInject,    params['inject']    ?? 0.06);
     gl.uniform1f(this.#uViscosity, params['viscosity'] ?? 0.7);
     gl.uniform1f(this.#uScale,     Math.max(0.5, params['scale'] ?? 1.5));
     gl.uniform1f(this.#uSpeed,     params['speed']     ?? 1.0);
@@ -60,6 +66,9 @@ class FluidSimVideoStage implements VideoStage {
     gl.uniform1f(this.#uCx,        params['cx']        ?? 0.5);
     gl.uniform1f(this.#uCy,        params['cy']        ?? 0.5);
     gl.uniform1f(this.#uSeedStr,   params['seedStr']   ?? 0.3);
+    gl.uniform1f(this.#uDrift,     params['drift']     ?? 0);
+    gl.uniform1f(this.#uTrail,     params['trail']     ?? 1.0);
+    gl.uniform1f(this.#uTime,      ctx.time);
   }
 
   dispose(gl: WebGL2RenderingContext): void {
@@ -78,8 +87,8 @@ export const fluidSimDef: OperatorDef = {
   ownedState2: {
     uniform: 'u_prev_vel',
   },
-  paramOrder: ['mix', 'inject', 'viscosity', 'scale', 'speed', 'fieldType', 'angle', 'cx', 'cy', 'seedStr'],
-  defaults: { mix: 0, inject: 0.15, viscosity: 0.7, scale: 1.5, speed: 1.0, fieldType: 0, angle: 0, cx: 0.5, cy: 0.5, seedStr: 0.3 },
+  paramOrder: ['mix', 'inject', 'trail', 'viscosity', 'scale', 'speed', 'fieldType', 'drift', 'angle', 'cx', 'cy', 'seedStr'],
+  defaults: { mix: 0, inject: 0.06, trail: 1.0, viscosity: 0.7, scale: 1.5, speed: 1.0, fieldType: 0, drift: 0, angle: 0, cx: 0.5, cy: 0.5, seedStr: 0.3 },
   coupling: {
     op: 'fluidSim',
     params: {
@@ -88,7 +97,7 @@ export const fluidSimDef: OperatorDef = {
         toVideo: (raw) => raw,
       },
       inject: {
-        spec: { id: 'inject', label: 'inject', range: [0, 1], default: 0.15, curve: 'lin', unit: 'norm', hint: 'rate at which live video pixels are fed into the dye each frame' },
+        spec: { id: 'inject', label: 'inject', range: [0, 1], default: 0.06, curve: 'lin', unit: 'norm', hint: 'rate at which live video pixels are fed into the dye — lower values give longer-lived trails' },
         toVideo: (raw) => raw,
       },
       viscosity: {
@@ -104,7 +113,7 @@ export const fluidSimDef: OperatorDef = {
         toVideo: (raw) => raw,
       },
       fieldType: {
-        spec: { id: 'fieldType', label: 'field', range: [0, 3], default: 0, curve: 'lin', unit: 'norm', hint: '0=none (pure CFD), 1=vortex, 2=linear, 3=curl — continuously steers velocity' },
+        spec: { id: 'fieldType', label: 'field', range: [0, 5], default: 0, curve: 'lin', unit: 'norm', hint: '0=none (pure CFD), 1=vortex, 2=linear, 3=curl, 4=dual vortex, 5=radial — continuously steers velocity' },
         toVideo: (raw) => raw,
       },
       angle: {
@@ -121,6 +130,14 @@ export const fluidSimDef: OperatorDef = {
       },
       seedStr: {
         spec: { id: 'seedStr', label: 'seed str', range: [0, 1], default: 0.3, curve: 'lin', unit: 'norm', hint: 'field forcing strength — 0 = pure self-advecting CFD, 1 = strongly shaped by field type' },
+        toVideo: (raw) => raw,
+      },
+      drift: {
+        spec: { id: 'drift', label: 'drift', range: [0, 1], default: 0, curve: 'lin', unit: 'norm', hint: 'animates field centre in a Lissajous figure and time-varies the field pattern over time' },
+        toVideo: (raw) => raw,
+      },
+      trail: {
+        spec: { id: 'trail', label: 'trail', range: [0, 1], default: 1.0, curve: 'lin', unit: 'norm', hint: '1.0 = maximum dye persistence (longest trails), 0 = fast independent decay — combine with low inject for very long trails' },
         toVideo: (raw) => raw,
       },
     },
