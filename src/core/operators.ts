@@ -240,6 +240,12 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['feedback', 'motion', 'video texture', 'glitch'],
     coreParams: ['mix', 'drift', 'decay', 'chunk'],
   },
+  acidFeedback: {
+    family: 'Feedback',
+    blurb: 'recursive RGB leak and multiply-burn over live video input',
+    intents: ['feedback', 'glitch', 'video texture'],
+    coreParams: ['mix', 'feedback', 'dispersion', 'billow', 'push'],
+  },
   pixelSort: {
     family: 'Feedback',
     blurb: 'luma-threshold pixel sort — bright pixels stream along the sort direction each frame',
@@ -277,23 +283,17 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['feedback', 'video texture', 'motion'],
     coreParams: ['mix', 'strength', 'softness', 'anisotropy', 'drift'],
   },
-  pinchBulge: {
+  warp: {
     family: 'Feedback',
-    blurb: 'stable lens warp — macro pinch or bulge around a movable centre',
+    blurb: 'radial warp — lens mode (pinch/bulge) or flow mode (sink/source with spin) around a movable centre',
     intents: ['feedback', 'video texture', 'motion'],
-    coreParams: ['mix', 'amount', 'radius', 'falloff', 'centerX', 'drift'],
+    coreParams: ['mode', 'mix', 'strength', 'radius', 'falloff', 'spin', 'drift'],
   },
   polarRipple: {
     family: 'Feedback',
     blurb: 'concentric radial ripple field — good for kick or envelope pulses',
     intents: ['feedback', 'video texture', 'motion'],
     coreParams: ['mix', 'amplitude', 'frequency', 'phase', 'falloff', 'drift'],
-  },
-  sinkSourceField: {
-    family: 'Feedback',
-    blurb: 'radial sink/source field with optional spin — push or pull around a point',
-    intents: ['feedback', 'video texture', 'motion'],
-    coreParams: ['mix', 'strength', 'radius', 'falloff', 'spin', 'drift'],
   },
   fluidSim: {
     family: 'Feedback',
@@ -368,25 +368,11 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['finish', 'display', 'nostalgia', 'vhs', 'tape'],
     coreParams: ['mix', 'scanlines', 'vhsDist', 'vhsTape', 'bleed', 'phosphor'],
   },
-  r: {
+  channel: {
     family: 'Finish',
-    blurb: 'red-channel matte or low-band isolate',
+    blurb: 'isolate r, g, b, or alpha/luma as a greyscale matte',
     intents: ['matte', 'channel routing'],
-  },
-  g: {
-    family: 'Finish',
-    blurb: 'green-channel matte or mid-band isolate',
-    intents: ['matte', 'channel routing'],
-  },
-  b: {
-    family: 'Finish',
-    blurb: 'blue-channel matte or high-band isolate',
-    intents: ['matte', 'channel routing'],
-  },
-  a: {
-    family: 'Finish',
-    blurb: 'alpha or luma matte isolate',
-    intents: ['matte', 'channel routing'],
+    coreParams: ['mode'],
   },
   grain: {
     family: 'Audio Character',
@@ -396,9 +382,9 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
   },
   modulate: {
     family: 'Feedback',
-    blurb: 'self-warp the image and signal with prior energy',
+    blurb: 'UV warp from internal oscillator or routed second input',
     intents: ['feedback', 'video texture'],
-    coreParams: ['amount'],
+    coreParams: ['source', 'amount'],
   },
   modulateDisplace: {
     family: 'Blend/Composite',
@@ -406,59 +392,29 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['composite', 'video texture', 'audio-reactive'],
     coreParams: ['amount', 'bias'],
   },
-  modulateRouted: {
-    family: 'Blend/Composite',
-    blurb: 'warp one branch with another routed modulator',
-    intents: ['composite', 'feedback', 'video texture'],
-    coreParams: ['amount'],
-  },
   modulateRotate: {
     family: 'Feedback',
-    blurb: 'spin with self-driven rotational drift',
+    blurb: 'rotational drift from prev frame or routed second input',
     intents: ['feedback', 'motion'],
-    coreParams: ['multiple', 'offset'],
-  },
-  modulateRotateRouted: {
-    family: 'Blend/Composite',
-    blurb: 'spin one branch from a routed rotation field',
-    intents: ['composite', 'motion', 'audio-reactive'],
-    coreParams: ['multiple', 'offset'],
+    coreParams: ['source', 'multiple', 'offset'],
   },
   modulateScale: {
     family: 'Feedback',
-    blurb: 'zoom from self-driven motion energy',
+    blurb: 'zoom from prev frame or routed second input',
     intents: ['feedback', 'motion'],
-    coreParams: ['multiple', 'offset'],
-  },
-  modulateScaleRouted: {
-    family: 'Blend/Composite',
-    blurb: 'zoom one branch from a routed scale field',
-    intents: ['composite', 'motion', 'audio-reactive'],
-    coreParams: ['multiple', 'offset'],
+    coreParams: ['source', 'multiple', 'offset'],
   },
   modulatePixelate: {
     family: 'Feedback',
-    blurb: 'block and held-window resample from prior-frame detail',
+    blurb: 'block resample from prev frame or routed second input',
     intents: ['feedback', 'video texture'],
-    coreParams: ['multiple', 'offset'],
-  },
-  modulatePixelateRouted: {
-    family: 'Blend/Composite',
-    blurb: 'block one branch from a routed hold field',
-    intents: ['composite', 'video texture', 'audio-reactive'],
-    coreParams: ['multiple', 'offset'],
+    coreParams: ['source', 'multiple', 'offset'],
   },
   modulateRepeat: {
     family: 'Feedback',
-    blurb: 'tile from self-driven comb density',
+    blurb: 'tile density from prev frame or routed second input',
     intents: ['feedback', 'video texture'],
-    coreParams: ['repeatX', 'repeatY', 'offsetX', 'offsetY'],
-  },
-  modulateRepeatRouted: {
-    family: 'Blend/Composite',
-    blurb: 'tile one branch from a routed density field',
-    intents: ['composite', 'video texture', 'audio-reactive'],
-    coreParams: ['repeatX', 'repeatY', 'offsetX', 'offsetY'],
+    coreParams: ['source', 'repeatX', 'repeatY', 'offsetX', 'offsetY'],
   },
   modulateScrollX: {
     family: 'Feedback',
@@ -468,15 +424,9 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
   },
   modulateScrollY: {
     family: 'Feedback',
-    blurb: 'vertical drift with self-driven stereo motion',
+    blurb: 'vertical drift from prev frame or routed second input',
     intents: ['feedback', 'motion'],
-    coreParams: ['amount', 'speed'],
-  },
-  modulateScrollYRouted: {
-    family: 'Blend/Composite',
-    blurb: 'vertical drift from a routed motion branch',
-    intents: ['composite', 'motion', 'audio-reactive'],
-    coreParams: ['amount', 'speed'],
+    coreParams: ['source', 'amount', 'speed'],
   },
   modulateKaleid: {
     family: 'Feedback',
@@ -486,15 +436,9 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
   },
   modulateHue: {
     family: 'Feedback',
-    blurb: 'self-driven color rotation and pitch color',
+    blurb: 'hue rotation from prev frame or routed second input',
     intents: ['feedback', 'finishing'],
-    coreParams: ['amount'],
-  },
-  modulateHueRouted: {
-    family: 'Blend/Composite',
-    blurb: 'color rotation from a routed modulator branch',
-    intents: ['composite', 'finishing', 'audio-reactive'],
-    coreParams: ['amount'],
+    coreParams: ['source', 'amount'],
   },
   selfMod: {
     family: 'Audio Character',
@@ -514,35 +458,17 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['motion', 'finishing'],
     coreParams: ['angle'],
   },
-  scrollX: {
+  scroll: {
     family: 'Motion',
-    blurb: 'horizontal translation with phase-offset smear',
+    blurb: 'translate the frame on X and Y with independent time rates',
     intents: ['motion', 'video texture'],
-    coreParams: ['amount', 'speed'],
-  },
-  scrollY: {
-    family: 'Motion',
-    blurb: 'vertical translation with stereo motion',
-    intents: ['motion', 'video texture'],
-    coreParams: ['amount', 'speed'],
+    coreParams: ['x', 'y', 'speedX', 'speedY'],
   },
   repeat: {
     family: 'Motion',
-    blurb: 'tile the frame into a denser lattice',
+    blurb: 'tile the frame into a denser lattice — both axes or one',
     intents: ['video texture', 'motion'],
-    coreParams: ['repeatX', 'repeatY', 'offsetX', 'offsetY'],
-  },
-  repeatX: {
-    family: 'Motion',
-    blurb: 'horizontal tiling and comb density',
-    intents: ['video texture', 'motion'],
-    coreParams: ['reps', 'offset'],
-  },
-  repeatY: {
-    family: 'Motion',
-    blurb: 'vertical tiling and comb density',
-    intents: ['video texture', 'motion'],
-    coreParams: ['reps', 'offset'],
+    coreParams: ['axis', 'repeatX', 'repeatY', 'offsetX', 'offsetY'],
   },
   pixelate: {
     family: 'Texture',
@@ -556,37 +482,17 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['video texture', 'audio-reactive'],
     coreParams: ['nSides', 'drive', 'tone', 'mix'],
   },
-  chromaShift: {
+  glitch: {
     family: 'Texture',
-    blurb: 'RGB split and stereo micro-delay shimmer',
-    intents: ['finishing', 'video texture'],
-    coreParams: ['amount'],
-  },
-  chromaFract: {
-    family: 'Texture',
-    blurb:
-      'compression-artifact visualiser — isolates chroma deviation, amplifies and quantises it into dense colour bands',
+    blurb: 'signal damage, chroma shift, or chroma fract — three glitch modes with one shared amount',
     intents: ['glitch', 'video texture', 'finishing'],
-    coreParams: ['mix', 'scale'],
+    coreParams: ['type', 'amount', 'displace', 'damage', 'jitter'],
   },
-  signalDamage: {
-    family: 'Texture',
-    blurb:
-      'block-stable interference damage — displacement, ordered-dither quantisation, and cool composite tint in one current-frame pass',
-    intents: ['glitch', 'video texture', 'finishing'],
-    coreParams: ['mix', 'displace', 'damage', 'quantize', 'jitter'],
-  },
-  brightness: {
+  grade: {
     family: 'Color',
-    blurb: 'lift or darken the signal',
+    blurb: 'four-way colour grade: brightness, contrast, saturation, hue',
     intents: ['finishing', 'video tone'],
-    coreParams: ['amount'],
-  },
-  contrast: {
-    family: 'Color',
-    blurb: 'stretch tonal contrast and soft-clip drive',
-    intents: ['finishing', 'video tone'],
-    coreParams: ['amount'],
+    coreParams: ['brightness', 'contrast', 'saturate', 'hue'],
   },
   color: {
     family: 'Color',
@@ -594,41 +500,17 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['finishing', 'video tone'],
     coreParams: ['r', 'g', 'b'],
   },
-  saturate: {
-    family: 'Color',
-    blurb: 'push chroma and harmonic density',
-    intents: ['finishing', 'video tone'],
-    coreParams: ['amount'],
-  },
   posterize: {
     family: 'Color',
     blurb: 'quantize tone into stepped bands',
     intents: ['video texture', 'finishing'],
     coreParams: ['bins', 'gamma'],
   },
-  invert: {
-    family: 'Color',
-    blurb: 'phase and color inversion blend',
-    intents: ['finishing', 'video tone'],
-    coreParams: ['amount'],
-  },
-  luma: {
+  extract: {
     family: 'Finish',
-    blurb: 'key by luminance with soft thresholding',
+    blurb: 'luma key, hard threshold, or colour invert — three extract modes with shared amount and threshold',
     intents: ['matte', 'finishing'],
-    coreParams: ['threshold', 'tolerance', 'invert', 'amount'],
-  },
-  thresh: {
-    family: 'Finish',
-    blurb: 'harder cutoff and comparator contrast',
-    intents: ['matte', 'video texture'],
-    coreParams: ['threshold', 'tolerance', 'amount'],
-  },
-  hue: {
-    family: 'Color',
-    blurb: 'rotate hue and pitch color together',
-    intents: ['finishing', 'video tone'],
-    coreParams: ['amount'],
+    coreParams: ['mode', 'amount', 'threshold', 'tolerance'],
   },
   colorama: {
     family: 'Color',
@@ -636,53 +518,17 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['finishing', 'video texture'],
     coreParams: ['amount'],
   },
-  add: {
+  composite: {
     family: 'Blend/Composite',
-    blurb: 'sum two branches',
-    intents: ['composite', 'bus mix'],
-    coreParams: ['amount'],
+    blurb: 'add, subtract, multiply, diff, crossfade, screen, key, or mask two branches',
+    intents: ['composite', 'matte', 'bus mix'],
+    coreParams: ['mode', 'amount', 'threshold', 'tolerance', 'invert'],
   },
   sum: {
     family: 'Finish',
     blurb: 'collapse rgba or band energy into a weighted matte',
     intents: ['matte', 'finishing'],
     coreParams: ['amount', 'r', 'g', 'b'],
-  },
-  sub: {
-    family: 'Blend/Composite',
-    blurb: 'subtract one branch from another',
-    intents: ['composite', 'bus mix'],
-    coreParams: ['amount'],
-  },
-  mult: {
-    family: 'Blend/Composite',
-    blurb: 'multiply branches for masking and ring-mod color',
-    intents: ['composite', 'matte'],
-    coreParams: ['amount'],
-  },
-  diff: {
-    family: 'Blend/Composite',
-    blurb: 'difference blend for contours and phase contrast',
-    intents: ['composite', 'video texture'],
-    coreParams: ['amount'],
-  },
-  layer: {
-    family: 'Blend/Composite',
-    blurb: 'key one branch over another with a shaped matte',
-    intents: ['composite', 'matte'],
-    coreParams: ['amount', 'threshold', 'tolerance', 'invert'],
-  },
-  blend: {
-    family: 'Blend/Composite',
-    blurb: 'crossfade two routed branches',
-    intents: ['composite', 'bus mix'],
-    coreParams: ['amount'],
-  },
-  mask: {
-    family: 'Blend/Composite',
-    blurb: 'use one branch as a shaped matte for the other',
-    intents: ['matte', 'composite'],
-    coreParams: ['amount', 'threshold', 'tolerance', 'invert'],
   },
 };
 
@@ -771,6 +617,7 @@ export function isNeutralInstance(instance: OperatorInstance): boolean {
     if ((assignment?.lfoIndex ?? null) !== null || (assignment?.videoFeature ?? null) !== null)
       return false;
   }
+  if (instance.def.audit?.neutralDefault === false) return false;
   if (instance.def.paramOrder.length === 0) return false;
   for (const paramId of instance.def.paramOrder) {
     const fallback = instance.def.defaults[paramId] ?? 0;

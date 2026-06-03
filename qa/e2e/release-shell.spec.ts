@@ -73,6 +73,37 @@ test.describe('release showcase shell', () => {
     await expect(page.locator('.experiment-grid .program-card')).toHaveCount(40);
     await expect(page.locator('.presets-active')).toHaveCount(0);
     await expect(page.locator('[data-qa^="program-macro-"]')).toHaveCount(0);
+
+    const transportStarted = await page.evaluate(() =>
+      (
+        window as Window & {
+          __AV_SYNTH_QA__?: { startTransport(): Promise<boolean> };
+        }
+      ).__AV_SYNTH_QA__?.startTransport(),
+    );
+    expect(transportStarted).toBe(true);
+    const grainLoaded = await page.evaluate(() =>
+      (
+        window as Window & {
+          __AV_SYNTH_QA__?: { ensureGrainAudioLoaded(): Promise<boolean> };
+        }
+      ).__AV_SYNTH_QA__?.ensureGrainAudioLoaded(),
+    );
+    expect(grainLoaded).toBe(true);
+    const grainSourceSelected = await page.evaluate(() =>
+      (
+        window as Window & {
+          __AV_SYNTH_QA__?: { setGranulatorEnabled(enabled: boolean): Promise<boolean> };
+        }
+      ).__AV_SYNTH_QA__?.setGranulatorEnabled(true),
+    );
+    expect(grainSourceSelected).toBe(true);
+    await page.locator('[data-qa="source-kind-grain-composite"]').click();
+    await expect(page.locator('[data-qa="grain-source-message"]')).toHaveCount(0);
+    await expect(page.locator('[data-qa="source-kind-grain-composite"]')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     await page.getByRole('button', { name: 'clear feedback' }).click();
 
     expect(consoleErrors).toEqual([]);

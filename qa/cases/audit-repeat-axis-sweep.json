@@ -1,0 +1,123 @@
+{
+  "id": "audit-repeat-axis-sweep",
+  "title": "Repeat axis mode sweep — X-only, Y-only, both",
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-repeat-axis-sweep",
+    "tailMs": 600
+  },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "repeat",
+    "kind": "sweep",
+    "path": "operator-regression",
+    "expectedVideo": [
+      "axis=1 (X-only) with repeatX=4 should tile horizontally but leave vertical unchanged",
+      "axis=2 (Y-only) with repeatY=4 should tile vertically but leave horizontal unchanged",
+      "axis=0 (both) with repeatX=3 repeatY=3 should tile in both directions equally"
+    ],
+    "expectedAudio": [
+      "grain density behaviour should change with each axis mode as tiling changes the repeat density routing"
+    ],
+    "manualChecks": [
+      "Does axis=1 produce only horizontal repeats with no Y compression?",
+      "Does axis=2 produce only vertical repeats with no X compression?",
+      "Does axis=0 at 3×3 match the original repeat behaviour?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "axis",
+      "value": 1,
+      "screenshot": "repeat-axis-x-only"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatX",
+      "value": 4,
+      "screenshot": "repeat-axis-x-reps-4"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "repeat-axis-x-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "axis",
+      "value": 2,
+      "screenshot": "repeat-axis-y-only"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatY",
+      "value": 4,
+      "screenshot": "repeat-axis-y-reps-4"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "repeat-axis-y-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "axis",
+      "value": 0,
+      "screenshot": "repeat-axis-both"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatX",
+      "value": 3,
+      "screenshot": "repeat-axis-both-rx-3"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatY",
+      "value": 3,
+      "screenshot": "repeat-axis-both-ry-3"
+    },
+    {
+      "type": "wait",
+      "ms": 300,
+      "screenshot": "repeat-axis-both-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "axis",
+      "value": 0
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatX",
+      "value": 1
+    },
+    {
+      "type": "set-operator-param",
+      "op": "repeat",
+      "paramId": "repeatY",
+      "value": 1
+    }
+  ]
+}

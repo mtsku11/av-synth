@@ -27,21 +27,27 @@
     },
     {
       "type": "add-blend-node",
-      "op": "blend",
-      "screenshot": "blend-node-added"
-    },
-    {
-      "type": "add-node-input",
-      "op": "blend",
-      "input": "src(o1)",
-      "screenshot": "blend-src-o1"
+      "op": "composite",
+      "screenshot": "composite-node-added"
     },
     {
       "type": "set-operator-param",
-      "op": "blend",
+      "op": "composite",
+      "paramId": "mode",
+      "value": 4
+    },
+    {
+      "type": "add-node-input",
+      "op": "composite",
+      "input": "src(o1)",
+      "screenshot": "composite-src-o1"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "composite",
       "paramId": "amount",
       "value": 0.45,
-      "screenshot": "blend-045"
+      "screenshot": "composite-045"
     }
   ],
   "audit": {

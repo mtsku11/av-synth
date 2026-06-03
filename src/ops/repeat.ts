@@ -2,6 +2,8 @@
 // The audio side is intentionally no longer a literal comb filter: repeated
 // image tiles read more convincingly as looping recent-time grains than as a
 // resonator when stacked in the product path.
+//
+// axis 0 = both axes (default), 1 = X-only (absorbs repeatX), 2 = Y-only (absorbs repeatY).
 
 import frag from '../video/shaders/repeat.frag?raw';
 import {
@@ -16,15 +18,25 @@ export const repeatDef = createVideoOperatorDef({
   frag,
   uniforms: [
     PRIMARY_SOURCE_UNIFORM,
+    paramUniform('u_axis', 'axis', 0),
     paramUniform('u_repeatX', 'repeatX', 1),
     paramUniform('u_repeatY', 'repeatY', 1),
     paramUniform('u_offsetX', 'offsetX', 0),
     paramUniform('u_offsetY', 'offsetY', 0),
   ],
-  paramOrder: ['repeatX', 'repeatY', 'offsetX', 'offsetY'],
-  // Identity default = 1×1 (no tiling). Hydra invocation default is 3×3.
-  defaults: { repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0 },
+  paramOrder: ['axis', 'repeatX', 'repeatY', 'offsetX', 'offsetY'],
+  // Identity default = axis 0, 1×1 tiling with no offset. Hydra invocation default is 3×3.
+  defaults: { axis: 0, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0 },
   params: {
+    axis: passthroughParam({
+      id: 'axis',
+      label: 'axis',
+      range: [0, 2],
+      default: 0,
+      curve: 'lin',
+      unit: 'norm',
+      hint: '0=both 1=X-only 2=Y-only',
+    }),
     repeatX: passthroughParam({
       id: 'repeatX',
       label: 'repeatX',
@@ -65,7 +77,7 @@ export const repeatDef = createVideoOperatorDef({
   audit: {
     shaderPath: 'src/video/shaders/repeat.frag',
     neutralDefault: true,
-    qaCaseIds: ['audit-repeat-osc-sweep', 'audit-repeat-video-cross-source'],
+    qaCaseIds: ['audit-repeat-osc-sweep', 'audit-repeat-video-cross-source', 'audit-repeat-axis-sweep'],
     qaCoverage: 'dedicated',
   },
 });

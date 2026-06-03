@@ -62,7 +62,7 @@
   "steps": [
     {
       "type": "set-node-bus",
-      "op": "r",
+      "op": "channel",
       "bus": 1,
       "screenshot": "modulateDisplace-r-bus1"
     },

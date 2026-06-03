@@ -479,6 +479,10 @@ The boundary matters more than the effect count. AV Synth does **not** embed the
 
 Candidate selection, licensing, and defer/reject rationale live in `docs/RESHADER_PORT_CANDIDATES.md`. Attribution notes for the permissive reference material used in the clean-room ports live in `docs/RESHADER_PORT_NOTICES.md`. Do not let this pack drift into runtime-compatibility work during release hardening.
 
+### 10.5.2a Recursive glitch-feedback slice
+
+✅ **Landed 2026-06-03 as a bounded `Feedback` operator.** `acidFeedback` extracts the recursive RGB-leak / multiply-burn character from a multipass sketch, but keeps AV Synth’s product boundary intact: one per-op `ownedState` loop, the loaded clip on `u_tex` as the canonical live input each frame, and no new renderer pass graph or Shadertoy-style buffer surface. It belongs in the `Feedback` family beside `dataMosh` / `flow` because the look depends on temporal recirculation, not on a one-frame texture treatment.
+
 ### 10.5.3 Audit recommendations (2026-05-28 + 2026-05-29)
 
 ✅ All audit items R1–R7 and S1–S8 closed 2026-05-29. Full item-by-item status in `todo.md`. R8 (real-device latency/CPU measurement) remains open — requires physical hardware access at staging time. Dated change-log subsections moved to `docs/archive/build-log.md` 2026-05-28; open design tensions (`timeDisplace` source-anchored history, `flow` motion-estimator ceiling) tracked in `todo.md` "Deferred / open follow-ups".
@@ -534,6 +538,45 @@ The grain composite currently renders every voice at identical size and brightne
 **Performance cost:** Near zero. One extra float per instance in the VBO upload (~256 bytes at 64 voices). One extra multiply in the vertex and fragment shaders. The optional depth sort is O(n log n) on ≤64 items in a pre-allocated pool. No new texture lookups, no new render passes.
 
 **Design constraint:** `depth = 0` must be a perfect no-op — identical output to the current composite. The feature is additive only.
+
+### 10.5.6 Operator consolidation (2026-06-03)
+
+The tool currently has ~80 registered operators. This creates an overwhelming operator palette and hides the product's character behind too much surface area. The goal is to reduce visible op count by merging operators that differ only by mode, axis, or routing style — without changing what any individual operator does mathematically.
+
+**Tier 1 — Zero-compromise mode selectors** (no new math; a mode param covers all variants)
+
+| Merge | Before | After | Saves |
+|---|---|---|---|
+| `r / g / b / a` → **`channel`** (mode: R/G/B/A) | 4 | 1 | 3 |
+| `add / blend / diff / layer / mask / mult / sub / sum` → **`composite`** | 8 | 1 | 7 |
+| `scrollX / scrollY` → **`scroll`** (x + y params) | 2 | 1 | 1 |
+| `repeatX / repeatY` folded into **`repeat`** (axis param) | 3 | 1 | 2 |
+
+**Tier 2 — Clean merges with minor shader work** (one combined shader + mode uniform; no mathematical meaning lost)
+
+| Merge | Before | After | Saves |
+|---|---|---|---|
+| 7 `modulate* / modulate*Routed` pairs → one op each with **source toggle** | 14 | 7 | 7 |
+| `brightness / contrast / saturate / hue` → **`grade`** | 4 | 1 | 3 |
+| `signalDamage / chromaShift / chromaFract` → **`glitch`** | 3 | 1 | 2 |
+| `luma / thresh / invert` → **`extract`** | 3 | 1 | 2 |
+
+Modulate pairs: `modulate`, `modulateHue`, `modulatePixelate`, `modulateRotate`, `modulateRepeat`, `modulateScale`, `modulateScrollY`.
+
+**Tier 3 — Discuss before implementing** (param incompatibilities or architectural questions need agreement first)
+
+- `glyphRender / glyphMotion / matrixRain` → **`text`** (style selector). Params mostly orthogonal; shared: size, density, colour.
+- `pinchBulge / sinkSourceField` → both radial push-pull; confirm param compatibility before merging.
+- `spiralField / vortex` → confirm vortex ≡ spiralField with pull=0 before merging.
+- `dataMosh / flowMosh` → mode selector [block / optical-flow]; shared params: mix, inject, keyInterval.
+
+**What is not merged**
+
+The 15-op vector field family (`fluidSim`, `curlNoise`, `gyreField`, `turbulenceWarp`, `voidEater`, `magneticDipole`, `domainFold`, `saddleField`, `flow`, `polarRipple`, `sinkSourceField`, `vortexPacket`, etc.) has genuinely different math and incompatible parameter sets per op. A mode-select over them would not simplify the user experience — the params would change completely per mode. These stay as individual ops.
+
+Similarly left alone: `feedback`, `slitScan`, `timeDisplace`, `retroDisplay`, `filmGrade`, `colorama`, `gradeLUT`, `grain`, `clarity`, `structure`, `selfMod`, `pixelSort`, `fieldSort`, `acidFeedback`, `kaleid`, `pixelate`, `rotate`, `scale`, `modulateKaleid`, `modulateDisplace`.
+
+**Outcome:** Tier 1+2 fully applied brings ~80 ops → ~51. Tier 3 (all) → ~46.
 
 ### 10.6 Role of procedural sources after the pivot
 

@@ -1,0 +1,30 @@
+{
+  "id": "audit-warp-mode-sweep",
+  "description": "Verify warp op in both modes: lens (pinch/bulge) and flow (sink/source with spin)",
+  "audit": {
+    "operator": "warp",
+    "family": "feedback"
+  },
+  "steps": [
+    { "action": "set-operator", "op": "warp" },
+    { "action": "set-operator-param", "param": "mix", "value": 1.0 },
+
+    { "action": "set-operator-param", "param": "mode", "value": 0 },
+    { "action": "set-operator-param", "param": "strength", "value": 0.6 },
+    { "action": "screenshot", "id": "warp-lens-bulge" },
+
+    { "action": "set-operator-param", "param": "strength", "value": -0.6 },
+    { "action": "screenshot", "id": "warp-lens-pinch" },
+
+    { "action": "set-operator-param", "param": "mode", "value": 1 },
+    { "action": "set-operator-param", "param": "strength", "value": 0.8 },
+    { "action": "set-operator-param", "param": "spin", "value": 0 },
+    { "action": "screenshot", "id": "warp-flow-source" },
+
+    { "action": "set-operator-param", "param": "spin", "value": 1.0 },
+    { "action": "screenshot", "id": "warp-flow-spin" },
+
+    { "action": "set-operator-param", "param": "mix", "value": 0 },
+    { "action": "screenshot", "id": "warp-bypass" }
+  ]
+}

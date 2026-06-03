@@ -92,7 +92,7 @@
     compileGraphExecution,
     orderInstancesByGraph,
   } from './core/patch-chain';
-  import { BLEND_OPS } from './ops/blend';
+  const COMPOSITING_OPS = ['composite', 'sum'] as const;
   import GranulatorCard from './ui/GranulatorCard.svelte';
   import MasterMeter from './ui/MasterMeter.svelte';
   import LfoBank from './ui/LfoBank.svelte';
@@ -1770,7 +1770,7 @@
       stopCapture: async () => stopCapture(),
       exportLastCapture: async () => exportLastCapture(),
       addBlendNode: async (op) => {
-        if (!BLEND_OPS.includes(op as (typeof BLEND_OPS)[number])) return false;
+        if (!COMPOSITING_OPS.includes(op as (typeof COMPOSITING_OPS)[number])) return false;
         onAddPatchNode(op);
         await tick();
         return true;
@@ -2064,42 +2064,9 @@
       return;
     }
 
-    // tick() flushes Svelte's pending DOM updates so bind:this is guaranteed
-    // to have populated videoEl before we touch it.
     await tick();
 
-    if (videoEl) {
-      const vid = videoEl;
-      vid.src = `${import.meta.env.BASE_URL}placeholder.mp4`;
-      vid.loop = true;
-      vid.preload = 'auto';
-      loadedVideoName = 'built-in footage';
-      try {
-        if (vid.readyState >= 2) {
-          await waitForVideoFrame(vid);
-        } else {
-          await new Promise<void>((resolve, reject) => {
-            const onLoaded = () => {
-              vid.removeEventListener('error', onError);
-              resolve();
-            };
-            const onError = () => {
-              vid.removeEventListener('loadeddata', onLoaded);
-              reject(new Error('built-in demo video failed to load'));
-            };
-            vid.addEventListener('loadeddata', onLoaded, { once: true });
-            vid.addEventListener('error', onError, { once: true });
-          });
-          await waitForVideoFrame(vid);
-        }
-        setSourceKind('video');
-      } catch (e) {
-        initError = e instanceof Error ? e.message : String(e);
-        setSourceKind('placeholder');
-      }
-    } else {
-      setSourceKind('placeholder');
-    }
+    setSourceKind('placeholder');
     renderer.start();
 
     try {

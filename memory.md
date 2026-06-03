@@ -8,6 +8,12 @@ This file is project-scoped engineering memory, distinct from Claude's harness m
 
 ## Decisions
 
+### 2026-06-03 — Recursive glitch sketches should land as bounded live-video feedback ops, not literal buffer graphs
+
+The requested RGB glitch sketch came in as a Shadertoy-style `Buffer A` / `Buffer B` / `Image` graph, but AV Synth should not grow a public multipass import surface for one look. The chosen extraction is `acidFeedback`: a single `Feedback`-family operator with per-instance `ownedState`, the loaded clip on `u_tex` as the canonical current-frame signal, and one recursive shader that derives RGB offsets from the operator’s own prior state before mixing back against live video.
+
+That boundary matters for both honesty and product shape. The source look is clearly temporal and glitchy, so it belongs with `flow`, `dataMosh`, and `voidEater`, but the app remains a video-first effects instrument over footage rather than a Shadertoy buffer host. No extra renderer subsystem, no general `iChannel` buffer graph, and no claim of exact parity with the original pass topology.
+
 ### 2026-06-01 — `voidEater` should stay a bounded single-pass owned-state operator
 
 **Decision**: land `voidEater` as a normal `OperatorDef`/`VideoStage` feedback operator that uses one per-instance `ownedState` ping-pong buffer, not as a renderer-level preset path or a new temporal subsystem.
@@ -2743,6 +2749,11 @@ Closed several long-standing tooling gaps surfaced after the B2.3 release-gate l
 **Next single action:**
 
 - enable the pre-push hook locally (`git config core.hooksPath scripts/hooks`), then make a no-op commit on a branch to confirm both the hook and the path-filtered B2.3 workflow behave as intended before reviewing for merge
+
+## 2026-06-03 — Chrome DevTools MCP must run isolated
+
+- The recurring "Browser is already in use" failure during local browser verification was not caused by `qa/playwright.config.ts`; it came from `chrome-devtools-mcp` launching Chrome against the shared profile at `~/.cache/chrome-devtools-mcp/chrome-profile`.
+- Multiple concurrent Claude/Codex sessions can each spawn their own `chrome-devtools-mcp`, so the repo-local `.mcp.json` should pass `--isolated` to avoid cross-session profile locks.
 
 ## 2026-05-25 — B2.3 gate #4 CLOSED: V8 code-flush GC root cause + spec fix + 4-hour soak PASS
 

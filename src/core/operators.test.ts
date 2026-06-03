@@ -23,15 +23,16 @@ const EXPECTED_OPERATOR_IDS = [
   'structure',
   'flow',
   'dataMosh',
+  'acidFeedback',
+  'flowMosh',
   'pixelSort',
   'fieldSort',
   'vortex',
   'vortexPacket',
   'curlNoise',
   'saddleField',
-  'pinchBulge',
+  'warp',
   'polarRipple',
-  'sinkSourceField',
   'fluidSim',
   'spiralField',
   'domainFold',
@@ -39,64 +40,38 @@ const EXPECTED_OPERATOR_IDS = [
   'turbulenceWarp',
   'voidEater',
   'magneticDipole',
-  'r',
-  'g',
-  'b',
-  'a',
+  'channel',
   'grain',
   'modulate',
-  'modulateRouted',
   'modulateDisplace',
   'modulateRotate',
-  'modulateRotateRouted',
   'modulateScale',
-  'modulateScaleRouted',
   'modulatePixelate',
-  'modulatePixelateRouted',
   'modulateRepeat',
-  'modulateRepeatRouted',
   'modulateScrollX',
   'modulateScrollY',
   'modulateKaleid',
   'modulateHue',
-  'modulateScrollYRouted',
-  'modulateHueRouted',
   'selfMod',
   'scale',
   'rotate',
-  'scrollX',
-  'scrollY',
+  'scroll',
   'repeat',
-  'repeatX',
-  'repeatY',
   'pixelate',
   'kaleid',
-  'chromaShift',
-  'chromaFract',
-  'signalDamage',
-  'brightness',
-  'contrast',
+  'glitch',
+  'grade',
   'color',
-  'saturate',
   'posterize',
-  'invert',
-  'luma',
-  'thresh',
-  'hue',
+  'extract',
   'colorama',
   'filmGrade',
   'clarity',
   'gradeLUT',
   'debandDither',
   'retroDisplay',
+  'composite',
   'sum',
-  'add',
-  'sub',
-  'mult',
-  'diff',
-  'layer',
-  'blend',
-  'mask',
 ] as const;
 
 describe('operator UI metadata', () => {
@@ -119,20 +94,13 @@ describe('operator UI metadata', () => {
       'Audio Character',
     ]);
     expect(getOperatorUiMeta('rotate').family).toBe('Motion');
-    expect(getOperatorUiMeta('luma').family).toBe('Finish');
+    expect(getOperatorUiMeta('extract').family).toBe('Finish');
     expect(getOperatorUiMeta('grain').family).toBe('Audio Character');
     expect(getOperatorUiMeta('modulateDisplace').family).toBe('Blend/Composite');
-    expect(getOperatorUiMeta('modulateRouted').family).toBe('Blend/Composite');
-    expect(getOperatorUiMeta('modulateRotateRouted').family).toBe('Blend/Composite');
-    expect(getOperatorUiMeta('modulateScaleRouted').family).toBe('Blend/Composite');
-    expect(getOperatorUiMeta('modulatePixelateRouted').family).toBe('Blend/Composite');
-    expect(getOperatorUiMeta('modulateRepeatRouted').family).toBe('Blend/Composite');
-    expect(getOperatorUiMeta('modulateHueRouted').family).toBe('Blend/Composite');
-    expect(getOperatorUiMeta('r').family).toBe('Finish');
+    expect(getOperatorUiMeta('channel').family).toBe('Finish');
     expect(getOperatorUiMeta('sum').family).toBe('Finish');
-    expect(getOperatorUiMeta('pinchBulge').family).toBe('Feedback');
+    expect(getOperatorUiMeta('warp').family).toBe('Feedback');
     expect(getOperatorUiMeta('polarRipple').family).toBe('Feedback');
-    expect(getOperatorUiMeta('sinkSourceField').family).toBe('Feedback');
     expect(getOperatorUiMeta('spiralField').family).toBe('Feedback');
     expect(getOperatorUiMeta('domainFold').family).toBe('Feedback');
     expect(getOperatorUiMeta('gyreField').family).toBe('Feedback');
@@ -140,6 +108,7 @@ describe('operator UI metadata', () => {
     expect(getOperatorUiMeta('voidEater').family).toBe('Feedback');
     expect(getOperatorUiMeta('magneticDipole').family).toBe('Feedback');
     expect(getOperatorUiMeta('fluidSim').family).toBe('Feedback');
+    expect(getOperatorUiMeta('acidFeedback').family).toBe('Feedback');
     expect(getOperatorUiMeta('glyphRender').family).toBe('Texture');
     expect(getOperatorUiMeta('glyphMotion').family).toBe('Motion');
     expect(getOperatorUiMeta('matrixRain').family).toBe('Texture');
@@ -154,7 +123,8 @@ describe('operator UI metadata', () => {
   it('surfaces curated core controls for node-card summaries', () => {
     expect(getOperatorUiMeta('kaleid').coreParams).toEqual(['nSides', 'drive', 'tone', 'mix']);
     expect(getOperatorUiMeta('selfMod').coreParams).toEqual(['amount', 'ratio', 'feedback', 'mix']);
-    expect(getOperatorUiMeta('mask').coreParams).toEqual([
+    expect(getOperatorUiMeta('composite').coreParams).toEqual([
+      'mode',
       'amount',
       'threshold',
       'tolerance',
@@ -167,11 +137,11 @@ describe('operator UI metadata', () => {
       'saturation',
       'shoulder',
     ]);
-    expect(getOperatorUiMeta('signalDamage').coreParams).toEqual([
-      'mix',
+    expect(getOperatorUiMeta('glitch').coreParams).toEqual([
+      'type',
+      'amount',
       'displace',
       'damage',
-      'quantize',
       'jitter',
     ]);
   });

@@ -1,0 +1,117 @@
+{
+  "id": "audit-glitch-type-sweep",
+  "title": "Glitch (signal/shift/fract) type and amount sweep on osc source",
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-glitch-type-sweep",
+    "tailMs": 600
+  },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "audit": {
+    "family": "texture",
+    "operator": "glitch",
+    "kind": "sweep",
+    "path": "operator-regression",
+    "expectedVideo": [
+      "type=0 amount=1: block-stable interference damage with displacement and cool tint",
+      "type=1 amount=0.5: RGB spatial split (chromatic aberration)",
+      "type=2 amount=1: compression-artifact colour banding from chroma fract",
+      "amount=0 for any type should be bypass/identity"
+    ],
+    "expectedAudio": [],
+    "manualChecks": [
+      "Does amount=0 restore the original image for each type?",
+      "Does type=1 produce visible RGB fringing on edges?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "glitch",
+      "paramId": "type",
+      "value": 0
+    },
+    {
+      "type": "set-operator-param",
+      "op": "glitch",
+      "paramId": "amount",
+      "value": 1.0,
+      "screenshot": "glitch-signal-amount-1"
+    },
+    {
+      "type": "wait",
+      "ms": 250,
+      "screenshot": "glitch-signal-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "glitch",
+      "paramId": "amount",
+      "value": 0
+    },
+    {
+      "type": "set-operator-param",
+      "op": "glitch",
+      "paramId": "type",
+      "value": 1
+    },
+    {
+      "type": "set-operator-param",
+      "op": "glitch",
+      "paramId": "amount",
+      "value": 0.5,
+      "screenshot": "glitch-shift-amount-0.5"
+    },
+    {
+      "type": "wait",
+      "ms": 250,
+      "screenshot": "glitch-shift-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "glitch",
+      "paramId": "amount",
+      "value": 0
+    },
+    {
+      "type": "set-operator-param",
+      "op": "glitch",
+      "paramId": "type",
+      "value": 2
+    },
+    {
+      "type": "set-operator-param",
+      "op": "glitch",
+      "paramId": "amount",
+      "value": 1.0,
+      "screenshot": "glitch-fract-amount-1"
+    },
+    {
+      "type": "wait",
+      "ms": 250,
+      "screenshot": "glitch-fract-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "glitch",
+      "paramId": "amount",
+      "value": 0
+    },
+    {
+      "type": "set-operator-param",
+      "op": "glitch",
+      "paramId": "type",
+      "value": 0
+    }
+  ]
+}

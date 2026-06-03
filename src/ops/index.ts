@@ -8,6 +8,8 @@ import { glyphRenderDef } from './glyphRender';
 import { glyphMotionDef } from './glyphMotion';
 import { matrixRainDef } from './matrixRain';
 import { dataMoshDef } from './dataMosh';
+import { acidFeedbackDef } from './acidFeedback';
+import { flowMoshDef } from './flowMosh';
 import { pixelSortDef } from './pixelSort';
 import { fieldSortDef } from './fieldSort';
 import { structureDef } from './structure';
@@ -16,9 +18,8 @@ import { vortexDef } from './vortex';
 import { vortexPacketDef } from './vortexPacket';
 import { curlNoiseDef } from './curlNoise';
 import { saddleFieldDef } from './saddleField';
-import { pinchBulgeDef } from './pinchBulge';
+import { warpDef } from './warp';
 import { polarRippleDef } from './polarRipple';
-import { sinkSourceFieldDef } from './sinkSourceField';
 import { fluidSimDef } from './fluidSim';
 import { spiralFieldDef } from './spiralField';
 import { domainFoldDef } from './domainFold';
@@ -26,54 +27,37 @@ import { gyreFieldDef } from './gyreField';
 import { turbulenceWarpDef } from './turbulenceWarp';
 import { voidEaterDef } from './voidEater';
 import { magneticDipoleDef } from './magneticDipole';
-import { aDef, bDef, gDef, rDef } from './channel';
+import { channelDef } from './channel';
 import { grainDef } from './grain';
 import { modulateDef } from './modulate';
 import { modulateDisplaceDef } from './modulateDisplace';
 import { modulateHueDef } from './modulateHue';
-import { modulateHueRoutedDef } from './modulateHueRouted';
 import { modulateKaleidDef } from './modulateKaleid';
 import { modulatePixelateDef } from './modulatePixelate';
-import { modulatePixelateRoutedDef } from './modulatePixelateRouted';
 import { modulateRotateDef } from './modulateRotate';
-import { modulateRotateRoutedDef } from './modulateRotateRouted';
-import { modulateRoutedDef } from './modulateRouted';
 import { modulateRepeatDef } from './modulateRepeat';
-import { modulateRepeatRoutedDef } from './modulateRepeatRouted';
 import { modulateScaleDef } from './modulateScale';
-import { modulateScaleRoutedDef } from './modulateScaleRouted';
 import { modulateScrollXDef } from './modulateScrollX';
 import { modulateScrollYDef } from './modulateScrollY';
-import { modulateScrollYRoutedDef } from './modulateScrollYRouted';
 import { selfModDef } from './selfMod';
 import { scaleDef } from './scale';
 import { rotateDef } from './rotate';
-import { scrollXDef } from './scrollX';
-import { scrollYDef } from './scrollY';
+import { scrollDef } from './scroll';
 import { repeatDef } from './repeat';
-import { repeatXDef } from './repeatX';
-import { repeatYDef } from './repeatY';
 import { pixelateDef } from './pixelate';
 import { kaleidDef } from './kaleid';
-import { chromaShiftDef } from './chromaShift';
-import { chromaFractDef } from './chromaFract';
-import { signalDamageDef } from './signalDamage';
-import { brightnessDef } from './brightness';
-import { contrastDef } from './contrast';
+import { glitchDef } from './glitch';
+import { gradeDef } from './grade';
 import { colorDef } from './color';
-import { saturateDef } from './saturate';
 import { posterizeDef } from './posterize';
-import { invertDef } from './invert';
-import { lumaDef } from './luma';
-import { threshDef } from './thresh';
-import { hueDef } from './hue';
+import { extractDef } from './extract';
 import { coloramaDef } from './colorama';
 import { filmGradeDef } from './filmGrade';
 import { clarityDef } from './clarity';
 import { gradeLUTDef } from './gradeLUT';
 import { debandDitherDef } from './debandDither';
 import { retroDisplayDef } from './retroDisplay';
-import { addDef, blendDef, diffDef, layerDef, maskDef, multDef, subDef } from './blend';
+import { compositeDef } from './composite';
 import { sumDef } from './sum';
 
 let registered = false;
@@ -90,15 +74,16 @@ export function registerAllOps(): void {
   registerOp(structureDef);
   registerOp(flowDef);
   registerOp(dataMoshDef);
+  registerOp(acidFeedbackDef);
+  registerOp(flowMoshDef);
   registerOp(pixelSortDef);
   registerOp(fieldSortDef);
   registerOp(vortexDef);
   registerOp(vortexPacketDef);
   registerOp(curlNoiseDef);
   registerOp(saddleFieldDef);
-  registerOp(pinchBulgeDef);
+  registerOp(warpDef);
   registerOp(polarRippleDef);
-  registerOp(sinkSourceFieldDef);
   registerOp(fluidSimDef);
   registerOp(spiralFieldDef);
   registerOp(domainFoldDef);
@@ -106,64 +91,38 @@ export function registerAllOps(): void {
   registerOp(turbulenceWarpDef);
   registerOp(voidEaterDef);
   registerOp(magneticDipoleDef);
-  registerOp(rDef);
-  registerOp(gDef);
-  registerOp(bDef);
-  registerOp(aDef);
+  registerOp(channelDef);
   registerOp(grainDef);
   registerOp(modulateDef);
-  registerOp(modulateRoutedDef);
   registerOp(modulateDisplaceDef);
   registerOp(modulateRotateDef);
-  registerOp(modulateRotateRoutedDef);
   registerOp(modulateScaleDef);
-  registerOp(modulateScaleRoutedDef);
   registerOp(modulatePixelateDef);
-  registerOp(modulatePixelateRoutedDef);
   registerOp(modulateRepeatDef);
-  registerOp(modulateRepeatRoutedDef);
   registerOp(modulateScrollXDef);
   registerOp(modulateScrollYDef);
   registerOp(modulateKaleidDef);
   registerOp(modulateHueDef);
-  registerOp(modulateScrollYRoutedDef);
-  registerOp(modulateHueRoutedDef);
   registerOp(selfModDef);
   registerOp(scaleDef);
   registerOp(rotateDef);
-  registerOp(scrollXDef);
-  registerOp(scrollYDef);
+  registerOp(scrollDef);
   registerOp(repeatDef);
-  registerOp(repeatXDef);
-  registerOp(repeatYDef);
   registerOp(pixelateDef);
   registerOp(kaleidDef);
-  registerOp(chromaShiftDef);
-  registerOp(chromaFractDef);
-  registerOp(signalDamageDef);
-  registerOp(brightnessDef);
-  registerOp(contrastDef);
+  registerOp(glitchDef);
+  registerOp(gradeDef);
   registerOp(colorDef);
-  registerOp(saturateDef);
   registerOp(posterizeDef);
-  registerOp(invertDef);
-  registerOp(lumaDef);
-  registerOp(threshDef);
-  registerOp(hueDef);
+  registerOp(extractDef);
   registerOp(coloramaDef);
   registerOp(filmGradeDef);
   registerOp(clarityDef);
   registerOp(gradeLUTDef);
   registerOp(debandDitherDef);
   registerOp(retroDisplayDef);
+  registerOp(compositeDef);
   registerOp(sumDef);
-  registerOp(addDef);
-  registerOp(subDef);
-  registerOp(multDef);
-  registerOp(diffDef);
-  registerOp(layerDef);
-  registerOp(blendDef);
-  registerOp(maskDef);
 }
 
 // Chain order matches the typical Hydra source-→-geometry-→-color flow,
@@ -181,15 +140,16 @@ export const DEFAULT_CHAIN: readonly string[] = [
   'structure',
   'flow',
   'dataMosh',
+  'acidFeedback',
+  'flowMosh',
   'pixelSort',
   'fieldSort',
   'vortex',
   'vortexPacket',
   'curlNoise',
   'saddleField',
-  'pinchBulge',
+  'warp',
   'polarRipple',
-  'sinkSourceField',
   'fluidSim',
   'spiralField',
   'domainFold',
@@ -197,50 +157,30 @@ export const DEFAULT_CHAIN: readonly string[] = [
   'turbulenceWarp',
   'voidEater',
   'magneticDipole',
-  'r',
-  'g',
-  'b',
-  'a',
+  'channel',
   'grain',
   'modulate',
-  'modulateRouted',
   'modulateDisplace',
   'modulateScale',
-  'modulateScaleRouted',
   'modulatePixelate',
-  'modulatePixelateRouted',
   'modulateRepeat',
-  'modulateRepeatRouted',
   'selfMod',
   'scale',
   'rotate',
   'modulateRotate',
-  'modulateRotateRouted',
   'modulateScrollX',
   'modulateScrollY',
-  'modulateScrollYRouted',
-  'scrollX',
-  'scrollY',
+  'scroll',
   'repeat',
-  'repeatX',
-  'repeatY',
   'pixelate',
   'modulateKaleid',
   'kaleid',
-  'chromaShift',
-  'chromaFract',
-  'signalDamage',
-  'brightness',
-  'contrast',
+  'glitch',
+  'grade',
   'color',
-  'saturate',
   'posterize',
-  'invert',
-  'luma',
-  'thresh',
+  'extract',
   'modulateHue',
-  'modulateHueRouted',
-  'hue',
   'colorama',
   'filmGrade',
   'clarity',

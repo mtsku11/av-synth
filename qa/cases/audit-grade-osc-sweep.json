@@ -1,0 +1,114 @@
+{
+  "id": "audit-grade-osc-sweep",
+  "title": "Grade (brightness/contrast/saturate/hue) sweep on osc source",
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-grade-osc-sweep",
+    "tailMs": 600
+  },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "audit": {
+    "family": "color",
+    "operator": "grade",
+    "kind": "sweep",
+    "path": "operator-regression",
+    "expectedVideo": [
+      "brightness=0.4 should visibly lift the image toward white",
+      "contrast=2.0 should compress shadows and expand highlights",
+      "saturate=2.0 should produce vivid oversaturated colour",
+      "hue=0.5 should rotate the colour wheel roughly 180 degrees",
+      "all params at defaults (brightness=0, contrast=1, saturate=1, hue=0) should be identity"
+    ],
+    "expectedAudio": [
+      "each grade adjustment should remain coupled to the audio mix"
+    ],
+    "manualChecks": [
+      "Does returning all params to defaults restore the original image?",
+      "Does hue=0.5 produce the complementary colour palette?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "grade",
+      "paramId": "brightness",
+      "value": 0.4,
+      "screenshot": "grade-brightness-0.4"
+    },
+    {
+      "type": "wait",
+      "ms": 250,
+      "screenshot": "grade-brightness-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grade",
+      "paramId": "brightness",
+      "value": 0
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grade",
+      "paramId": "contrast",
+      "value": 2.0,
+      "screenshot": "grade-contrast-2"
+    },
+    {
+      "type": "wait",
+      "ms": 250,
+      "screenshot": "grade-contrast-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grade",
+      "paramId": "contrast",
+      "value": 1
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grade",
+      "paramId": "saturate",
+      "value": 2.0,
+      "screenshot": "grade-saturate-2"
+    },
+    {
+      "type": "wait",
+      "ms": 250,
+      "screenshot": "grade-saturate-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grade",
+      "paramId": "saturate",
+      "value": 1
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grade",
+      "paramId": "hue",
+      "value": 0.5,
+      "screenshot": "grade-hue-0.5"
+    },
+    {
+      "type": "wait",
+      "ms": 250,
+      "screenshot": "grade-hue-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "grade",
+      "paramId": "hue",
+      "value": 0
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "id": "audit-scroll-osc-sweep",
+  "title": "Scroll (X+Y) sweep on osc source",
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-scroll-osc-sweep",
+    "tailMs": 700
+  },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "scroll-osc-static-hold",
+        "to": "scroll-osc-moving-hold",
+        "domain": "video",
+        "metric": "temporalDiff",
+        "op": ">",
+        "delta": 0.03,
+        "description": "adding scroll motion should materially increase frame-to-frame movement on the oscillator source"
+      }
+    ]
+  },
+  "audit": {
+    "family": "geometry-spatial",
+    "operator": "scroll",
+    "kind": "sweep",
+    "path": "operator-regression",
+    "expectedVideo": [
+      "raising x amount and speedX should produce clear horizontal drift",
+      "raising y amount and speedY should produce clear vertical drift",
+      "both axes active simultaneously should show diagonal scroll motion"
+    ],
+    "expectedAudio": [
+      "the X scroll should introduce an audible short-delay smear on the rendered mix",
+      "the stronger setting should stay stable without zippering or silence"
+    ],
+    "manualChecks": [
+      "Does horizontal drift feel coupled to the audio slip/smear?",
+      "Does vertical drift produce the expected pan/motion effect?",
+      "Does the moving state feel like one AV gesture rather than separate effects?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-source-param",
+      "paramId": "frequency",
+      "value": 110,
+      "screenshot": "scroll-osc-frequency-110"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scroll",
+      "paramId": "x",
+      "value": 0.08,
+      "screenshot": "scroll-osc-static-x"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scroll",
+      "paramId": "speedX",
+      "value": 0,
+      "screenshot": "scroll-osc-static-speedX"
+    },
+    {
+      "type": "wait",
+      "ms": 320,
+      "screenshot": "scroll-osc-static-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scroll",
+      "paramId": "x",
+      "value": 0.68,
+      "screenshot": "scroll-osc-moving-x"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scroll",
+      "paramId": "speedX",
+      "value": 1.8,
+      "screenshot": "scroll-osc-moving-speedX"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scroll",
+      "paramId": "y",
+      "value": 0.4,
+      "screenshot": "scroll-osc-moving-y"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "scroll",
+      "paramId": "speedY",
+      "value": 1.2,
+      "screenshot": "scroll-osc-moving-speedY"
+    },
+    {
+      "type": "wait",
+      "ms": 520,
+      "screenshot": "scroll-osc-moving-hold"
+    }
+  ]
+}

@@ -4,29 +4,87 @@
     "tagline": "Invert and recirculate the loaded clip, then warp it through a repeated routed branch for a hard-edged feedback twist.",
     "videoIntent": "Best on graphic motion, silhouettes, or footage with clear contour so the warped repeat branch stays assertive instead of muddy.",
     "audioIntent": "The coupled sound should feel like phase-twisted feedback pressure, not a random chorus pasted over the clip.",
-    "operatorFocus": ["blend", "rotate", "modulateRepeatRouted", "repeatX", "repeatY"],
-    "chain": [
-      "invert",
-      "blend",
+    "operatorFocus": [
+      "composite",
       "rotate",
       "modulateRepeatRouted",
-      "contrast",
+      "repeat"
+    ],
+    "chain": [
+      "extract",
+      "composite",
+      "rotate",
+      "modulateRepeat",
+      "grade",
       "kaleid",
-      "repeatX",
-      "repeatY"
+      "repeat"
     ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
-        { "target": "invert#0", "bus": 0, "inputs": ["source"] },
-        { "target": "blend#0", "bus": 0, "inputs": ["invert#0", "src(o0)"] },
-        { "target": "rotate#0", "bus": 0, "inputs": ["blend#0"] },
-        { "target": "modulateRepeatRouted#0", "bus": 0, "inputs": ["rotate#0", "repeatY#0"] },
-        { "target": "contrast#0", "bus": 0, "inputs": ["modulateRepeatRouted#0"] },
-        { "target": "kaleid#0", "bus": 1, "inputs": ["source"] },
-        { "target": "repeatX#0", "bus": 1, "inputs": ["kaleid#0"] },
-        { "target": "repeatY#0", "bus": 1, "inputs": ["repeatX#0"] }
-      ]
+        {
+          "target": "invert#0",
+          "bus": 0,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "composite#0",
+          "bus": 0,
+          "inputs": [
+            "invert#0",
+            "src(o0)"
+          ]
+        },
+        {
+          "target": "rotate#0",
+          "bus": 0,
+          "inputs": [
+            "composite#0"
+          ]
+        },
+        {
+          "target": "modulateRepeatRouted#0",
+          "bus": 0,
+          "inputs": [
+            "rotate#0",
+            "repeat#1"
+          ]
+        },
+        {
+          "target": "contrast#0",
+          "bus": 0,
+          "inputs": [
+            "modulateRepeatRouted#0"
+          ]
+        },
+        {
+          "target": "kaleid#0",
+          "bus": 1,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "repeat#0",
+          "bus": 1,
+          "inputs": [
+            "kaleid#0"
+          ]
+        },
+        {
+          "target": "repeat#1",
+          "bus": 1,
+          "inputs": [
+            "repeat#0"
+          ]
+        }
+      ],
+      "values": {
+        "repeat#0.axis": 1,
+        "repeat#1.axis": 2
+      }
     },
     "render": {
       "look": "bleach",
@@ -37,19 +95,22 @@
     },
     "values": {
       "clock.rate": 0.5,
-      "invert.amount": 1.0,
-      "blend.amount": 0.38,
       "rotate.angle": -0.5,
-      "modulateRepeatRouted.repeatX": 3.4,
-      "modulateRepeatRouted.repeatY": 4.8,
-      "modulateRepeatRouted.offsetX": 0.45,
-      "modulateRepeatRouted.offsetY": 0.45,
-      "contrast.amount": 1.24,
+      "modulateRepeat.repeatX": 3.4,
+      "modulateRepeat.source": 1,
+      "modulateRepeat.repeatY": 4.8,
+      "modulateRepeat.offsetX": 0.45,
+      "modulateRepeat.offsetY": 0.45,
       "kaleid.nSides": 4,
-      "repeatX.reps": 2.0,
-      "repeatX.offset": 0.45,
-      "repeatY.reps": 2.0,
-      "repeatY.offset": 0.45
+      "repeat#0.repeatX": 2.0,
+      "repeat#0.offsetX": 0.45,
+      "repeat#1.repeatY": 2.0,
+      "repeat#1.offsetY": 0.45,
+      "composite#0.amount": 0.38,
+      "composite#0.mode": 4,
+      "grade.contrast": 1.24,
+      "extract.mode": 2,
+      "extract.amount": 1.0
     }
   },
   "pixelscape": {
@@ -57,42 +118,138 @@
     "tagline": "Push the clip through a routed scale-and-hue field, then lay a keyed tinted branch back over it like a floating matte.",
     "videoIntent": "Best on faces, gestures, and layered light where a routed zoom field can pull the image apart before the overprint lands.",
     "audioIntent": "The coupled sound should shimmer and widen through a real routed motion branch rather than just blurring into polite detune.",
-    "operatorFocus": ["modulateScaleRouted", "modulateHueRouted", "layer", "posterize"],
+    "operatorFocus": [
+      "modulateScaleRouted",
+      "modulateHueRouted",
+      "composite",
+      "posterize"
+    ],
     "chain": [
-      "saturate",
+      "grade",
       "scale",
       "color",
-      "modulateScaleRouted",
-      "hue",
-      "modulateHueRouted",
-      "layer",
+      "modulateScale",
+      "modulateHue",
+      "composite",
       "rotate",
-      "scrollX",
+      "scroll",
       "posterize",
-      "hue",
-      "contrast",
-      "luma",
+      "extract",
       "color",
-      "mult"
+      "composite"
     ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
-        { "target": "saturate#0", "bus": 0, "inputs": ["source"] },
-        { "target": "scale#0", "bus": 0, "inputs": ["saturate#0"] },
-        { "target": "color#0", "bus": 0, "inputs": ["scale#0"] },
-        { "target": "modulateScaleRouted#0", "bus": 0, "inputs": ["color#0", "contrast#0"] },
-        { "target": "hue#0", "bus": 0, "inputs": ["modulateScaleRouted#0"] },
-        { "target": "modulateHueRouted#0", "bus": 0, "inputs": ["hue#0", "contrast#0"] },
-        { "target": "layer#0", "bus": 0, "inputs": ["modulateHueRouted#0", "mult#0"] },
-        { "target": "rotate#0", "bus": 1, "inputs": ["source"] },
-        { "target": "scrollX#0", "bus": 1, "inputs": ["rotate#0"] },
-        { "target": "posterize#0", "bus": 1, "inputs": ["scrollX#0"] },
-        { "target": "hue#1", "bus": 1, "inputs": ["posterize#0"] },
-        { "target": "contrast#0", "bus": 1, "inputs": ["hue#1"] },
-        { "target": "luma#0", "bus": 2, "inputs": ["contrast#0"] },
-        { "target": "color#1", "bus": 2, "inputs": ["luma#0"] },
-        { "target": "mult#0", "bus": 2, "inputs": ["color#1", "contrast#0"] }
+        {
+          "target": "saturate#0",
+          "bus": 0,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "scale#0",
+          "bus": 0,
+          "inputs": [
+            "saturate#0"
+          ]
+        },
+        {
+          "target": "color#0",
+          "bus": 0,
+          "inputs": [
+            "scale#0"
+          ]
+        },
+        {
+          "target": "modulateScaleRouted#0",
+          "bus": 0,
+          "inputs": [
+            "color#0",
+            "contrast#0"
+          ]
+        },
+        {
+          "target": "hue#0",
+          "bus": 0,
+          "inputs": [
+            "modulateScaleRouted#0"
+          ]
+        },
+        {
+          "target": "modulateHueRouted#0",
+          "bus": 0,
+          "inputs": [
+            "hue#0",
+            "contrast#0"
+          ]
+        },
+        {
+          "target": "composite#0",
+          "bus": 0,
+          "inputs": [
+            "modulateHueRouted#0",
+            "composite#1"
+          ]
+        },
+        {
+          "target": "rotate#0",
+          "bus": 1,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "scroll#0",
+          "bus": 1,
+          "inputs": [
+            "rotate#0"
+          ]
+        },
+        {
+          "target": "posterize#0",
+          "bus": 1,
+          "inputs": [
+            "scroll#0"
+          ]
+        },
+        {
+          "target": "hue#1",
+          "bus": 1,
+          "inputs": [
+            "posterize#0"
+          ]
+        },
+        {
+          "target": "contrast#0",
+          "bus": 1,
+          "inputs": [
+            "hue#1"
+          ]
+        },
+        {
+          "target": "luma#0",
+          "bus": 2,
+          "inputs": [
+            "contrast#0"
+          ]
+        },
+        {
+          "target": "color#1",
+          "bus": 2,
+          "inputs": [
+            "luma#0"
+          ]
+        },
+        {
+          "target": "composite#1",
+          "bus": 2,
+          "inputs": [
+            "color#1",
+            "contrast#0"
+          ]
+        }
       ]
     },
     "render": {
@@ -104,36 +261,40 @@
     },
     "values": {
       "clock.rate": 0.24,
-      "saturate.amount": 1.28,
       "scale.amount": 0.92,
       "color#0.r": 1.18,
       "color#0.g": 0.94,
       "color#0.b": 1.22,
       "color#0.a": 1.0,
-      "modulateScaleRouted.multiple": 0.42,
-      "modulateScaleRouted.offset": 0.82,
-      "hue#0.amount": 0.16,
-      "modulateHueRouted.amount": 0.88,
-      "layer.amount": 0.84,
-      "layer.threshold": 0.24,
-      "layer.tolerance": 0.28,
-      "layer.invert": 0.0,
+      "modulateScale.multiple": 0.42,
+      "modulateScale.source": 1,
+      "modulateScale.offset": 0.82,
+      "modulateHue.amount": 0.88,
+      "modulateHue.source": 1,
       "rotate#0.angle": 0.62,
-      "scrollX#0.amount": 0.26,
-      "scrollX#0.speed": 0.11,
+      "scroll#0.x": 0.26,
+      "scroll#0.speedX": 0.11,
       "posterize#0.bins": 3,
       "posterize#0.gamma": 0.76,
-      "hue#1.amount": 0.56,
-      "contrast#0.amount": 1.28,
-      "luma#0.amount": 1.0,
-      "luma#0.threshold": 0.38,
-      "luma#0.tolerance": 0.18,
-      "luma#0.invert": 0.0,
       "color#1.r": 1.84,
       "color#1.g": 0.96,
       "color#1.b": 1.42,
       "color#1.a": 1.0,
-      "mult#0.amount": 0.92
+      "composite#0.amount": 0.84,
+      "composite#0.threshold": 0.24,
+      "composite#0.tolerance": 0.28,
+      "composite#0.invert": 0.0,
+      "composite#0.mode": 6,
+      "composite#1.amount": 0.92,
+      "composite#1.mode": 2,
+      "grade.saturate": 1.28,
+      "grade.hue": 0.72,
+      "grade.contrast": 1.28,
+      "extract#0.amount": 1.0,
+      "extract#0.threshold": 0.38,
+      "extract#0.tolerance": 0.18,
+      "extract#0.flip": 0.0,
+      "extract.mode": 0
     }
   },
   "disintegration": {
@@ -141,30 +302,92 @@
     "tagline": "Shear the clip through routed displacement and vertical motion control, then pull it inward under a pale collapsing tint.",
     "videoIntent": "Best on bodies, edges, and directional movement where the routed motion branches can visibly tear the image apart.",
     "audioIntent": "The coupled sound should feel like a dissolving stereo field with real motion pressure, not generic reverb wash.",
-    "operatorFocus": ["modulateRouted", "diff", "modulateScrollYRouted", "scale"],
+    "operatorFocus": [
+      "modulateRouted",
+      "composite",
+      "modulateScrollYRouted",
+      "scale"
+    ],
     "chain": [
       "color",
-      "modulateRouted",
-      "diff",
-      "modulateScrollYRouted",
+      "modulate",
+      "composite",
+      "modulateScrollY",
       "scale",
       "rotate",
-      "contrast",
+      "grade",
       "color",
       "rotate"
     ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
-        { "target": "color#0", "bus": 0, "inputs": ["source"] },
-        { "target": "modulateRouted#0", "bus": 0, "inputs": ["color#0", "contrast#0"] },
-        { "target": "diff#0", "bus": 0, "inputs": ["modulateRouted#0", "src(o0)"] },
-        { "target": "modulateScrollYRouted#0", "bus": 0, "inputs": ["diff#0", "rotate#1"] },
-        { "target": "scale#0", "bus": 0, "inputs": ["modulateScrollYRouted#0"] },
-        { "target": "rotate#0", "bus": 1, "inputs": ["source"] },
-        { "target": "contrast#0", "bus": 1, "inputs": ["rotate#0"] },
-        { "target": "color#1", "bus": 2, "inputs": ["source"] },
-        { "target": "rotate#1", "bus": 2, "inputs": ["color#1"] }
+        {
+          "target": "color#0",
+          "bus": 0,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "modulateRouted#0",
+          "bus": 0,
+          "inputs": [
+            "color#0",
+            "contrast#0"
+          ]
+        },
+        {
+          "target": "composite#0",
+          "bus": 0,
+          "inputs": [
+            "modulateRouted#0",
+            "src(o0)"
+          ]
+        },
+        {
+          "target": "modulateScrollYRouted#0",
+          "bus": 0,
+          "inputs": [
+            "composite#0",
+            "rotate#1"
+          ]
+        },
+        {
+          "target": "scale#0",
+          "bus": 0,
+          "inputs": [
+            "modulateScrollYRouted#0"
+          ]
+        },
+        {
+          "target": "rotate#0",
+          "bus": 1,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "contrast#0",
+          "bus": 1,
+          "inputs": [
+            "rotate#0"
+          ]
+        },
+        {
+          "target": "color#1",
+          "bus": 2,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "rotate#1",
+          "bus": 2,
+          "inputs": [
+            "color#1"
+          ]
+        }
       ]
     },
     "render": {
@@ -180,18 +403,21 @@
       "color#0.g": 1.014,
       "color#0.b": 1.0,
       "color#0.a": 1.0,
-      "modulateRouted#0.amount": 0.22,
-      "diff#0.amount": 0.64,
-      "modulateScrollYRouted#0.amount": 0.3,
-      "modulateScrollYRouted#0.speed": 0.22,
+      "modulate#0.amount": 0.22,
+      "modulate#0.source": 1,
+      "modulateScrollY#0.amount": 0.3,
+      "modulateScrollY#0.source": 1,
+      "modulateScrollY#0.speed": 0.22,
       "scale#0.amount": 0.72,
       "rotate#0.angle": 0.5,
-      "contrast#0.amount": 1.08,
       "color#1.r": 1.05,
       "color#1.g": 1.0,
       "color#1.b": 1.18,
       "color#1.a": 1.0,
-      "rotate#1.angle": 0.18
+      "rotate#1.angle": 0.18,
+      "composite#0.amount": 0.64,
+      "composite#0.mode": 3,
+      "grade.contrast": 1.08
     }
   },
   "acidBusSeat": {
@@ -199,34 +425,92 @@
     "tagline": "Split the clip across buses, force one branch into routed held-window grime, then shove the main image through a cyan acid scale field.",
     "videoIntent": "Best on busy footage, instruments, or bodies where a pixel-torn side bus can keep fighting the main branch instead of tinting it politely.",
     "audioIntent": "The coupled sound should feel restless and acid-leaning, with the dirty routed bus actively pushing the main line rather than just doubling it.",
-    "operatorFocus": ["modulateScaleRouted", "modulatePixelateRouted", "add", "diff"],
+    "operatorFocus": [
+      "modulateScaleRouted",
+      "modulatePixelateRouted",
+      "composite"
+    ],
     "chain": [
       "color",
       "rotate",
-      "modulateScaleRouted",
-      "contrast",
-      "add",
+      "modulateScale",
+      "grade",
+      "composite",
       "color",
-      "diff",
-      "modulatePixelateRouted",
+      "composite",
+      "modulatePixelate",
       "color"
     ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
-        { "target": "color#2", "bus": 1, "inputs": ["source"] },
-        { "target": "diff#0", "bus": 1, "inputs": ["color#2", "src(o0)"] },
-        { "target": "modulatePixelateRouted#0", "bus": 1, "inputs": ["diff#0", "rotate#0"] },
-        { "target": "color#0", "bus": 0, "inputs": ["source"] },
-        { "target": "rotate#0", "bus": 0, "inputs": ["color#0"] },
+        {
+          "target": "color#2",
+          "bus": 1,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "composite#0",
+          "bus": 1,
+          "inputs": [
+            "color#2",
+            "src(o0)"
+          ]
+        },
+        {
+          "target": "modulatePixelateRouted#0",
+          "bus": 1,
+          "inputs": [
+            "composite#0",
+            "rotate#0"
+          ]
+        },
+        {
+          "target": "color#0",
+          "bus": 0,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "rotate#0",
+          "bus": 0,
+          "inputs": [
+            "color#0"
+          ]
+        },
         {
           "target": "modulateScaleRouted#0",
           "bus": 0,
-          "inputs": ["rotate#0", "modulatePixelateRouted#0"]
+          "inputs": [
+            "rotate#0",
+            "modulatePixelateRouted#0"
+          ]
         },
-        { "target": "contrast#0", "bus": 0, "inputs": ["modulateScaleRouted#0"] },
-        { "target": "color#1", "bus": 2, "inputs": ["source"] },
-        { "target": "add#0", "bus": 0, "inputs": ["contrast#0", "color#1"] }
+        {
+          "target": "contrast#0",
+          "bus": 0,
+          "inputs": [
+            "modulateScaleRouted#0"
+          ]
+        },
+        {
+          "target": "color#1",
+          "bus": 2,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "composite#1",
+          "bus": 0,
+          "inputs": [
+            "contrast#0",
+            "color#1"
+          ]
+        }
       ]
     },
     "render": {
@@ -243,10 +527,9 @@
       "color#0.b": 1.28,
       "color#0.a": 1.0,
       "rotate#0.angle": 0.46,
-      "modulateScaleRouted#0.multiple": 0.58,
-      "modulateScaleRouted#0.offset": 0.84,
-      "contrast#0.amount": 1.34,
-      "add#0.amount": 0.74,
+      "modulateScale#0.multiple": 0.58,
+      "modulateScale#0.source": 1,
+      "modulateScale#0.offset": 0.84,
       "color#1.r": 0.0,
       "color#1.g": 1.24,
       "color#1.b": 1.5,
@@ -255,9 +538,14 @@
       "color#2.g": 0.56,
       "color#2.b": 0.18,
       "color#2.a": 1.0,
-      "diff#0.amount": 0.88,
-      "modulatePixelateRouted#0.multiple": 240,
-      "modulatePixelateRouted#0.offset": 52
+      "modulatePixelate#0.multiple": 240,
+      "modulatePixelate#0.source": 1,
+      "modulatePixelate#0.offset": 52,
+      "composite#0.amount": 0.88,
+      "composite#0.mode": 3,
+      "composite#1.amount": 0.74,
+      "composite#1.mode": 0,
+      "grade.contrast": 1.34
     }
   },
   "glitchySlitScan": {
@@ -265,32 +553,99 @@
     "tagline": "Carve a moving slit branch out of the clip, push it through routed held-window tearing, then lay that memory strip back onto the clean image.",
     "videoIntent": "Best on faces, webcams, or close framing where a moving slit branch can read as motion memory instead of static masking.",
     "audioIntent": "The coupled sound should feel like a narrow moving spectral cut with persistence and scrape, not a nearly dry image-to-audio mapping.",
-    "operatorFocus": ["layer", "mask", "modulatePixelateRouted", "scrollX"],
+    "operatorFocus": [
+      "composite",
+      "modulatePixelateRouted",
+      "scroll"
+    ],
     "chain": [
-      "contrast",
-      "layer",
+      "grade",
+      "composite",
       "posterize",
       "scale",
-      "scrollX",
-      "scrollY",
-      "modulatePixelateRouted",
+      "scroll",
+      "scroll",
+      "modulatePixelate",
       "sum",
-      "scrollX",
-      "mask"
+      "scroll",
+      "composite"
     ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
-        { "target": "contrast#0", "bus": 0, "inputs": ["source"] },
-        { "target": "layer#0", "bus": 0, "inputs": ["contrast#0", "mask#0"] },
-        { "target": "posterize#0", "bus": 2, "inputs": ["source"] },
-        { "target": "scale#0", "bus": 2, "inputs": ["posterize#0"] },
-        { "target": "scrollX#0", "bus": 2, "inputs": ["scale#0"] },
-        { "target": "scrollY#0", "bus": 2, "inputs": ["scrollX#0"] },
-        { "target": "modulatePixelateRouted#0", "bus": 2, "inputs": ["scrollY#0", "contrast#0"] },
-        { "target": "sum#0", "bus": 1, "inputs": ["source"] },
-        { "target": "scrollX#1", "bus": 1, "inputs": ["sum#0"] },
-        { "target": "mask#0", "bus": 1, "inputs": ["modulatePixelateRouted#0", "scrollX#1"] }
+        {
+          "target": "contrast#0",
+          "bus": 0,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "composite#0",
+          "bus": 0,
+          "inputs": [
+            "contrast#0",
+            "composite#1"
+          ]
+        },
+        {
+          "target": "posterize#0",
+          "bus": 2,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "scale#0",
+          "bus": 2,
+          "inputs": [
+            "posterize#0"
+          ]
+        },
+        {
+          "target": "scroll#0",
+          "bus": 2,
+          "inputs": [
+            "scale#0"
+          ]
+        },
+        {
+          "target": "scroll#1",
+          "bus": 2,
+          "inputs": [
+            "scroll#0"
+          ]
+        },
+        {
+          "target": "modulatePixelateRouted#0",
+          "bus": 2,
+          "inputs": [
+            "scroll#1",
+            "contrast#0"
+          ]
+        },
+        {
+          "target": "sum#0",
+          "bus": 1,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "scroll#2",
+          "bus": 1,
+          "inputs": [
+            "sum#0"
+          ]
+        },
+        {
+          "target": "composite#1",
+          "bus": 1,
+          "inputs": [
+            "modulatePixelateRouted#0",
+            "scroll#2"
+          ]
+        }
       ]
     },
     "render": {
@@ -302,31 +657,34 @@
     },
     "values": {
       "clock.rate": 0.11,
-      "contrast.amount": 1.54,
-      "layer.amount": 0.88,
-      "layer.threshold": 0.18,
-      "layer.tolerance": 0.16,
-      "layer.invert": 0.0,
       "posterize#0.bins": 3,
       "posterize#0.gamma": 0.74,
       "scale.amount": 0.58,
-      "scrollX#0.amount": 0.36,
-      "scrollX#0.speed": 0.22,
-      "scrollY#0.amount": 0.18,
-      "scrollY#0.speed": -0.14,
-      "modulatePixelateRouted#0.multiple": 220,
-      "modulatePixelateRouted#0.offset": 38,
+      "scroll#0.x": 0.36,
+      "scroll#0.speedX": 0.22,
+      "scroll#1.y": 0.18,
+      "scroll#1.speedY": -0.14,
+      "modulatePixelate#0.multiple": 220,
+      "modulatePixelate#0.source": 1,
+      "modulatePixelate#0.offset": 38,
       "sum#0.amount": 0.72,
       "sum#0.r": 1.8,
       "sum#0.g": 0.15,
       "sum#0.b": 1.3,
       "sum#0.a": 1.0,
-      "scrollX#1.amount": 0.44,
-      "scrollX#1.speed": 0.31,
-      "mask.amount": 1.0,
-      "mask.threshold": 0.3,
-      "mask.tolerance": 0.08,
-      "mask.invert": 0.0
+      "scroll#2.x": 0.44,
+      "scroll#2.speedX": 0.31,
+      "composite#0.amount": 0.88,
+      "composite#0.threshold": 0.18,
+      "composite#0.tolerance": 0.16,
+      "composite#0.invert": 0.0,
+      "composite#0.mode": 6,
+      "composite#1.amount": 1.0,
+      "composite#1.threshold": 0.3,
+      "composite#1.tolerance": 0.08,
+      "composite#1.invert": 0.0,
+      "composite#1.mode": 7,
+      "grade.contrast": 1.54
     }
   },
   "haloKey": {
@@ -334,16 +692,58 @@
     "tagline": "Lift the clip through a keyed halo branch, then lay the glow back over the clean source.",
     "videoIntent": "Best on portraits, bodies, lights, or high-contrast motion where a bright matte can separate without turning to soup.",
     "audioIntent": "The coupled result should widen and sweeten the keyed peaks rather than sounding like a generic chorus pasted on top.",
-    "operatorFocus": ["luma", "sum", "layer", "chromaShift"],
-    "chain": ["luma", "chromaShift", "saturate", "sum", "layer"],
+    "operatorFocus": [
+      "luma",
+      "sum",
+      "composite",
+      "chromaShift"
+    ],
+    "chain": [
+      "extract",
+      "glitch",
+      "grade",
+      "sum",
+      "composite"
+    ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
-        { "target": "luma#0", "bus": 1, "inputs": ["source"] },
-        { "target": "chromaShift#0", "bus": 1, "inputs": ["luma#0"] },
-        { "target": "saturate#0", "bus": 1, "inputs": ["chromaShift#0"] },
-        { "target": "sum#0", "bus": 1, "inputs": ["saturate#0"] },
-        { "target": "layer#0", "bus": 0, "inputs": ["source", "sum#0"] }
+        {
+          "target": "luma#0",
+          "bus": 1,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "chromaShift#0",
+          "bus": 1,
+          "inputs": [
+            "luma#0"
+          ]
+        },
+        {
+          "target": "saturate#0",
+          "bus": 1,
+          "inputs": [
+            "chromaShift#0"
+          ]
+        },
+        {
+          "target": "sum#0",
+          "bus": 1,
+          "inputs": [
+            "saturate#0"
+          ]
+        },
+        {
+          "target": "composite#0",
+          "bus": 0,
+          "inputs": [
+            "source",
+            "sum#0"
+          ]
+        }
       ]
     },
     "render": {
@@ -355,21 +755,24 @@
     },
     "values": {
       "clock.rate": 0.42,
-      "luma.threshold": 0.58,
-      "luma.tolerance": 0.22,
-      "luma.invert": 0.0,
-      "luma.amount": 1.0,
-      "chromaShift.amount": 0.018,
-      "saturate.amount": 1.28,
       "sum.amount": 0.82,
       "sum.r": 1.7,
       "sum.g": 0.35,
       "sum.b": 1.8,
       "sum.a": 1.1,
-      "layer.amount": 0.74,
-      "layer.threshold": 0.3,
-      "layer.tolerance": 0.32,
-      "layer.invert": 0.0
+      "composite#0.amount": 0.74,
+      "composite#0.threshold": 0.3,
+      "composite#0.tolerance": 0.32,
+      "composite#0.invert": 0.0,
+      "composite#0.mode": 6,
+      "grade.saturate": 1.28,
+      "glitch.type": 1,
+      "glitch.amount": 0.225,
+      "extract.threshold": 0.58,
+      "extract.tolerance": 0.22,
+      "extract.flip": 0.0,
+      "extract.amount": 1.0,
+      "extract.mode": 0
     }
   },
   "rgbSpill": {
@@ -377,19 +780,82 @@
     "tagline": "Split the source into red and blue matte branches, collapse one into a weighted key, then spill the tinted composite back into the clip.",
     "videoIntent": "Use on clips with edges, silhouettes, or costume contrast so the split-matte color spill stays graphic instead of muddy.",
     "audioIntent": "The coupled sound should feel spectrally separated and tense, with the low and high-band branches rejoining as one gesture.",
-    "operatorFocus": ["r", "b", "sum", "mask", "layer"],
-    "chain": ["r", "color", "sum", "b", "color", "layer", "mask", "contrast"],
+    "operatorFocus": [
+      "channel",
+      "sum",
+      "composite"
+    ],
+    "chain": [
+      "channel",
+      "color",
+      "sum",
+      "channel",
+      "color",
+      "composite",
+      "composite",
+      "grade"
+    ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
-        { "target": "r#0", "bus": 1, "inputs": ["source"] },
-        { "target": "color#0", "bus": 1, "inputs": ["r#0"] },
-        { "target": "sum#0", "bus": 1, "inputs": ["color#0"] },
-        { "target": "b#0", "bus": 2, "inputs": ["source"] },
-        { "target": "color#1", "bus": 2, "inputs": ["b#0"] },
-        { "target": "layer#0", "bus": 3, "inputs": ["color#1", "sum#0"] },
-        { "target": "mask#0", "bus": 0, "inputs": ["source", "layer#0"] },
-        { "target": "contrast#0", "bus": 0, "inputs": ["mask#0"] }
+        {
+          "target": "channel#0",
+          "bus": 1,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "color#0",
+          "bus": 1,
+          "inputs": [
+            "channel#0"
+          ]
+        },
+        {
+          "target": "sum#0",
+          "bus": 1,
+          "inputs": [
+            "color#0"
+          ]
+        },
+        {
+          "target": "channel#1",
+          "bus": 2,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "color#1",
+          "bus": 2,
+          "inputs": [
+            "channel#1"
+          ]
+        },
+        {
+          "target": "composite#0",
+          "bus": 3,
+          "inputs": [
+            "color#1",
+            "sum#0"
+          ]
+        },
+        {
+          "target": "composite#1",
+          "bus": 0,
+          "inputs": [
+            "source",
+            "composite#0"
+          ]
+        },
+        {
+          "target": "contrast#0",
+          "bus": 0,
+          "inputs": [
+            "composite#1"
+          ]
+        }
       ]
     },
     "render": {
@@ -414,15 +880,19 @@
       "color#1.g": 0.62,
       "color#1.b": 1.8,
       "color#1.a": 1.0,
-      "layer.amount": 0.78,
-      "layer.threshold": 0.26,
-      "layer.tolerance": 0.24,
-      "layer.invert": 0.0,
-      "mask.amount": 0.82,
-      "mask.threshold": 0.22,
-      "mask.tolerance": 0.26,
-      "mask.invert": 0.0,
-      "contrast.amount": 1.14
+      "channel#0.mode": 0,
+      "channel#1.mode": 2,
+      "composite#0.amount": 0.78,
+      "composite#0.threshold": 0.26,
+      "composite#0.tolerance": 0.24,
+      "composite#0.invert": 0.0,
+      "composite#0.mode": 6,
+      "composite#1.amount": 0.82,
+      "composite#1.threshold": 0.22,
+      "composite#1.tolerance": 0.26,
+      "composite#1.invert": 0.0,
+      "composite#1.mode": 7,
+      "grade.contrast": 1.14
     }
   },
   "shadowMatte": {
@@ -430,16 +900,59 @@
     "tagline": "Carve the source through an inverted alpha-or-luma matte, then feed the dark cut back as a stylized finish layer.",
     "videoIntent": "Best on moody footage, backlight, or dark wardrobe where the shadow carve should feel deliberate instead of merely underexposed.",
     "audioIntent": "The coupled sound should narrow into a darker contour and then reopen with controlled texture, not collapse into broadband mud.",
-    "operatorFocus": ["a", "posterize", "sum", "mask", "color"],
-    "chain": ["a", "posterize", "color", "sum", "mask"],
+    "operatorFocus": [
+      "channel",
+      "posterize",
+      "sum",
+      "composite",
+      "color"
+    ],
+    "chain": [
+      "channel",
+      "posterize",
+      "color",
+      "sum",
+      "composite"
+    ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
-        { "target": "a#0", "bus": 1, "inputs": ["source"] },
-        { "target": "posterize#0", "bus": 1, "inputs": ["a#0"] },
-        { "target": "color#0", "bus": 1, "inputs": ["posterize#0"] },
-        { "target": "sum#0", "bus": 1, "inputs": ["color#0"] },
-        { "target": "mask#0", "bus": 0, "inputs": ["source", "sum#0"] }
+        {
+          "target": "channel#0",
+          "bus": 1,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "posterize#0",
+          "bus": 1,
+          "inputs": [
+            "channel#0"
+          ]
+        },
+        {
+          "target": "color#0",
+          "bus": 1,
+          "inputs": [
+            "posterize#0"
+          ]
+        },
+        {
+          "target": "sum#0",
+          "bus": 1,
+          "inputs": [
+            "color#0"
+          ]
+        },
+        {
+          "target": "composite#0",
+          "bus": 0,
+          "inputs": [
+            "source",
+            "sum#0"
+          ]
+        }
       ]
     },
     "render": {
@@ -462,10 +975,12 @@
       "sum.g": 1.0,
       "sum.b": 0.2,
       "sum.a": 1.6,
-      "mask.amount": 0.75,
-      "mask.threshold": 0.55,
-      "mask.tolerance": 0.28,
-      "mask.invert": 1.0
+      "channel#0.mode": 3,
+      "composite#0.amount": 0.75,
+      "composite#0.threshold": 0.55,
+      "composite#0.tolerance": 0.28,
+      "composite#0.invert": 1.0,
+      "composite#0.mode": 7
     }
   },
   "velasco": {
@@ -473,34 +988,109 @@
     "tagline": "Split the loaded clip across two buses, tint each branch differently, then drive a repeated diff field with live low-band audio scale.",
     "videoIntent": "Best on footage with crisp edges, bodies, or graphic motion so the repeated lattice and bus-difference contours stay legible.",
     "audioIntent": "The coupled result should feel agitated and rhythmic, with low-band energy physically breathing the scale rather than reading as random wobble.",
-    "operatorFocus": ["repeat", "mult", "diff", "modulateRotateRouted", "scale"],
+    "operatorFocus": [
+      "repeat",
+      "composite",
+      "modulateRotateRouted",
+      "scale"
+    ],
     "chain": [
       "color",
-      "mult",
+      "composite",
       "repeat",
       "rotate",
       "modulate",
       "scale",
-      "diff",
+      "composite",
       "color",
-      "mult",
-      "modulateRotateRouted",
+      "composite",
+      "modulateRotate",
       "rotate"
     ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
-        { "target": "color#0", "bus": 0, "inputs": ["source"] },
-        { "target": "mult#0", "bus": 0, "inputs": ["color#0", "rotate#1"] },
-        { "target": "repeat#0", "bus": 0, "inputs": ["mult#0"] },
-        { "target": "rotate#0", "bus": 0, "inputs": ["repeat#0"] },
-        { "target": "modulate#0", "bus": 0, "inputs": ["rotate#0"] },
-        { "target": "scale#0", "bus": 0, "inputs": ["modulate#0"] },
-        { "target": "diff#0", "bus": 0, "inputs": ["scale#0", "rotate#1"] },
-        { "target": "color#1", "bus": 1, "inputs": ["source"] },
-        { "target": "mult#1", "bus": 1, "inputs": ["color#1", "source"] },
-        { "target": "modulateRotateRouted#0", "bus": 1, "inputs": ["mult#1", "src(o0)"] },
-        { "target": "rotate#1", "bus": 1, "inputs": ["modulateRotateRouted#0"] }
+        {
+          "target": "color#0",
+          "bus": 0,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "composite#0",
+          "bus": 0,
+          "inputs": [
+            "color#0",
+            "rotate#1"
+          ]
+        },
+        {
+          "target": "repeat#0",
+          "bus": 0,
+          "inputs": [
+            "composite#0"
+          ]
+        },
+        {
+          "target": "rotate#0",
+          "bus": 0,
+          "inputs": [
+            "repeat#0"
+          ]
+        },
+        {
+          "target": "modulate#0",
+          "bus": 0,
+          "inputs": [
+            "rotate#0"
+          ]
+        },
+        {
+          "target": "scale#0",
+          "bus": 0,
+          "inputs": [
+            "modulate#0"
+          ]
+        },
+        {
+          "target": "composite#1",
+          "bus": 0,
+          "inputs": [
+            "scale#0",
+            "rotate#1"
+          ]
+        },
+        {
+          "target": "color#1",
+          "bus": 1,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "composite#2",
+          "bus": 1,
+          "inputs": [
+            "color#1",
+            "source"
+          ]
+        },
+        {
+          "target": "modulateRotateRouted#0",
+          "bus": 1,
+          "inputs": [
+            "composite#2",
+            "src(o0)"
+          ]
+        },
+        {
+          "target": "rotate#1",
+          "bus": 1,
+          "inputs": [
+            "modulateRotateRouted#0"
+          ]
+        }
       ]
     },
     "render": {
@@ -516,7 +1106,6 @@
       "color#0.g": 0.1,
       "color#0.b": 2.0,
       "color#0.a": 1.0,
-      "mult#0.amount": 0.82,
       "repeat#0.repeatX": 2.0,
       "repeat#0.repeatY": 8.0,
       "repeat#0.offsetX": 0.0,
@@ -524,15 +1113,20 @@
       "rotate#0.angle": 0.5,
       "modulate#0.amount": 0.48,
       "scale#0.amount": 1.0,
-      "diff#0.amount": 0.86,
       "color#1.r": 2.0,
       "color#1.g": 0.7,
       "color#1.b": 0.1,
       "color#1.a": 1.0,
-      "mult#1.amount": 0.55,
-      "modulateRotateRouted#0.multiple": 0.2,
-      "modulateRotateRouted#0.offset": 0.0,
-      "rotate#1.angle": 0.2
+      "modulateRotate#0.multiple": 0.2,
+      "modulateRotate#0.source": 1,
+      "modulateRotate#0.offset": 0.0,
+      "rotate#1.angle": 0.2,
+      "composite#0.amount": 0.82,
+      "composite#0.mode": 2,
+      "composite#1.amount": 0.86,
+      "composite#1.mode": 3,
+      "composite#2.amount": 0.55,
+      "composite#2.mode": 2
     },
     "automation": {
       "scale#0.amount": {
@@ -549,8 +1143,20 @@
     "tagline": "Fold the loaded clip through stepped kaleido symmetry, subtle hue drift, and self-rotating modulation.",
     "videoIntent": "Best on clips with strong contour, gesture, or silhouette so the rotating kaleido and chroma treatment stay legible.",
     "audioIntent": "The coupled result should feel shimmering and spatially alive rather than washed out or vibrato-heavy.",
-    "operatorFocus": ["kaleid", "modulateRotate", "colorama"],
-    "chain": ["kaleid", "color", "colorama", "rotate", "modulateRotate", "modulate", "scale"],
+    "operatorFocus": [
+      "kaleid",
+      "modulateRotate",
+      "colorama"
+    ],
+    "chain": [
+      "kaleid",
+      "color",
+      "colorama",
+      "rotate",
+      "modulateRotate",
+      "modulate",
+      "scale"
+    ],
     "render": {
       "look": "silver",
       "quality": "cinema",
@@ -575,7 +1181,15 @@
     "automation": {
       "kaleid.nSides": {
         "kind": "sequence",
-        "values": [3, 4, 5, 7, 8, 9, 10],
+        "values": [
+          3,
+          4,
+          5,
+          7,
+          8,
+          9,
+          10
+        ],
         "fast": 0.1,
         "smooth": 0,
         "ease": "linear",
@@ -601,7 +1215,11 @@
     "tagline": "Pull the uploaded clip into a receding audio-visual tunnel.",
     "videoIntent": "Best on footage with perspective lines, camera drift, or strong center framing.",
     "audioIntent": "Feedback and light modulation should add a receding, hollow persistence without washing out transients.",
-    "operatorFocus": ["feedback", "scale", "rotate"],
+    "operatorFocus": [
+      "feedback",
+      "scale",
+      "rotate"
+    ],
     "render": {
       "look": "cine",
       "quality": "cinema",
@@ -616,7 +1234,6 @@
       "scale.amount": 1.05,
       "rotate.angle": 0.02,
       "kaleid.nSides": 1,
-      "chromaShift.amount": 0.0,
       "posterize.bins": 64,
       "posterize.gamma": 1.0
     }
@@ -626,7 +1243,11 @@
     "tagline": "Smear highlights and sustain the clip into a soft trailing bloom.",
     "videoIntent": "Works best on bright footage, silhouettes, practical lights, or stage shots.",
     "audioIntent": "The coupled delay should widen and soften the sound without collapsing the attack.",
-    "operatorFocus": ["feedback", "modulate", "chromaShift"],
+    "operatorFocus": [
+      "feedback",
+      "modulate",
+      "chromaShift"
+    ],
     "render": {
       "look": "cine",
       "quality": "cinema",
@@ -641,7 +1262,6 @@
       "scale.amount": 1.0,
       "rotate.angle": 0.0,
       "kaleid.nSides": 1,
-      "chromaShift.amount": 0.012,
       "posterize.bins": 64,
       "posterize.gamma": 1.0
     }
@@ -651,7 +1271,11 @@
     "tagline": "Fold the clip into a repeated kaleido lattice with controlled feedback.",
     "videoIntent": "Use on rhythmic motion, architecture, fabric, or any source with strong repeating detail.",
     "audioIntent": "The coupled motion should feel grid-like and pulsed rather than smeared or random.",
-    "operatorFocus": ["kaleid", "feedback", "posterize"],
+    "operatorFocus": [
+      "kaleid",
+      "feedback",
+      "posterize"
+    ],
     "render": {
       "look": "silver",
       "quality": "standard",
@@ -666,7 +1290,6 @@
       "scale.amount": 1.0,
       "rotate.angle": 0.0,
       "kaleid.nSides": 8,
-      "chromaShift.amount": 0.0,
       "posterize.bins": 27,
       "posterize.gamma": 1.0
     }
@@ -676,7 +1299,11 @@
     "tagline": "Push the clip into unstable rotational feedback and chroma drift.",
     "videoIntent": "Best for energetic footage where loss of stability is part of the look, not a defect.",
     "audioIntent": "The coupled sound should become more agitated and unstable without collapsing into clipping.",
-    "operatorFocus": ["feedback", "rotate", "chromaShift"],
+    "operatorFocus": [
+      "feedback",
+      "rotate",
+      "chromaShift"
+    ],
     "render": {
       "look": "bleach",
       "quality": "cinema",
@@ -691,7 +1318,6 @@
       "scale.amount": 0.97,
       "rotate.angle": 0.18,
       "kaleid.nSides": 5,
-      "chromaShift.amount": 0.025,
       "posterize.bins": 43,
       "posterize.gamma": 1.0
     }
@@ -701,7 +1327,11 @@
     "tagline": "Leave spectral after-images that trail behind the moving subject.",
     "videoIntent": "Use on portraits, bodies, or slow camera motion where temporal echoes stay legible.",
     "audioIntent": "The sound should feel suspended and haunted, with persistence more than obvious pitch shift.",
-    "operatorFocus": ["feedback", "modulate", "scale"],
+    "operatorFocus": [
+      "feedback",
+      "modulate",
+      "scale"
+    ],
     "render": {
       "look": "silver",
       "quality": "cinema",
@@ -716,7 +1346,6 @@
       "scale.amount": 1.01,
       "rotate.angle": -0.01,
       "kaleid.nSides": 1,
-      "chromaShift.amount": 0.005,
       "posterize.bins": 64,
       "posterize.gamma": 1.0
     }
@@ -726,7 +1355,11 @@
     "tagline": "Turn the clip into a multi-sided prism with restrained motion feedback.",
     "videoIntent": "Works well on hands, faces, instruments, and centered action that can tolerate symmetry.",
     "audioIntent": "The coupled motion should read as prismatic widening rather than pure delay wash.",
-    "operatorFocus": ["kaleid", "scale", "feedback"],
+    "operatorFocus": [
+      "kaleid",
+      "scale",
+      "feedback"
+    ],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -741,7 +1374,6 @@
       "scale.amount": 1.01,
       "rotate.angle": 0.04,
       "kaleid.nSides": 9,
-      "chromaShift.amount": 0.0,
       "posterize.bins": 58,
       "posterize.gamma": 1.0
     }
@@ -764,30 +1396,86 @@
       "spiralField",
       "polarRipple",
       "timeDisplace",
-      "pinchBulge",
+      "warp",
       "modulateDisplace",
       "structure",
       "feedback",
-      "saturate",
-      "contrast"
+      "grade"
     ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
-        { "target": "domainFold#0", "bus": 1, "inputs": ["source"] },
-        { "target": "spiralField#0", "bus": 1, "inputs": ["domainFold#0"] },
-        { "target": "polarRipple#0", "bus": 1, "inputs": ["spiralField#0"] },
-        { "target": "timeDisplace#0", "bus": 0, "inputs": ["source"] },
-        { "target": "pinchBulge#0", "bus": 0, "inputs": ["timeDisplace#0"] },
+        {
+          "target": "domainFold#0",
+          "bus": 1,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "spiralField#0",
+          "bus": 1,
+          "inputs": [
+            "domainFold#0"
+          ]
+        },
+        {
+          "target": "polarRipple#0",
+          "bus": 1,
+          "inputs": [
+            "spiralField#0"
+          ]
+        },
+        {
+          "target": "timeDisplace#0",
+          "bus": 0,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "pinchBulge#0",
+          "bus": 0,
+          "inputs": [
+            "timeDisplace#0"
+          ]
+        },
         {
           "target": "modulateDisplace#0",
           "bus": 0,
-          "inputs": ["pinchBulge#0", "polarRipple#0"]
+          "inputs": [
+            "pinchBulge#0",
+            "polarRipple#0"
+          ]
         },
-        { "target": "structure#0", "bus": 0, "inputs": ["modulateDisplace#0"] },
-        { "target": "feedback#0", "bus": 0, "inputs": ["structure#0"] },
-        { "target": "saturate#0", "bus": 0, "inputs": ["feedback#0"] },
-        { "target": "contrast#0", "bus": 0, "inputs": ["saturate#0"] }
+        {
+          "target": "structure#0",
+          "bus": 0,
+          "inputs": [
+            "modulateDisplace#0"
+          ]
+        },
+        {
+          "target": "feedback#0",
+          "bus": 0,
+          "inputs": [
+            "structure#0"
+          ]
+        },
+        {
+          "target": "saturate#0",
+          "bus": 0,
+          "inputs": [
+            "feedback#0"
+          ]
+        },
+        {
+          "target": "contrast#0",
+          "bus": 0,
+          "inputs": [
+            "saturate#0"
+          ]
+        }
       ]
     },
     "render": {
@@ -822,11 +1510,6 @@
       "timeDisplace.scan": 0.34,
       "timeDisplace.smear": 0.22,
       "timeDisplace.decay": 0.74,
-      "pinchBulge.mix": 0.56,
-      "pinchBulge.amount": -0.22,
-      "pinchBulge.radius": 0.76,
-      "pinchBulge.falloff": 2.2,
-      "pinchBulge.drift": 0.14,
       "modulateDisplace.amount": 0.38,
       "modulateDisplace.bias": -0.08,
       "structure.mix": 0.52,
@@ -840,11 +1523,22 @@
       "feedback.zoom": 0.012,
       "feedback.motionBlend": 0.1,
       "feedback.chromaDrift": 0.006,
-      "saturate.amount": 1.18,
-      "contrast.amount": 1.12
+      "grade.saturate": 1.18,
+      "grade.contrast": 1.12,
+      "warp.mix": 0.56,
+      "warp.strength": -0.22,
+      "warp.radius": 0.76,
+      "warp.falloff": 2.2,
+      "warp.drift": 0.14,
+      "warp.mode": 0
     },
     "automation": {
-      "spiralField.phase": { "kind": "lfo", "rate": 0.07, "depth": 0.18, "phase": 0.0 },
+      "spiralField.phase": {
+        "kind": "lfo",
+        "rate": 0.07,
+        "depth": 0.18,
+        "phase": 0.0
+      },
       "polarRipple.phase": {
         "kind": "fft",
         "bin": 8,
@@ -858,8 +1552,18 @@
         "scale": 0.2,
         "smooth": 0.72
       },
-      "structure.glow": { "kind": "video", "feature": "edge", "scale": 0.24, "smooth": 0.74 },
-      "feedback.motionBlend": { "kind": "video", "feature": "flux", "scale": 0.18, "smooth": 0.8 }
+      "structure.glow": {
+        "kind": "video",
+        "feature": "edge",
+        "scale": 0.24,
+        "smooth": 0.74
+      },
+      "feedback.motionBlend": {
+        "kind": "video",
+        "feature": "flux",
+        "scale": 0.18,
+        "smooth": 0.8
+      }
     },
     "macros": [
       {
@@ -867,9 +1571,21 @@
         "label": "Gravity",
         "default": 0.54,
         "targets": [
-          { "key": "pinchBulge.amount", "min": -0.08, "max": -0.5 },
-          { "key": "spiralField.twist", "min": 0.8, "max": 4.4 },
-          { "key": "modulateDisplace.amount", "min": 0.18, "max": 0.68 }
+          {
+            "key": "pinchBulge.amount",
+            "min": -0.08,
+            "max": -0.5
+          },
+          {
+            "key": "spiralField.twist",
+            "min": 0.8,
+            "max": 4.4
+          },
+          {
+            "key": "modulateDisplace.amount",
+            "min": 0.18,
+            "max": 0.68
+          }
         ]
       },
       {
@@ -877,9 +1593,21 @@
         "label": "Halo",
         "default": 0.58,
         "targets": [
-          { "key": "structure.glow", "min": 0.16, "max": 0.72 },
-          { "key": "feedback.feedback", "min": 0.52, "max": 0.84 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.38 }
+          {
+            "key": "structure.glow",
+            "min": 0.16,
+            "max": 0.72
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.52,
+            "max": 0.84
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.12,
+            "max": 0.38
+          }
         ]
       },
       {
@@ -887,9 +1615,21 @@
         "label": "Cloud",
         "default": 0.62,
         "targets": [
-          { "key": "audio.granulator.density", "min": 20, "max": 48 },
-          { "key": "audio.granulator.panSpread", "min": 0.3, "max": 0.78 },
-          { "key": "audio.granulator.distribution", "min": 0.16, "max": 0.62 }
+          {
+            "key": "audio.granulator.density",
+            "min": 20,
+            "max": 48
+          },
+          {
+            "key": "audio.granulator.panSpread",
+            "min": 0.3,
+            "max": 0.78
+          },
+          {
+            "key": "audio.granulator.distribution",
+            "min": 0.16,
+            "max": 0.62
+          }
         ]
       }
     ],
@@ -939,30 +1679,87 @@
       "dataMosh",
       "fieldSort",
       "domainFold",
-      "modulateHueRouted",
+      "modulateHue",
       "structure",
       "feedback",
       "posterize",
-      "chromaShift",
-      "contrast"
+      "glitch",
+      "grade"
     ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
-        { "target": "slitScan#0", "bus": 1, "inputs": ["source"] },
-        { "target": "dataMosh#0", "bus": 1, "inputs": ["slitScan#0"] },
-        { "target": "fieldSort#0", "bus": 1, "inputs": ["dataMosh#0"] },
-        { "target": "domainFold#0", "bus": 0, "inputs": ["source"] },
+        {
+          "target": "slitScan#0",
+          "bus": 1,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "dataMosh#0",
+          "bus": 1,
+          "inputs": [
+            "slitScan#0"
+          ]
+        },
+        {
+          "target": "fieldSort#0",
+          "bus": 1,
+          "inputs": [
+            "dataMosh#0"
+          ]
+        },
+        {
+          "target": "domainFold#0",
+          "bus": 0,
+          "inputs": [
+            "source"
+          ]
+        },
         {
           "target": "modulateHueRouted#0",
           "bus": 0,
-          "inputs": ["domainFold#0", "fieldSort#0"]
+          "inputs": [
+            "domainFold#0",
+            "fieldSort#0"
+          ]
         },
-        { "target": "structure#0", "bus": 0, "inputs": ["modulateHueRouted#0"] },
-        { "target": "feedback#0", "bus": 0, "inputs": ["structure#0"] },
-        { "target": "posterize#0", "bus": 0, "inputs": ["feedback#0"] },
-        { "target": "chromaShift#0", "bus": 0, "inputs": ["posterize#0"] },
-        { "target": "contrast#0", "bus": 0, "inputs": ["chromaShift#0"] }
+        {
+          "target": "structure#0",
+          "bus": 0,
+          "inputs": [
+            "modulateHueRouted#0"
+          ]
+        },
+        {
+          "target": "feedback#0",
+          "bus": 0,
+          "inputs": [
+            "structure#0"
+          ]
+        },
+        {
+          "target": "posterize#0",
+          "bus": 0,
+          "inputs": [
+            "feedback#0"
+          ]
+        },
+        {
+          "target": "chromaShift#0",
+          "bus": 0,
+          "inputs": [
+            "posterize#0"
+          ]
+        },
+        {
+          "target": "contrast#0",
+          "bus": 0,
+          "inputs": [
+            "chromaShift#0"
+          ]
+        }
       ]
     },
     "render": {
@@ -995,7 +1792,8 @@
       "domainFold.softness": 0.05,
       "domainFold.zoom": 1.08,
       "domainFold.drift": 0.1,
-      "modulateHueRouted.amount": 0.2,
+      "modulateHue.amount": 0.2,
+      "modulateHue.source": 1,
       "structure.mix": 0.34,
       "structure.mode": 0.68,
       "structure.threshold": 0.18,
@@ -1009,15 +1807,32 @@
       "feedback.chromaDrift": 0.008,
       "posterize.bins": 28,
       "posterize.gamma": 0.92,
-      "chromaShift.amount": 0.012,
-      "contrast.amount": 1.24
+      "grade.contrast": 1.24,
+      "glitch.type": 1,
+      "glitch.amount": 0.15
     },
     "automation": {
-      "slitScan.slitX": { "kind": "lfo", "rate": 0.16, "depth": 0.34, "phase": 0.0 },
-      "dataMosh.drift": { "kind": "lfo", "rate": 0.055, "depth": 0.28, "phase": 3.1415926536 },
+      "slitScan.slitX": {
+        "kind": "lfo",
+        "rate": 0.16,
+        "depth": 0.34,
+        "phase": 0.0
+      },
+      "dataMosh.drift": {
+        "kind": "lfo",
+        "rate": 0.055,
+        "depth": 0.28,
+        "phase": 3.1415926536
+      },
       "fieldSort.angle": {
         "kind": "sequence",
-        "values": [0.02, 0.14, 0.24, 0.38, 0.58],
+        "values": [
+          0.02,
+          0.14,
+          0.24,
+          0.38,
+          0.58
+        ],
         "fast": 0.22,
         "smooth": 0.24,
         "ease": "easeInOutCubic",
@@ -1030,7 +1845,12 @@
         "scale": 0.24,
         "smooth": 0.76
       },
-      "feedback.chromaDrift": { "kind": "video", "feature": "edge", "scale": 0.016, "smooth": 0.78 }
+      "feedback.chromaDrift": {
+        "kind": "video",
+        "feature": "edge",
+        "scale": 0.016,
+        "smooth": 0.78
+      }
     },
     "macros": [
       {
@@ -1038,9 +1858,21 @@
         "label": "Fracture",
         "default": 0.58,
         "targets": [
-          { "key": "dataMosh.mix", "min": 0.3, "max": 0.92 },
-          { "key": "fieldSort.mix", "min": 0.18, "max": 0.82 },
-          { "key": "fieldSort.bands", "min": 3, "max": 13 }
+          {
+            "key": "dataMosh.mix",
+            "min": 0.3,
+            "max": 0.92
+          },
+          {
+            "key": "fieldSort.mix",
+            "min": 0.18,
+            "max": 0.82
+          },
+          {
+            "key": "fieldSort.bands",
+            "min": 3,
+            "max": 13
+          }
         ]
       },
       {
@@ -1048,9 +1880,21 @@
         "label": "Relay",
         "default": 0.62,
         "targets": [
-          { "key": "modulateHueRouted.amount", "min": 0.06, "max": 0.54 },
-          { "key": "feedback.feedback", "min": 0.58, "max": 0.9 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.16, "max": 0.48 }
+          {
+            "key": "modulateHueRouted.amount",
+            "min": 0.06,
+            "max": 0.54
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.58,
+            "max": 0.9
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.16,
+            "max": 0.48
+          }
         ]
       },
       {
@@ -1058,9 +1902,21 @@
         "label": "Reverse",
         "default": 0.56,
         "targets": [
-          { "key": "audio.granulator.reverseProbability", "min": 0.14, "max": 0.64 },
-          { "key": "audio.granulator.duration", "min": 110, "max": 260 },
-          { "key": "chromaShift.amount", "min": 0.004, "max": 0.024 }
+          {
+            "key": "audio.granulator.reverseProbability",
+            "min": 0.14,
+            "max": 0.64
+          },
+          {
+            "key": "audio.granulator.duration",
+            "min": 110,
+            "max": 260
+          },
+          {
+            "key": "chromaShift.amount",
+            "min": 0.004,
+            "max": 0.024
+          }
         ]
       }
     ],
@@ -1109,31 +1965,87 @@
       "magneticDipole",
       "gyreField",
       "polarRipple",
-      "saturate",
+      "grade",
       "kaleid",
       "spiralField",
-      "modulateRotateRouted",
+      "modulateRotate",
       "feedback",
-      "colorama",
-      "contrast"
+      "colorama"
     ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
-        { "target": "magneticDipole#0", "bus": 1, "inputs": ["source"] },
-        { "target": "gyreField#0", "bus": 1, "inputs": ["magneticDipole#0"] },
-        { "target": "polarRipple#0", "bus": 1, "inputs": ["gyreField#0"] },
-        { "target": "saturate#0", "bus": 1, "inputs": ["polarRipple#0"] },
-        { "target": "kaleid#0", "bus": 0, "inputs": ["source"] },
-        { "target": "spiralField#0", "bus": 0, "inputs": ["kaleid#0"] },
+        {
+          "target": "magneticDipole#0",
+          "bus": 1,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "gyreField#0",
+          "bus": 1,
+          "inputs": [
+            "magneticDipole#0"
+          ]
+        },
+        {
+          "target": "polarRipple#0",
+          "bus": 1,
+          "inputs": [
+            "gyreField#0"
+          ]
+        },
+        {
+          "target": "saturate#0",
+          "bus": 1,
+          "inputs": [
+            "polarRipple#0"
+          ]
+        },
+        {
+          "target": "kaleid#0",
+          "bus": 0,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "spiralField#0",
+          "bus": 0,
+          "inputs": [
+            "kaleid#0"
+          ]
+        },
         {
           "target": "modulateRotateRouted#0",
           "bus": 0,
-          "inputs": ["spiralField#0", "saturate#0"]
+          "inputs": [
+            "spiralField#0",
+            "saturate#0"
+          ]
         },
-        { "target": "feedback#0", "bus": 0, "inputs": ["modulateRotateRouted#0"] },
-        { "target": "colorama#0", "bus": 0, "inputs": ["feedback#0"] },
-        { "target": "contrast#0", "bus": 0, "inputs": ["colorama#0"] }
+        {
+          "target": "feedback#0",
+          "bus": 0,
+          "inputs": [
+            "modulateRotateRouted#0"
+          ]
+        },
+        {
+          "target": "colorama#0",
+          "bus": 0,
+          "inputs": [
+            "feedback#0"
+          ]
+        },
+        {
+          "target": "contrast#0",
+          "bus": 0,
+          "inputs": [
+            "colorama#0"
+          ]
+        }
       ]
     },
     "render": {
@@ -1165,7 +2077,6 @@
       "polarRipple.phase": 0.2,
       "polarRipple.falloff": 1.8,
       "polarRipple.drift": 0.12,
-      "saturate.amount": 1.16,
       "kaleid.nSides": 7,
       "kaleid.drive": 1.22,
       "kaleid.symmetry": 0.18,
@@ -1179,18 +2090,30 @@
       "spiralField.falloff": 1.6,
       "spiralField.phase": 0.1,
       "spiralField.drift": 0.18,
-      "modulateRotateRouted.multiple": 0.24,
-      "modulateRotateRouted.offset": 0.02,
+      "modulateRotate.multiple": 0.24,
+      "modulateRotate.source": 1,
+      "modulateRotate.offset": 0.02,
       "feedback.feedback": 0.66,
       "feedback.zoom": 0.006,
       "feedback.motionBlend": 0.12,
       "feedback.chromaDrift": 0.004,
       "colorama.amount": 0.32,
-      "contrast.amount": 1.18
+      "grade.saturate": 1.16,
+      "grade.contrast": 1.18
     },
     "automation": {
-      "magneticDipole.angle": { "kind": "lfo", "rate": 0.065, "depth": 0.42, "phase": 0.0 },
-      "gyreField.phase": { "kind": "lfo", "rate": 0.11, "depth": 0.18, "phase": 1.5707963268 },
+      "magneticDipole.angle": {
+        "kind": "lfo",
+        "rate": 0.065,
+        "depth": 0.42,
+        "phase": 0.0
+      },
+      "gyreField.phase": {
+        "kind": "lfo",
+        "rate": 0.11,
+        "depth": 0.18,
+        "phase": 1.5707963268
+      },
       "polarRipple.phase": {
         "kind": "fft",
         "bin": 5,
@@ -1204,7 +2127,12 @@
         "scale": 0.22,
         "smooth": 0.78
       },
-      "colorama.amount": { "kind": "video", "feature": "luma", "scale": 0.16, "smooth": 0.8 }
+      "colorama.amount": {
+        "kind": "video",
+        "feature": "luma",
+        "scale": 0.16,
+        "smooth": 0.8
+      }
     },
     "macros": [
       {
@@ -1212,9 +2140,21 @@
         "label": "Orbit",
         "default": 0.54,
         "targets": [
-          { "key": "magneticDipole.strength", "min": 0.12, "max": 0.62 },
-          { "key": "gyreField.strength", "min": 0.12, "max": 0.58 },
-          { "key": "modulateRotateRouted.multiple", "min": 0.08, "max": 0.52 }
+          {
+            "key": "magneticDipole.strength",
+            "min": 0.12,
+            "max": 0.62
+          },
+          {
+            "key": "gyreField.strength",
+            "min": 0.12,
+            "max": 0.58
+          },
+          {
+            "key": "modulateRotateRouted.multiple",
+            "min": 0.08,
+            "max": 0.52
+          }
         ]
       },
       {
@@ -1222,9 +2162,21 @@
         "label": "Prism",
         "default": 0.56,
         "targets": [
-          { "key": "kaleid.nSides", "min": 4, "max": 11 },
-          { "key": "colorama.amount", "min": 0.12, "max": 0.62 },
-          { "key": "feedback.feedback", "min": 0.48, "max": 0.8 }
+          {
+            "key": "kaleid.nSides",
+            "min": 4,
+            "max": 11
+          },
+          {
+            "key": "colorama.amount",
+            "min": 0.12,
+            "max": 0.62
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.48,
+            "max": 0.8
+          }
         ]
       },
       {
@@ -1232,9 +2184,21 @@
         "label": "Choir",
         "default": 0.6,
         "targets": [
-          { "key": "audio.granulator.density", "min": 16, "max": 38 },
-          { "key": "audio.granulator.duration", "min": 96, "max": 220 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.36 }
+          {
+            "key": "audio.granulator.density",
+            "min": 16,
+            "max": 38
+          },
+          {
+            "key": "audio.granulator.duration",
+            "min": 96,
+            "max": 220
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.12,
+            "max": 0.36
+          }
         ]
       }
     ],
@@ -1271,7 +2235,11 @@
     "tagline": "Hold the clip inside a soft multi-frame memory field, then let the brightest gestures bloom back through it.",
     "videoIntent": "Best on portraits, lights, and slow-to-medium movement where time drag can stay legible instead of collapsing into noise.",
     "audioIntent": "The grain cloud should widen and hang in the air while feedback stays present but controlled.",
-    "operatorFocus": ["timeDisplace", "feedback", "chromaShift"],
+    "operatorFocus": [
+      "timeDisplace",
+      "feedback",
+      "chromaShift"
+    ],
     "render": {
       "look": "cine",
       "quality": "cinema",
@@ -1291,7 +2259,6 @@
       "scale.amount": 1.008,
       "rotate.angle": 0.0,
       "kaleid.nSides": 1,
-      "chromaShift.amount": 0.008,
       "posterize.bins": 64,
       "posterize.gamma": 1.0
     },
@@ -1301,9 +2268,21 @@
         "label": "Intensity",
         "default": 0.55,
         "targets": [
-          { "key": "feedback.feedback", "min": 0.58, "max": 0.82 },
-          { "key": "timeDisplace.mix", "min": 0.26, "max": 0.66 },
-          { "key": "audio.granulator.density", "min": 18, "max": 32 }
+          {
+            "key": "feedback.feedback",
+            "min": 0.58,
+            "max": 0.82
+          },
+          {
+            "key": "timeDisplace.mix",
+            "min": 0.26,
+            "max": 0.66
+          },
+          {
+            "key": "audio.granulator.density",
+            "min": 18,
+            "max": 32
+          }
         ]
       },
       {
@@ -1311,9 +2290,21 @@
         "label": "Memory",
         "default": 0.62,
         "targets": [
-          { "key": "timeDisplace.depth", "min": 0.32, "max": 0.82 },
-          { "key": "timeDisplace.decay", "min": 0.42, "max": 0.88 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.18, "max": 0.42 }
+          {
+            "key": "timeDisplace.depth",
+            "min": 0.32,
+            "max": 0.82
+          },
+          {
+            "key": "timeDisplace.decay",
+            "min": 0.42,
+            "max": 0.88
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.18,
+            "max": 0.42
+          }
         ]
       },
       {
@@ -1321,9 +2312,21 @@
         "label": "Drift",
         "default": 0.46,
         "targets": [
-          { "key": "clock.rate", "min": 0.28, "max": 0.62 },
-          { "key": "chromaShift.amount", "min": 0.002, "max": 0.014 },
-          { "key": "audio.granulator.pitchJitter", "min": 1, "max": 8 }
+          {
+            "key": "clock.rate",
+            "min": 0.28,
+            "max": 0.62
+          },
+          {
+            "key": "chromaShift.amount",
+            "min": 0.002,
+            "max": 0.014
+          },
+          {
+            "key": "audio.granulator.pitchJitter",
+            "min": 1,
+            "max": 8
+          }
         ]
       }
     ],
@@ -1359,7 +2362,11 @@
     "tagline": "Slice the frame into vertical time bands, then let each band replay a slightly different moment of the clip.",
     "videoIntent": "Best on faces, dancers, and handheld movement where vertical temporal drift reads as a deliberate scan rather than random tearing.",
     "audioIntent": "The grains should feel more sparse and suspended, with enough space for the time slicing to read as one gesture.",
-    "operatorFocus": ["timeDisplace", "scrollX", "feedback"],
+    "operatorFocus": [
+      "timeDisplace",
+      "scroll",
+      "feedback"
+    ],
     "render": {
       "look": "silver",
       "quality": "standard",
@@ -1375,12 +2382,11 @@
       "timeDisplace.scan": 0.0,
       "timeDisplace.smear": 0.46,
       "timeDisplace.decay": 0.34,
-      "scrollX.amount": 0.04,
-      "scrollX.speed": 0.035,
+      "scroll.x": 0.04,
+      "scroll.speedX": 0.035,
       "scale.amount": 1.0,
       "rotate.angle": 0.0,
       "kaleid.nSides": 1,
-      "chromaShift.amount": 0.003,
       "posterize.bins": 56,
       "posterize.gamma": 1.0
     },
@@ -1390,9 +2396,21 @@
         "label": "Depth",
         "default": 0.72,
         "targets": [
-          { "key": "timeDisplace.mix", "min": 0.45, "max": 0.95 },
-          { "key": "timeDisplace.depth", "min": 0.62, "max": 1.0 },
-          { "key": "audio.granulator.density", "min": 12, "max": 26 }
+          {
+            "key": "timeDisplace.mix",
+            "min": 0.45,
+            "max": 0.95
+          },
+          {
+            "key": "timeDisplace.depth",
+            "min": 0.62,
+            "max": 1.0
+          },
+          {
+            "key": "audio.granulator.density",
+            "min": 12,
+            "max": 26
+          }
         ]
       },
       {
@@ -1400,9 +2418,21 @@
         "label": "Smear",
         "default": 0.54,
         "targets": [
-          { "key": "timeDisplace.smear", "min": 0.16, "max": 0.68 },
-          { "key": "scrollX.amount", "min": 0.0, "max": 0.08 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.32 }
+          {
+            "key": "timeDisplace.smear",
+            "min": 0.16,
+            "max": 0.68
+          },
+          {
+            "key": "scroll.x",
+            "min": 0.0,
+            "max": 0.08
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.12,
+            "max": 0.32
+          }
         ]
       },
       {
@@ -1410,9 +2440,21 @@
         "label": "Drift",
         "default": 0.58,
         "targets": [
-          { "key": "clock.rate", "min": 0.44, "max": 0.86 },
-          { "key": "scrollX.speed", "min": 0.01, "max": 0.06 },
-          { "key": "audio.granulator.pitchJitter", "min": 2, "max": 10 }
+          {
+            "key": "clock.rate",
+            "min": 0.44,
+            "max": 0.86
+          },
+          {
+            "key": "scroll.speedX",
+            "min": 0.01,
+            "max": 0.06
+          },
+          {
+            "key": "audio.granulator.pitchJitter",
+            "min": 2,
+            "max": 10
+          }
         ]
       }
     ],
@@ -1448,7 +2490,11 @@
     "tagline": "Let bright and dark structures pull from different moments of the clip, then tighten the result into a shaped contour.",
     "videoIntent": "Best on graphic lighting, silhouettes, and footage with strong tonal separation so luma-indexed time drag stays articulate.",
     "audioIntent": "The grain cloud should stay present and musical while the shared feedback remains a supporting texture instead of the headline.",
-    "operatorFocus": ["timeDisplace", "luma", "posterize"],
+    "operatorFocus": [
+      "timeDisplace",
+      "luma",
+      "posterize"
+    ],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -1464,13 +2510,9 @@
       "timeDisplace.scan": 1.0,
       "timeDisplace.smear": 0.5,
       "timeDisplace.decay": 0.5,
-      "luma.threshold": 0.56,
-      "luma.tolerance": 0.12,
-      "luma.amount": 0.24,
       "scale.amount": 1.004,
       "rotate.angle": 0.0,
       "kaleid.nSides": 1,
-      "chromaShift.amount": 0.006,
       "posterize.bins": 28,
       "posterize.gamma": 0.92
     },
@@ -1480,9 +2522,21 @@
         "label": "Contrast",
         "default": 0.5,
         "targets": [
-          { "key": "luma.threshold", "min": 0.4, "max": 0.72 },
-          { "key": "posterize.bins", "min": 18, "max": 42 },
-          { "key": "audio.granulator.duration", "min": 60, "max": 110 }
+          {
+            "key": "luma.threshold",
+            "min": 0.4,
+            "max": 0.72
+          },
+          {
+            "key": "posterize.bins",
+            "min": 18,
+            "max": 42
+          },
+          {
+            "key": "audio.granulator.duration",
+            "min": 60,
+            "max": 110
+          }
         ]
       },
       {
@@ -1490,9 +2544,21 @@
         "label": "Drag",
         "default": 0.66,
         "targets": [
-          { "key": "timeDisplace.depth", "min": 0.56, "max": 1.0 },
-          { "key": "timeDisplace.smear", "min": 0.22, "max": 0.7 },
-          { "key": "feedback.feedback", "min": 0.48, "max": 0.78 }
+          {
+            "key": "timeDisplace.depth",
+            "min": 0.56,
+            "max": 1.0
+          },
+          {
+            "key": "timeDisplace.smear",
+            "min": 0.22,
+            "max": 0.7
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.48,
+            "max": 0.78
+          }
         ]
       },
       {
@@ -1500,9 +2566,21 @@
         "label": "Air",
         "default": 0.54,
         "targets": [
-          { "key": "audio.granulator.density", "min": 22, "max": 40 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.14, "max": 0.34 },
-          { "key": "chromaShift.amount", "min": 0.002, "max": 0.01 }
+          {
+            "key": "audio.granulator.density",
+            "min": 22,
+            "max": 40
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.14,
+            "max": 0.34
+          },
+          {
+            "key": "chromaShift.amount",
+            "min": 0.002,
+            "max": 0.01
+          }
         ]
       }
     ],
@@ -1538,8 +2616,17 @@
     "tagline": "Let the clip's own contours decide where memory and displacement are allowed to bite, so edges drag while flat regions stay calm.",
     "videoIntent": "Best on silhouettes, architecture, and body motion where contour-led tearing reads as authored structure instead of general blur.",
     "audioIntent": "The grains should stay compact and articulate while the shared delay mirrors the visual drag without taking over.",
-    "operatorFocus": ["structure", "feedback", "posterize"],
-    "chain": ["feedback", "structure", "posterize", "chromaShift"],
+    "operatorFocus": [
+      "structure",
+      "feedback",
+      "posterize"
+    ],
+    "chain": [
+      "feedback",
+      "structure",
+      "posterize",
+      "glitch"
+    ],
     "render": {
       "look": "silver",
       "quality": "standard",
@@ -1560,9 +2647,10 @@
       "scale.amount": 1.002,
       "rotate.angle": 0.0,
       "kaleid.nSides": 1,
-      "chromaShift.amount": 0.004,
       "posterize.bins": 38,
-      "posterize.gamma": 0.97
+      "posterize.gamma": 0.97,
+      "glitch.type": 1,
+      "glitch.amount": 0.05
     },
     "macros": [
       {
@@ -1570,9 +2658,21 @@
         "label": "Edge",
         "default": 0.58,
         "targets": [
-          { "key": "structure.threshold", "min": 0.08, "max": 0.28 },
-          { "key": "structure.mix", "min": 0.58, "max": 0.92 },
-          { "key": "audio.granulator.duration", "min": 70, "max": 110 }
+          {
+            "key": "structure.threshold",
+            "min": 0.08,
+            "max": 0.28
+          },
+          {
+            "key": "structure.mix",
+            "min": 0.58,
+            "max": 0.92
+          },
+          {
+            "key": "audio.granulator.duration",
+            "min": 70,
+            "max": 110
+          }
         ]
       },
       {
@@ -1580,9 +2680,21 @@
         "label": "Drag",
         "default": 0.62,
         "targets": [
-          { "key": "structure.displace", "min": 0.18, "max": 0.68 },
-          { "key": "structure.memory", "min": 0.24, "max": 0.74 },
-          { "key": "feedback.feedback", "min": 0.5, "max": 0.78 }
+          {
+            "key": "structure.displace",
+            "min": 0.18,
+            "max": 0.68
+          },
+          {
+            "key": "structure.memory",
+            "min": 0.24,
+            "max": 0.74
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.5,
+            "max": 0.78
+          }
         ]
       },
       {
@@ -1590,9 +2702,21 @@
         "label": "Cut",
         "default": 0.46,
         "targets": [
-          { "key": "posterize.bins", "min": 20, "max": 50 },
-          { "key": "chromaShift.amount", "min": 0.0, "max": 0.009 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.14, "max": 0.32 }
+          {
+            "key": "posterize.bins",
+            "min": 20,
+            "max": 50
+          },
+          {
+            "key": "chromaShift.amount",
+            "min": 0.0,
+            "max": 0.009
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.14,
+            "max": 0.32
+          }
         ]
       }
     ],
@@ -1628,8 +2752,17 @@
     "tagline": "Pull luminous contour and luma structure out of the clip, then let those lines bloom and drift without washing the whole frame.",
     "videoIntent": "Best on highlights, costume contrast, and practical lights where contour-led glow can stay graphic instead of turning to fog.",
     "audioIntent": "The grain field should stay airy and musical, with the shared delay acting as a halo rather than a slap.",
-    "operatorFocus": ["structure", "timeDisplace", "luma"],
-    "chain": ["timeDisplace", "structure", "luma", "posterize"],
+    "operatorFocus": [
+      "structure",
+      "timeDisplace",
+      "luma"
+    ],
+    "chain": [
+      "timeDisplace",
+      "structure",
+      "extract",
+      "posterize"
+    ],
     "render": {
       "look": "cine",
       "quality": "cinema",
@@ -1652,15 +2785,15 @@
       "structure.displace": 0.22,
       "structure.memory": 0.24,
       "structure.glow": 0.78,
-      "luma.threshold": 0.5,
-      "luma.tolerance": 0.16,
-      "luma.amount": 0.14,
       "scale.amount": 1.003,
       "rotate.angle": 0.0,
       "kaleid.nSides": 1,
-      "chromaShift.amount": 0.005,
       "posterize.bins": 46,
-      "posterize.gamma": 0.98
+      "posterize.gamma": 0.98,
+      "extract.threshold": 0.5,
+      "extract.tolerance": 0.16,
+      "extract.amount": 0.14,
+      "extract.mode": 0
     },
     "macros": [
       {
@@ -1668,9 +2801,21 @@
         "label": "Contour",
         "default": 0.54,
         "targets": [
-          { "key": "structure.threshold", "min": 0.08, "max": 0.22 },
-          { "key": "structure.mix", "min": 0.52, "max": 0.9 },
-          { "key": "luma.amount", "min": 0.06, "max": 0.24 }
+          {
+            "key": "structure.threshold",
+            "min": 0.08,
+            "max": 0.22
+          },
+          {
+            "key": "structure.mix",
+            "min": 0.52,
+            "max": 0.9
+          },
+          {
+            "key": "luma.amount",
+            "min": 0.06,
+            "max": 0.24
+          }
         ]
       },
       {
@@ -1678,9 +2823,21 @@
         "label": "Halo",
         "default": 0.72,
         "targets": [
-          { "key": "structure.glow", "min": 0.36, "max": 0.96 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.32 },
-          { "key": "chromaShift.amount", "min": 0.001, "max": 0.008 }
+          {
+            "key": "structure.glow",
+            "min": 0.36,
+            "max": 0.96
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.12,
+            "max": 0.32
+          },
+          {
+            "key": "chromaShift.amount",
+            "min": 0.001,
+            "max": 0.008
+          }
         ]
       },
       {
@@ -1688,9 +2845,21 @@
         "label": "Drift",
         "default": 0.48,
         "targets": [
-          { "key": "timeDisplace.mix", "min": 0.14, "max": 0.46 },
-          { "key": "timeDisplace.decay", "min": 0.52, "max": 0.88 },
-          { "key": "audio.granulator.pitchJitter", "min": 2, "max": 9 }
+          {
+            "key": "timeDisplace.mix",
+            "min": 0.14,
+            "max": 0.46
+          },
+          {
+            "key": "timeDisplace.decay",
+            "min": 0.52,
+            "max": 0.88
+          },
+          {
+            "key": "audio.granulator.pitchJitter",
+            "min": 2,
+            "max": 9
+          }
         ]
       }
     ],
@@ -1726,8 +2895,17 @@
     "tagline": "Track motion between frames, then let that field drag the clip into blocky directional tears instead of generic blur.",
     "videoIntent": "Best on gestures, handheld movement, dancers, and directional camera motion where flow-driven tearing can read as motion memory instead of simple distortion.",
     "audioIntent": "The grains should stay clipped and present while the shared delay mirrors the smear as pressure, not as a washy headline effect.",
-    "operatorFocus": ["flow", "feedback", "posterize"],
-    "chain": ["feedback", "flow", "posterize", "chromaShift"],
+    "operatorFocus": [
+      "flow",
+      "feedback",
+      "posterize"
+    ],
+    "chain": [
+      "feedback",
+      "flow",
+      "posterize",
+      "glitch"
+    ],
     "render": {
       "look": "silver",
       "quality": "standard",
@@ -1750,7 +2928,8 @@
       "kaleid.nSides": 1,
       "posterize.bins": 28,
       "posterize.gamma": 0.94,
-      "chromaShift.amount": 0.007
+      "glitch.type": 1,
+      "glitch.amount": 0.0875
     },
     "automation": {
       "flow.smear": {
@@ -1772,9 +2951,21 @@
         "label": "Glitch",
         "default": 0.68,
         "targets": [
-          { "key": "flow.glitch", "min": 0.22, "max": 0.86 },
-          { "key": "posterize.bins", "min": 18, "max": 36 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.08, "max": 0.24 }
+          {
+            "key": "flow.glitch",
+            "min": 0.22,
+            "max": 0.86
+          },
+          {
+            "key": "posterize.bins",
+            "min": 18,
+            "max": 36
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.08,
+            "max": 0.24
+          }
         ]
       },
       {
@@ -1782,9 +2973,21 @@
         "label": "Smear",
         "default": 0.62,
         "targets": [
-          { "key": "flow.smear", "min": 0.36, "max": 0.82 },
-          { "key": "flow.memory", "min": 0.32, "max": 0.82 },
-          { "key": "feedback.feedback", "min": 0.42, "max": 0.76 }
+          {
+            "key": "flow.smear",
+            "min": 0.36,
+            "max": 0.82
+          },
+          {
+            "key": "flow.memory",
+            "min": 0.32,
+            "max": 0.82
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.42,
+            "max": 0.76
+          }
         ]
       },
       {
@@ -1792,9 +2995,21 @@
         "label": "Pressure",
         "default": 0.56,
         "targets": [
-          { "key": "flow.strength", "min": 0.36, "max": 0.82 },
-          { "key": "audio.granulator.density", "min": 16, "max": 30 },
-          { "key": "audio.granulator.duration", "min": 60, "max": 100 }
+          {
+            "key": "flow.strength",
+            "min": 0.36,
+            "max": 0.82
+          },
+          {
+            "key": "audio.granulator.density",
+            "min": 16,
+            "max": 30
+          },
+          {
+            "key": "audio.granulator.duration",
+            "min": 60,
+            "max": 100
+          }
         ]
       }
     ],
@@ -1830,8 +3045,17 @@
     "tagline": "Hold the last keyframe in a self-feedback buffer and let the clip's motion field smear that held image along the next predicted P-frames.",
     "videoIntent": "Best on cuts, fast camera moves, and percussive motion where the held keyframe can drift visibly before the motion threshold releases it back to live.",
     "audioIntent": "The grain cloud should sit just below the held image so that the visual freeze reads as a delay, not as a dropout, and the shared delay tail should match the smear length.",
-    "operatorFocus": ["dataMosh", "feedback", "flow"],
-    "chain": ["feedback", "dataMosh", "chromaShift", "contrast"],
+    "operatorFocus": [
+      "dataMosh",
+      "feedback",
+      "flow"
+    ],
+    "chain": [
+      "feedback",
+      "dataMosh",
+      "glitch",
+      "grade"
+    ],
     "render": {
       "look": "silver",
       "quality": "standard",
@@ -1846,8 +3070,9 @@
       "dataMosh.drift": 1.1,
       "dataMosh.decay": 0.04,
       "dataMosh.chunk": 0.55,
-      "chromaShift.amount": 0.012,
-      "contrast.amount": 1.18
+      "grade.contrast": 1.18,
+      "glitch.type": 1,
+      "glitch.amount": 0.15
     },
     "automation": {
       "dataMosh.drift": {
@@ -1863,8 +3088,16 @@
         "label": "Hold",
         "default": 0.5,
         "targets": [
-          { "key": "feedback.feedback", "min": 0.18, "max": 0.74 },
-          { "key": "dataMosh.decay", "min": 0.12, "max": 0.02 }
+          {
+            "key": "feedback.feedback",
+            "min": 0.18,
+            "max": 0.74
+          },
+          {
+            "key": "dataMosh.decay",
+            "min": 0.12,
+            "max": 0.02
+          }
         ]
       },
       {
@@ -1872,9 +3105,21 @@
         "label": "Smear",
         "default": 0.55,
         "targets": [
-          { "key": "dataMosh.drift", "min": 0.35, "max": 1.65 },
-          { "key": "dataMosh.chunk", "min": 0.2, "max": 0.85 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.06, "max": 0.28 }
+          {
+            "key": "dataMosh.drift",
+            "min": 0.35,
+            "max": 1.65
+          },
+          {
+            "key": "dataMosh.chunk",
+            "min": 0.2,
+            "max": 0.85
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.06,
+            "max": 0.28
+          }
         ]
       },
       {
@@ -1882,8 +3127,16 @@
         "label": "Edge",
         "default": 0.4,
         "targets": [
-          { "key": "chromaShift.amount", "min": 0.0, "max": 0.028 },
-          { "key": "contrast.amount", "min": 1.0, "max": 1.4 }
+          {
+            "key": "chromaShift.amount",
+            "min": 0.0,
+            "max": 0.028
+          },
+          {
+            "key": "contrast.amount",
+            "min": 1.0,
+            "max": 1.4
+          }
         ]
       }
     ]
@@ -1893,8 +3146,17 @@
     "tagline": "Use the clip's motion field as a soft liquid pull, then let temporal memory and contour structure turn that pull into a polished melt.",
     "videoIntent": "Best on faces, fabric, smoke, and broad moving surfaces where a directional melt can stay legible without reading as a hard glitch.",
     "audioIntent": "The grain cloud should stay airy and suspended while the shared delay adds a quiet tail behind the visual drag.",
-    "operatorFocus": ["flow", "timeDisplace", "structure"],
-    "chain": ["timeDisplace", "flow", "structure", "luma"],
+    "operatorFocus": [
+      "flow",
+      "timeDisplace",
+      "structure"
+    ],
+    "chain": [
+      "timeDisplace",
+      "flow",
+      "structure",
+      "extract"
+    ],
     "render": {
       "look": "cine",
       "quality": "cinema",
@@ -1924,13 +3186,13 @@
       "structure.displace": 0.16,
       "structure.memory": 0.18,
       "structure.glow": 0.46,
-      "luma.threshold": 0.48,
-      "luma.tolerance": 0.18,
-      "luma.amount": 0.09,
       "scale.amount": 1.002,
       "rotate.angle": 0.0,
       "kaleid.nSides": 1,
-      "chromaShift.amount": 0.004
+      "extract.threshold": 0.48,
+      "extract.tolerance": 0.18,
+      "extract.amount": 0.09,
+      "extract.mode": 0
     },
     "automation": {
       "flow.mix": {
@@ -1946,9 +3208,21 @@
         "label": "Melt",
         "default": 0.66,
         "targets": [
-          { "key": "flow.mix", "min": 0.42, "max": 0.88 },
-          { "key": "flow.smear", "min": 0.4, "max": 0.8 },
-          { "key": "audio.granulator.duration", "min": 90, "max": 150 }
+          {
+            "key": "flow.mix",
+            "min": 0.42,
+            "max": 0.88
+          },
+          {
+            "key": "flow.smear",
+            "min": 0.4,
+            "max": 0.8
+          },
+          {
+            "key": "audio.granulator.duration",
+            "min": 90,
+            "max": 150
+          }
         ]
       },
       {
@@ -1956,9 +3230,21 @@
         "label": "Contour",
         "default": 0.52,
         "targets": [
-          { "key": "structure.mix", "min": 0.18, "max": 0.62 },
-          { "key": "structure.glow", "min": 0.18, "max": 0.68 },
-          { "key": "luma.amount", "min": 0.02, "max": 0.16 }
+          {
+            "key": "structure.mix",
+            "min": 0.18,
+            "max": 0.62
+          },
+          {
+            "key": "structure.glow",
+            "min": 0.18,
+            "max": 0.68
+          },
+          {
+            "key": "luma.amount",
+            "min": 0.02,
+            "max": 0.16
+          }
         ]
       },
       {
@@ -1966,9 +3252,21 @@
         "label": "Drift",
         "default": 0.44,
         "targets": [
-          { "key": "timeDisplace.mix", "min": 0.06, "max": 0.3 },
-          { "key": "clock.rate", "min": 0.28, "max": 0.56 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.1, "max": 0.24 }
+          {
+            "key": "timeDisplace.mix",
+            "min": 0.06,
+            "max": 0.3
+          },
+          {
+            "key": "clock.rate",
+            "min": 0.28,
+            "max": 0.56
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.1,
+            "max": 0.24
+          }
         ]
       }
     ],
@@ -2004,8 +3302,17 @@
     "tagline": "Let motion pull a soft liquid ghost through the clip, then hold that ghost in a luminous temporal halo.",
     "videoIntent": "Best on medium movement, practical lights, and faces where motion memory can stay supple instead of turning into hard glitch blocks.",
     "audioIntent": "The grain cloud should hover and widen with the motion bloom rather than turn into a thick wash.",
-    "operatorFocus": ["flow", "timeDisplace", "structure"],
-    "chain": ["timeDisplace", "flow", "structure", "chromaShift"],
+    "operatorFocus": [
+      "flow",
+      "timeDisplace",
+      "structure"
+    ],
+    "chain": [
+      "timeDisplace",
+      "flow",
+      "structure",
+      "glitch"
+    ],
     "render": {
       "look": "cine",
       "quality": "cinema",
@@ -2038,7 +3345,8 @@
       "scale.amount": 1.002,
       "rotate.angle": 0.0,
       "kaleid.nSides": 1,
-      "chromaShift.amount": 0.005
+      "glitch.type": 1,
+      "glitch.amount": 0.0625
     },
     "automation": {
       "flow.mix": {
@@ -2060,9 +3368,21 @@
         "label": "Motion",
         "default": 0.62,
         "targets": [
-          { "key": "flow.mix", "min": 0.34, "max": 0.84 },
-          { "key": "flow.strength", "min": 0.24, "max": 0.62 },
-          { "key": "audio.granulator.positionJitter", "min": 0.03, "max": 0.11 }
+          {
+            "key": "flow.mix",
+            "min": 0.34,
+            "max": 0.84
+          },
+          {
+            "key": "flow.strength",
+            "min": 0.24,
+            "max": 0.62
+          },
+          {
+            "key": "audio.granulator.positionJitter",
+            "min": 0.03,
+            "max": 0.11
+          }
         ]
       },
       {
@@ -2070,9 +3390,21 @@
         "label": "Halo",
         "default": 0.7,
         "targets": [
-          { "key": "structure.glow", "min": 0.22, "max": 0.78 },
-          { "key": "timeDisplace.decay", "min": 0.46, "max": 0.9 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.1, "max": 0.28 }
+          {
+            "key": "structure.glow",
+            "min": 0.22,
+            "max": 0.78
+          },
+          {
+            "key": "timeDisplace.decay",
+            "min": 0.46,
+            "max": 0.9
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.1,
+            "max": 0.28
+          }
         ]
       },
       {
@@ -2080,9 +3412,21 @@
         "label": "Air",
         "default": 0.56,
         "targets": [
-          { "key": "audio.granulator.density", "min": 14, "max": 28 },
-          { "key": "audio.granulator.panSpread", "min": 0.28, "max": 0.66 },
-          { "key": "chromaShift.amount", "min": 0.001, "max": 0.009 }
+          {
+            "key": "audio.granulator.density",
+            "min": 14,
+            "max": 28
+          },
+          {
+            "key": "audio.granulator.panSpread",
+            "min": 0.28,
+            "max": 0.66
+          },
+          {
+            "key": "chromaShift.amount",
+            "min": 0.001,
+            "max": 0.009
+          }
         ]
       }
     ],
@@ -2118,8 +3462,17 @@
     "tagline": "Fold the clip into a restrained prism, then let temporal replay and feedback turn that prism into a tunneled corridor.",
     "videoIntent": "Best on centered movement, limbs, and architecture where symmetry can feel intentional and the tunnel still has a clear subject.",
     "audioIntent": "The grains should pulse around the tunnel rather than fill it completely, with the shared delay reading as depth.",
-    "operatorFocus": ["timeDisplace", "kaleid", "feedback"],
-    "chain": ["feedback", "timeDisplace", "kaleid", "scrollX"],
+    "operatorFocus": [
+      "timeDisplace",
+      "kaleid",
+      "feedback"
+    ],
+    "chain": [
+      "feedback",
+      "timeDisplace",
+      "kaleid",
+      "scroll"
+    ],
     "render": {
       "look": "silver",
       "quality": "standard",
@@ -2136,11 +3489,10 @@
       "timeDisplace.smear": 0.22,
       "timeDisplace.decay": 0.64,
       "kaleid.nSides": 7,
-      "scrollX.amount": 0.03,
-      "scrollX.speed": 0.026,
+      "scroll.x": 0.03,
+      "scroll.speedX": 0.026,
       "scale.amount": 1.016,
-      "rotate.angle": 0.02,
-      "chromaShift.amount": 0.006
+      "rotate.angle": 0.02
     },
     "macros": [
       {
@@ -2148,9 +3500,21 @@
         "label": "Sides",
         "default": 0.52,
         "targets": [
-          { "key": "kaleid.nSides", "min": 5, "max": 11 },
-          { "key": "rotate.angle", "min": -0.04, "max": 0.06 },
-          { "key": "scale.amount", "min": 1.002, "max": 1.03 }
+          {
+            "key": "kaleid.nSides",
+            "min": 5,
+            "max": 11
+          },
+          {
+            "key": "rotate.angle",
+            "min": -0.04,
+            "max": 0.06
+          },
+          {
+            "key": "scale.amount",
+            "min": 1.002,
+            "max": 1.03
+          }
         ]
       },
       {
@@ -2158,9 +3522,21 @@
         "label": "Tunnel",
         "default": 0.64,
         "targets": [
-          { "key": "feedback.feedback", "min": 0.52, "max": 0.84 },
-          { "key": "timeDisplace.depth", "min": 0.32, "max": 0.88 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.34 }
+          {
+            "key": "feedback.feedback",
+            "min": 0.52,
+            "max": 0.84
+          },
+          {
+            "key": "timeDisplace.depth",
+            "min": 0.32,
+            "max": 0.88
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.12,
+            "max": 0.34
+          }
         ]
       },
       {
@@ -2168,9 +3544,21 @@
         "label": "Drift",
         "default": 0.48,
         "targets": [
-          { "key": "scrollX.amount", "min": 0.0, "max": 0.08 },
-          { "key": "scrollX.speed", "min": 0.0, "max": 0.05 },
-          { "key": "clock.rate", "min": 0.32, "max": 0.72 }
+          {
+            "key": "scroll.x",
+            "min": 0.0,
+            "max": 0.08
+          },
+          {
+            "key": "scroll.speedX",
+            "min": 0.0,
+            "max": 0.05
+          },
+          {
+            "key": "clock.rate",
+            "min": 0.32,
+            "max": 0.72
+          }
         ]
       }
     ],
@@ -2206,8 +3594,17 @@
     "tagline": "Hold fragments of the clip almost in place, then let contour-led feedback decide what continues to move inside the freeze.",
     "videoIntent": "Best on stillness, pauses, and sparse action where a near-held frame can keep a strong silhouette while only selected regions keep breathing.",
     "audioIntent": "The granulator should thin out and lengthen so the scene feels suspended rather than busy.",
-    "operatorFocus": ["timeDisplace", "feedback", "structure"],
-    "chain": ["feedback", "timeDisplace", "structure", "luma"],
+    "operatorFocus": [
+      "timeDisplace",
+      "feedback",
+      "structure"
+    ],
+    "chain": [
+      "feedback",
+      "timeDisplace",
+      "structure",
+      "extract"
+    ],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -2230,12 +3627,13 @@
       "structure.displace": 0.08,
       "structure.memory": 0.42,
       "structure.glow": 0.18,
-      "luma.threshold": 0.52,
-      "luma.tolerance": 0.12,
-      "luma.amount": 0.1,
       "scale.amount": 1.001,
       "rotate.angle": 0.0,
-      "kaleid.nSides": 1
+      "kaleid.nSides": 1,
+      "extract.threshold": 0.52,
+      "extract.tolerance": 0.12,
+      "extract.amount": 0.1,
+      "extract.mode": 0
     },
     "macros": [
       {
@@ -2243,9 +3641,21 @@
         "label": "Hold",
         "default": 0.74,
         "targets": [
-          { "key": "clock.rate", "min": 0.08, "max": 0.42 },
-          { "key": "timeDisplace.decay", "min": 0.72, "max": 0.98 },
-          { "key": "feedback.feedback", "min": 0.46, "max": 0.82 }
+          {
+            "key": "clock.rate",
+            "min": 0.08,
+            "max": 0.42
+          },
+          {
+            "key": "timeDisplace.decay",
+            "min": 0.72,
+            "max": 0.98
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.46,
+            "max": 0.82
+          }
         ]
       },
       {
@@ -2253,9 +3663,21 @@
         "label": "Contour",
         "default": 0.48,
         "targets": [
-          { "key": "structure.mix", "min": 0.12, "max": 0.56 },
-          { "key": "structure.memory", "min": 0.1, "max": 0.6 },
-          { "key": "luma.amount", "min": 0.02, "max": 0.18 }
+          {
+            "key": "structure.mix",
+            "min": 0.12,
+            "max": 0.56
+          },
+          {
+            "key": "structure.memory",
+            "min": 0.1,
+            "max": 0.6
+          },
+          {
+            "key": "luma.amount",
+            "min": 0.02,
+            "max": 0.18
+          }
         ]
       },
       {
@@ -2263,9 +3685,21 @@
         "label": "Wash",
         "default": 0.38,
         "targets": [
-          { "key": "audio.feedbackDelay.mix", "min": 0.08, "max": 0.3 },
-          { "key": "audio.granulator.density", "min": 10, "max": 24 },
-          { "key": "audio.granulator.duration", "min": 90, "max": 180 }
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.08,
+            "max": 0.3
+          },
+          {
+            "key": "audio.granulator.density",
+            "min": 10,
+            "max": 24
+          },
+          {
+            "key": "audio.granulator.duration",
+            "min": 90,
+            "max": 180
+          }
         ]
       }
     ],
@@ -2301,8 +3735,17 @@
     "tagline": "Shape the clip into a soft contour cloud while the granulator becomes the audible centre of gravity instead of an afterthought.",
     "videoIntent": "Best on broad moving forms, haze, cloth, and low-contrast footage where contour and motion can build a visible cloud instead of a hard edge effect.",
     "audioIntent": "The grain engine should read immediately as the instrument, with the video moving in the same density and spread family.",
-    "operatorFocus": ["structure", "flow", "posterize"],
-    "chain": ["structure", "flow", "posterize", "chromaShift"],
+    "operatorFocus": [
+      "structure",
+      "flow",
+      "posterize"
+    ],
+    "chain": [
+      "structure",
+      "flow",
+      "posterize",
+      "glitch"
+    ],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -2329,10 +3772,11 @@
       "flow.chroma": 0.16,
       "posterize.bins": 20,
       "posterize.gamma": 0.95,
-      "chromaShift.amount": 0.008,
       "scale.amount": 1.003,
       "rotate.angle": 0.0,
-      "kaleid.nSides": 1
+      "kaleid.nSides": 1,
+      "glitch.type": 1,
+      "glitch.amount": 0.1
     },
     "automation": {
       "flow.chroma": {
@@ -2354,9 +3798,21 @@
         "label": "Grains",
         "default": 0.66,
         "targets": [
-          { "key": "audio.granulator.density", "min": 22, "max": 42 },
-          { "key": "audio.granulator.voiceCount", "min": 18, "max": 32 },
-          { "key": "feedback.feedback", "min": 0.44, "max": 0.74 }
+          {
+            "key": "audio.granulator.density",
+            "min": 22,
+            "max": 42
+          },
+          {
+            "key": "audio.granulator.voiceCount",
+            "min": 18,
+            "max": 32
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.44,
+            "max": 0.74
+          }
         ]
       },
       {
@@ -2364,9 +3820,21 @@
         "label": "Cloud",
         "default": 0.58,
         "targets": [
-          { "key": "flow.mix", "min": 0.18, "max": 0.62 },
-          { "key": "structure.glow", "min": 0.14, "max": 0.58 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.34 }
+          {
+            "key": "flow.mix",
+            "min": 0.18,
+            "max": 0.62
+          },
+          {
+            "key": "structure.glow",
+            "min": 0.14,
+            "max": 0.58
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.12,
+            "max": 0.34
+          }
         ]
       },
       {
@@ -2374,9 +3842,21 @@
         "label": "Drift",
         "default": 0.5,
         "targets": [
-          { "key": "audio.granulator.panSpread", "min": 0.26, "max": 0.72 },
-          { "key": "audio.granulator.ySpread", "min": 0.14, "max": 0.44 },
-          { "key": "chromaShift.amount", "min": 0.002, "max": 0.012 }
+          {
+            "key": "audio.granulator.panSpread",
+            "min": 0.26,
+            "max": 0.72
+          },
+          {
+            "key": "audio.granulator.ySpread",
+            "min": 0.14,
+            "max": 0.44
+          },
+          {
+            "key": "chromaShift.amount",
+            "min": 0.002,
+            "max": 0.012
+          }
         ]
       }
     ],
@@ -2409,10 +3889,14 @@
   },
   "grainField": {
     "title": "Grain Field",
-    "tagline": "A dense field of small audible grains paired with a softly-banded video texture — the cleanest demonstration of the granulator-first product shape.",
+    "tagline": "A dense field of small audible grains paired with a softly-banded video texture \u2014 the cleanest demonstration of the granulator-first product shape.",
     "videoIntent": "Best on slow-moving footage with broad tonal areas where the gentle posterize banding and feedback smear can read as visible texture instead of noise.",
     "audioIntent": "The granulator runs at ~35 grains/sec with modest jitter and stereo spread, so individual grains are audible as a steady shimmering stream rather than a smoothed cloud.",
-    "operatorFocus": ["feedback", "posterize", "chromaShift"],
+    "operatorFocus": [
+      "feedback",
+      "posterize",
+      "chromaShift"
+    ],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -2427,7 +3911,6 @@
       "scale.amount": 1.005,
       "rotate.angle": 0.0,
       "kaleid.nSides": 1,
-      "chromaShift.amount": 0.004,
       "posterize.bins": 24,
       "posterize.gamma": 0.94
     },
@@ -2437,9 +3920,21 @@
         "label": "Density",
         "default": 0.7,
         "targets": [
-          { "key": "audio.granulator.density", "min": 20, "max": 44 },
-          { "key": "audio.granulator.voiceCount", "min": 18, "max": 30 },
-          { "key": "feedback.feedback", "min": 0.58, "max": 0.86 }
+          {
+            "key": "audio.granulator.density",
+            "min": 20,
+            "max": 44
+          },
+          {
+            "key": "audio.granulator.voiceCount",
+            "min": 18,
+            "max": 30
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.58,
+            "max": 0.86
+          }
         ]
       },
       {
@@ -2447,9 +3942,21 @@
         "label": "Shimmer",
         "default": 0.54,
         "targets": [
-          { "key": "posterize.bins", "min": 16, "max": 34 },
-          { "key": "chromaShift.amount", "min": 0.001, "max": 0.01 },
-          { "key": "audio.granulator.pitchJitter", "min": 2, "max": 10 }
+          {
+            "key": "posterize.bins",
+            "min": 16,
+            "max": 34
+          },
+          {
+            "key": "chromaShift.amount",
+            "min": 0.001,
+            "max": 0.01
+          },
+          {
+            "key": "audio.granulator.pitchJitter",
+            "min": 2,
+            "max": 10
+          }
         ]
       },
       {
@@ -2457,9 +3964,21 @@
         "label": "Spread",
         "default": 0.58,
         "targets": [
-          { "key": "audio.granulator.panSpread", "min": 0.28, "max": 0.74 },
-          { "key": "audio.granulator.ySpread", "min": 0.12, "max": 0.42 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.22, "max": 0.46 }
+          {
+            "key": "audio.granulator.panSpread",
+            "min": 0.28,
+            "max": 0.74
+          },
+          {
+            "key": "audio.granulator.ySpread",
+            "min": 0.12,
+            "max": 0.42
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.22,
+            "max": 0.46
+          }
         ]
       }
     ],
@@ -2493,10 +4012,19 @@
   "vortexField": {
     "title": "Vortex Field",
     "tagline": "Authored point-vortex velocity field swirls the clip while feedback trails hold the motion in place.",
-    "videoIntent": "Best on footage with strong colour contrast and gentle motion — faces, foliage, water — where the Biot-Savart swirl reads as designed flow rather than damage.",
+    "videoIntent": "Best on footage with strong colour contrast and gentle motion \u2014 faces, foliage, water \u2014 where the Biot-Savart swirl reads as designed flow rather than damage.",
     "audioIntent": "Quiet granulator bed so the visual swirl carries the piece; feedback delay stays light.",
-    "operatorFocus": ["vortex", "feedback", "saturate"],
-    "chain": ["feedback", "vortex", "saturate", "contrast", "chromaShift"],
+    "operatorFocus": [
+      "vortex",
+      "feedback",
+      "saturate"
+    ],
+    "chain": [
+      "feedback",
+      "vortex",
+      "grade",
+      "glitch"
+    ],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -2511,9 +4039,10 @@
       "vortex.strength": 0.28,
       "vortex.drift": 0.55,
       "vortex.softness": 0.05,
-      "saturate.amount": 1.4,
-      "contrast.amount": 1.18,
-      "chromaShift.amount": 0.022
+      "grade.saturate": 1.4,
+      "grade.contrast": 1.18,
+      "glitch.type": 1,
+      "glitch.amount": 0.275
     },
     "macros": [
       {
@@ -2521,8 +4050,16 @@
         "label": "Swirl",
         "default": 0.6,
         "targets": [
-          { "key": "vortex.strength", "min": 0.08, "max": 0.45 },
-          { "key": "vortex.drift", "min": 0.2, "max": 0.85 }
+          {
+            "key": "vortex.strength",
+            "min": 0.08,
+            "max": 0.45
+          },
+          {
+            "key": "vortex.drift",
+            "min": 0.2,
+            "max": 0.85
+          }
         ]
       },
       {
@@ -2530,8 +4067,16 @@
         "label": "Persistence",
         "default": 0.7,
         "targets": [
-          { "key": "feedback.feedback", "min": 0.55, "max": 0.94 },
-          { "key": "vortex.softness", "min": 0.025, "max": 0.12 }
+          {
+            "key": "feedback.feedback",
+            "min": 0.55,
+            "max": 0.94
+          },
+          {
+            "key": "vortex.softness",
+            "min": 0.025,
+            "max": 0.12
+          }
         ]
       },
       {
@@ -2539,9 +4084,21 @@
         "label": "Palette",
         "default": 0.55,
         "targets": [
-          { "key": "saturate.amount", "min": 1.0, "max": 1.85 },
-          { "key": "contrast.amount", "min": 1.0, "max": 1.32 },
-          { "key": "chromaShift.amount", "min": 0.0, "max": 0.05 }
+          {
+            "key": "saturate.amount",
+            "min": 1.0,
+            "max": 1.85
+          },
+          {
+            "key": "contrast.amount",
+            "min": 1.0,
+            "max": 1.32
+          },
+          {
+            "key": "chromaShift.amount",
+            "min": 0.0,
+            "max": 0.05
+          }
         ]
       }
     ],
@@ -2574,11 +4131,20 @@
   },
   "curlTurbulence": {
     "title": "Curl Turbulence",
-    "tagline": "Divergence-free curl-of-noise warps the clip like slow fluid — no piling, no thinning, just flow.",
+    "tagline": "Divergence-free curl-of-noise warps the clip like slow fluid \u2014 no piling, no thinning, just flow.",
     "videoIntent": "Best on footage with mid-frequency texture (skin, foliage, fabric) where the turbulence reads as motion rather than blur.",
     "audioIntent": "Granulator stays in a wide cloud so the audio breathes with the visual drift; feedback delay light.",
-    "operatorFocus": ["curlNoise", "feedback", "saturate"],
-    "chain": ["feedback", "curlNoise", "saturate", "contrast", "chromaShift"],
+    "operatorFocus": [
+      "curlNoise",
+      "feedback",
+      "saturate"
+    ],
+    "chain": [
+      "feedback",
+      "curlNoise",
+      "grade",
+      "glitch"
+    ],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -2595,9 +4161,10 @@
       "curlNoise.scale": 2.6,
       "curlNoise.speed": 0.45,
       "curlNoise.warp": 0.55,
-      "saturate.amount": 1.3,
-      "contrast.amount": 1.12,
-      "chromaShift.amount": 0.018
+      "grade.saturate": 1.3,
+      "grade.contrast": 1.12,
+      "glitch.type": 1,
+      "glitch.amount": 0.225
     },
     "macros": [
       {
@@ -2605,8 +4172,16 @@
         "label": "Flow",
         "default": 0.55,
         "targets": [
-          { "key": "curlNoise.strength", "min": 0.05, "max": 0.32 },
-          { "key": "curlNoise.speed", "min": 0.15, "max": 0.9 }
+          {
+            "key": "curlNoise.strength",
+            "min": 0.05,
+            "max": 0.32
+          },
+          {
+            "key": "curlNoise.speed",
+            "min": 0.15,
+            "max": 0.9
+          }
         ]
       },
       {
@@ -2614,8 +4189,16 @@
         "label": "Scale",
         "default": 0.5,
         "targets": [
-          { "key": "curlNoise.scale", "min": 1.2, "max": 6.0 },
-          { "key": "curlNoise.warp", "min": 0.2, "max": 0.85 }
+          {
+            "key": "curlNoise.scale",
+            "min": 1.2,
+            "max": 6.0
+          },
+          {
+            "key": "curlNoise.warp",
+            "min": 0.2,
+            "max": 0.85
+          }
         ]
       },
       {
@@ -2623,8 +4206,16 @@
         "label": "Persistence",
         "default": 0.6,
         "targets": [
-          { "key": "feedback.feedback", "min": 0.55, "max": 0.92 },
-          { "key": "saturate.amount", "min": 1.0, "max": 1.7 }
+          {
+            "key": "feedback.feedback",
+            "min": 0.55,
+            "max": 0.92
+          },
+          {
+            "key": "saturate.amount",
+            "min": 1.0,
+            "max": 1.7
+          }
         ]
       }
     ],
@@ -2658,10 +4249,19 @@
   "vortexPacketStorm": {
     "title": "Vortex Packet Storm",
     "tagline": "Broad slow swirls anchor the frame while a dense cloud of fast eddies stipples the surface.",
-    "videoIntent": "Best on busy, high-contrast footage — crowds, water, foliage in wind — where the two-band field separates into a readable macro/micro structure.",
+    "videoIntent": "Best on busy, high-contrast footage \u2014 crowds, water, foliage in wind \u2014 where the two-band field separates into a readable macro/micro structure.",
     "audioIntent": "Granulator pushed denser and slightly pitched, mirroring the micro-eddy stipple in the audio domain.",
-    "operatorFocus": ["vortexPacket", "feedback", "contrast"],
-    "chain": ["feedback", "vortexPacket", "saturate", "contrast", "chromaShift"],
+    "operatorFocus": [
+      "vortexPacket",
+      "feedback",
+      "contrast"
+    ],
+    "chain": [
+      "feedback",
+      "vortexPacket",
+      "grade",
+      "glitch"
+    ],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -2679,9 +4279,10 @@
       "vortexPacket.macroBalance": 0.55,
       "vortexPacket.macroSoftness": 0.22,
       "vortexPacket.microSoftness": 0.035,
-      "saturate.amount": 1.35,
-      "contrast.amount": 1.22,
-      "chromaShift.amount": 0.026
+      "grade.saturate": 1.35,
+      "grade.contrast": 1.22,
+      "glitch.type": 1,
+      "glitch.amount": 0.325
     },
     "macros": [
       {
@@ -2689,8 +4290,16 @@
         "label": "Energy",
         "default": 0.6,
         "targets": [
-          { "key": "vortexPacket.strength", "min": 0.1, "max": 0.5 },
-          { "key": "vortexPacket.drift", "min": 0.2, "max": 0.9 }
+          {
+            "key": "vortexPacket.strength",
+            "min": 0.1,
+            "max": 0.5
+          },
+          {
+            "key": "vortexPacket.drift",
+            "min": 0.2,
+            "max": 0.9
+          }
         ]
       },
       {
@@ -2698,8 +4307,16 @@
         "label": "Grain Balance",
         "default": 0.55,
         "targets": [
-          { "key": "vortexPacket.macroBalance", "min": 0.2, "max": 0.85 },
-          { "key": "vortexPacket.microSoftness", "min": 0.02, "max": 0.08 }
+          {
+            "key": "vortexPacket.macroBalance",
+            "min": 0.2,
+            "max": 0.85
+          },
+          {
+            "key": "vortexPacket.microSoftness",
+            "min": 0.02,
+            "max": 0.08
+          }
         ]
       },
       {
@@ -2707,8 +4324,16 @@
         "label": "Trails",
         "default": 0.65,
         "targets": [
-          { "key": "feedback.feedback", "min": 0.6, "max": 0.94 },
-          { "key": "chromaShift.amount", "min": 0.005, "max": 0.04 }
+          {
+            "key": "feedback.feedback",
+            "min": 0.6,
+            "max": 0.94
+          },
+          {
+            "key": "chromaShift.amount",
+            "min": 0.005,
+            "max": 0.04
+          }
         ]
       }
     ],
@@ -2742,10 +4367,19 @@
   "saddleSweep": {
     "title": "Saddle Sweep",
     "tagline": "Oriented saddle currents sweep the clip in directional streaks rather than swirls.",
-    "videoIntent": "Best on footage with existing horizontal or diagonal motion — landscapes from a moving vehicle, dance — where the saddle axes amplify the existing direction.",
+    "videoIntent": "Best on footage with existing horizontal or diagonal motion \u2014 landscapes from a moving vehicle, dance \u2014 where the saddle axes amplify the existing direction.",
     "audioIntent": "Granulator in classic mode with light spray so the sound stays focused; feedback delay adds spatial depth.",
-    "operatorFocus": ["saddleField", "feedback", "chromaShift"],
-    "chain": ["feedback", "saddleField", "saturate", "contrast", "chromaShift"],
+    "operatorFocus": [
+      "saddleField",
+      "feedback",
+      "chromaShift"
+    ],
+    "chain": [
+      "feedback",
+      "saddleField",
+      "grade",
+      "glitch"
+    ],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -2762,9 +4396,10 @@
       "saddleField.softness": 0.16,
       "saddleField.anisotropy": 0.6,
       "saddleField.drift": 0.5,
-      "saturate.amount": 1.25,
-      "contrast.amount": 1.16,
-      "chromaShift.amount": 0.028
+      "grade.saturate": 1.25,
+      "grade.contrast": 1.16,
+      "glitch.type": 1,
+      "glitch.amount": 0.35
     },
     "macros": [
       {
@@ -2772,8 +4407,16 @@
         "label": "Sweep",
         "default": 0.55,
         "targets": [
-          { "key": "saddleField.strength", "min": 0.08, "max": 0.38 },
-          { "key": "saddleField.drift", "min": 0.15, "max": 1.0 }
+          {
+            "key": "saddleField.strength",
+            "min": 0.08,
+            "max": 0.38
+          },
+          {
+            "key": "saddleField.drift",
+            "min": 0.15,
+            "max": 1.0
+          }
         ]
       },
       {
@@ -2781,8 +4424,16 @@
         "label": "Shape",
         "default": 0.5,
         "targets": [
-          { "key": "saddleField.softness", "min": 0.06, "max": 0.3 },
-          { "key": "saddleField.anisotropy", "min": 0.2, "max": 1.8 }
+          {
+            "key": "saddleField.softness",
+            "min": 0.06,
+            "max": 0.3
+          },
+          {
+            "key": "saddleField.anisotropy",
+            "min": 0.2,
+            "max": 1.8
+          }
         ]
       },
       {
@@ -2790,8 +4441,16 @@
         "label": "Persistence",
         "default": 0.65,
         "targets": [
-          { "key": "feedback.feedback", "min": 0.55, "max": 0.94 },
-          { "key": "chromaShift.amount", "min": 0.005, "max": 0.05 }
+          {
+            "key": "feedback.feedback",
+            "min": 0.55,
+            "max": 0.94
+          },
+          {
+            "key": "chromaShift.amount",
+            "min": 0.005,
+            "max": 0.05
+          }
         ]
       }
     ],
@@ -2827,15 +4486,18 @@
     "tagline": "Internal reference patch for the new field-operator pack: fold, spiral, sink/source, and ripple in one feedback-safe chain.",
     "videoIntent": "Authored field study for auditioning how the cheaper coordinate-warp operators stack under feedback.",
     "audioIntent": "Keep the granulator and delay present but secondary so the visual field motion stays readable while testing modulation.",
-    "operatorFocus": ["spiralField", "sinkSourceField", "polarRipple"],
+    "operatorFocus": [
+      "spiralField",
+      "sinkSourceField",
+      "polarRipple"
+    ],
     "chain": [
       "feedback",
       "domainFold",
       "spiralField",
-      "sinkSourceField",
+      "warp",
       "polarRipple",
-      "saturate",
-      "contrast"
+      "grade"
     ],
     "render": {
       "look": "clean",
@@ -2859,13 +4521,6 @@
       "spiralField.centerX": 0.48,
       "spiralField.centerY": 0.52,
       "spiralField.phase": 0.12,
-      "sinkSourceField.mix": 1.0,
-      "sinkSourceField.strength": 0.22,
-      "sinkSourceField.radius": 0.72,
-      "sinkSourceField.falloff": 2.6,
-      "sinkSourceField.centerX": 0.52,
-      "sinkSourceField.centerY": 0.48,
-      "sinkSourceField.spin": 0.38,
       "polarRipple.mix": 1.0,
       "polarRipple.amplitude": 0.045,
       "polarRipple.frequency": 9.0,
@@ -2873,32 +4528,76 @@
       "polarRipple.falloff": 1.3,
       "polarRipple.centerX": 0.5,
       "polarRipple.centerY": 0.5,
-      "saturate.amount": 1.18,
-      "contrast.amount": 1.12
+      "grade.saturate": 1.18,
+      "grade.contrast": 1.12,
+      "warp.mix": 1.0,
+      "warp.strength": 0.22,
+      "warp.radius": 0.72,
+      "warp.falloff": 2.6,
+      "warp.centerX": 0.52,
+      "warp.centerY": 0.48,
+      "warp.spin": 0.38,
+      "warp.mode": 1
     },
     "macros": [
       {
         "name": "orbit",
         "targets": [
-          { "key": "spiralField.twist", "min": 0.8, "max": 4.8 },
-          { "key": "sinkSourceField.spin", "min": -0.25, "max": 0.9 },
-          { "key": "domainFold.angle", "min": -0.5, "max": 0.8 }
+          {
+            "key": "spiralField.twist",
+            "min": 0.8,
+            "max": 4.8
+          },
+          {
+            "key": "sinkSourceField.spin",
+            "min": -0.25,
+            "max": 0.9
+          },
+          {
+            "key": "domainFold.angle",
+            "min": -0.5,
+            "max": 0.8
+          }
         ]
       },
       {
         "name": "pulse",
         "targets": [
-          { "key": "polarRipple.amplitude", "min": 0.01, "max": 0.1 },
-          { "key": "polarRipple.frequency", "min": 5.0, "max": 18.0 },
-          { "key": "feedback.feedback", "min": 0.58, "max": 0.84 }
+          {
+            "key": "polarRipple.amplitude",
+            "min": 0.01,
+            "max": 0.1
+          },
+          {
+            "key": "polarRipple.frequency",
+            "min": 5.0,
+            "max": 18.0
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.58,
+            "max": 0.84
+          }
         ]
       },
       {
         "name": "lens",
         "targets": [
-          { "key": "sinkSourceField.strength", "min": -0.35, "max": 0.38 },
-          { "key": "domainFold.zoom", "min": 0.9, "max": 1.5 },
-          { "key": "spiralField.radius", "min": 0.4, "max": 1.1 }
+          {
+            "key": "sinkSourceField.strength",
+            "min": -0.35,
+            "max": 0.38
+          },
+          {
+            "key": "domainFold.zoom",
+            "min": 0.9,
+            "max": 1.5
+          },
+          {
+            "key": "spiralField.radius",
+            "min": 0.4,
+            "max": 1.1
+          }
         ]
       }
     ],
@@ -2934,8 +4633,20 @@
     "tagline": "Turn the clip into an amber ASCII field and drag each gesture through a radial temporal echo.",
     "videoIntent": "Best on portraits, hands, and stage movement where glyph contours and soft history rings can stay legible.",
     "audioIntent": "A restrained cloud granulator and short cross-fed delay should feel like a typographic afterimage rather than a separate soundtrack.",
-    "operatorFocus": ["glyphRender", "glyphMotion", "slitScan", "feedback"],
-    "chain": ["slitScan", "feedback", "glyphRender", "glyphMotion", "chromaShift", "contrast"],
+    "operatorFocus": [
+      "glyphRender",
+      "glyphMotion",
+      "slitScan",
+      "feedback"
+    ],
+    "chain": [
+      "slitScan",
+      "feedback",
+      "glyphRender",
+      "glyphMotion",
+      "glitch",
+      "grade"
+    ],
     "render": {
       "look": "cine",
       "quality": "standard",
@@ -2972,13 +4683,30 @@
       "glyphMotion.decay": 0.68,
       "glyphMotion.ring": 0.34,
       "glyphMotion.motionAmount": 0.32,
-      "chromaShift.amount": 0.006,
-      "contrast.amount": 1.02
+      "grade.contrast": 1.02,
+      "glitch.type": 1,
+      "glitch.amount": 0.075
     },
     "automation": {
-      "slitScan.slitX": { "kind": "lfo", "rate": 0.07, "depth": 0.08, "phase": 0 },
-      "slitScan.slitY": { "kind": "lfo", "rate": 0.09, "depth": 0.07, "phase": 1.5707963268 },
-      "glyphMotion.ring": { "kind": "fft", "bin": 3, "scale": 2.8, "smooth": 0.72, "cutoff": 0.05 }
+      "slitScan.slitX": {
+        "kind": "lfo",
+        "rate": 0.07,
+        "depth": 0.08,
+        "phase": 0
+      },
+      "slitScan.slitY": {
+        "kind": "lfo",
+        "rate": 0.09,
+        "depth": 0.07,
+        "phase": 1.5707963268
+      },
+      "glyphMotion.ring": {
+        "kind": "fft",
+        "bin": 3,
+        "scale": 2.8,
+        "smooth": 0.72,
+        "cutoff": 0.05
+      }
     },
     "macros": [
       {
@@ -2986,9 +4714,21 @@
         "label": "Ghost",
         "default": 0.58,
         "targets": [
-          { "key": "slitScan.feedbackBlend", "min": 0.34, "max": 0.94 },
-          { "key": "slitScan.smearWidth", "min": 0.32, "max": 1 },
-          { "key": "feedback.feedback", "min": 0.38, "max": 0.76 }
+          {
+            "key": "slitScan.feedbackBlend",
+            "min": 0.34,
+            "max": 0.94
+          },
+          {
+            "key": "slitScan.smearWidth",
+            "min": 0.32,
+            "max": 1
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.38,
+            "max": 0.76
+          }
         ]
       },
       {
@@ -2996,9 +4736,21 @@
         "label": "Glyph",
         "default": 0.52,
         "targets": [
-          { "key": "glyphRender.cellSize", "min": 10, "max": 26 },
-          { "key": "glyphRender.contrast", "min": 1, "max": 2.2 },
-          { "key": "glyphRender.density", "min": 0.68, "max": 1 }
+          {
+            "key": "glyphRender.cellSize",
+            "min": 10,
+            "max": 26
+          },
+          {
+            "key": "glyphRender.contrast",
+            "min": 1,
+            "max": 2.2
+          },
+          {
+            "key": "glyphRender.density",
+            "min": 0.68,
+            "max": 1
+          }
         ]
       },
       {
@@ -3006,9 +4758,21 @@
         "label": "Pulse",
         "default": 0.46,
         "targets": [
-          { "key": "glyphMotion.bassPush", "min": 0.18, "max": 1.1 },
-          { "key": "glyphMotion.ring", "min": 0.08, "max": 0.72 },
-          { "key": "audio.granulator.density", "min": 14, "max": 34 }
+          {
+            "key": "glyphMotion.bassPush",
+            "min": 0.18,
+            "max": 1.1
+          },
+          {
+            "key": "glyphMotion.ring",
+            "min": 0.08,
+            "max": 0.72
+          },
+          {
+            "key": "audio.granulator.density",
+            "min": 14,
+            "max": 34
+          }
         ]
       }
     ],
@@ -3044,8 +4808,17 @@
     "tagline": "Feed binary cells into falling terminal columns while bass energy kicks the grid outward.",
     "videoIntent": "Best on high-contrast clips, city lights, and graphic movement where the digital rain can borrow source colour without turning muddy.",
     "audioIntent": "Compact grains and a dark stereo delay should leave room for the bass-reactive visual columns.",
-    "operatorFocus": ["matrixRain", "glyphRender", "brightness", "contrast"],
-    "chain": ["matrixRain", "glyphRender", "brightness", "contrast", "saturate"],
+    "operatorFocus": [
+      "matrixRain",
+      "glyphRender",
+      "brightness",
+      "contrast"
+    ],
+    "chain": [
+      "matrixRain",
+      "glyphRender",
+      "grade"
+    ],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -3069,9 +4842,9 @@
       "glyphRender.contrast": 1.12,
       "glyphRender.invert": 0,
       "glyphRender.colorMode": 1,
-      "brightness.amount": 0.26,
-      "contrast.amount": 0.96,
-      "saturate.amount": 1.04
+      "grade.brightness": 0.26,
+      "grade.contrast": 0.96,
+      "grade.saturate": 1.04
     },
     "automation": {
       "matrixRain.rainSpeed": {
@@ -3081,8 +4854,18 @@
         "smooth": 0.7,
         "cutoff": 0.04
       },
-      "matrixRain.sourceColorBlend": { "kind": "lfo", "rate": 0.08, "depth": 0.08, "phase": 0 },
-      "brightness.amount": { "kind": "video", "feature": "luma", "scale": 0.12, "smooth": 0.82 }
+      "matrixRain.sourceColorBlend": {
+        "kind": "lfo",
+        "rate": 0.08,
+        "depth": 0.08,
+        "phase": 0
+      },
+      "brightness.amount": {
+        "kind": "video",
+        "feature": "luma",
+        "scale": 0.12,
+        "smooth": 0.82
+      }
     },
     "macros": [
       {
@@ -3090,9 +4873,21 @@
         "label": "Rain",
         "default": 0.62,
         "targets": [
-          { "key": "matrixRain.rainSpeed", "min": 0.22, "max": 0.94 },
-          { "key": "matrixRain.trailLength", "min": 0.32, "max": 0.9 },
-          { "key": "matrixRain.columnDensity", "min": 0.24, "max": 0.72 }
+          {
+            "key": "matrixRain.rainSpeed",
+            "min": 0.22,
+            "max": 0.94
+          },
+          {
+            "key": "matrixRain.trailLength",
+            "min": 0.32,
+            "max": 0.9
+          },
+          {
+            "key": "matrixRain.columnDensity",
+            "min": 0.24,
+            "max": 0.72
+          }
         ]
       },
       {
@@ -3100,9 +4895,21 @@
         "label": "Bass",
         "default": 0.66,
         "targets": [
-          { "key": "matrixRain.audioReact", "min": 0.12, "max": 0.9 },
-          { "key": "matrixRain.rainSpeed", "min": 0.2, "max": 0.9 },
-          { "key": "glyphRender.mix", "min": 0.08, "max": 0.34 }
+          {
+            "key": "matrixRain.audioReact",
+            "min": 0.12,
+            "max": 0.9
+          },
+          {
+            "key": "matrixRain.rainSpeed",
+            "min": 0.2,
+            "max": 0.9
+          },
+          {
+            "key": "glyphRender.mix",
+            "min": 0.08,
+            "max": 0.34
+          }
         ]
       },
       {
@@ -3110,9 +4917,21 @@
         "label": "Signal",
         "default": 0.48,
         "targets": [
-          { "key": "brightness.amount", "min": 0.08, "max": 0.34 },
-          { "key": "contrast.amount", "min": 0.86, "max": 1.12 },
-          { "key": "matrixRain.sourceColorBlend", "min": 0.58, "max": 0.94 }
+          {
+            "key": "brightness.amount",
+            "min": 0.08,
+            "max": 0.34
+          },
+          {
+            "key": "contrast.amount",
+            "min": 0.86,
+            "max": 1.12
+          },
+          {
+            "key": "matrixRain.sourceColorBlend",
+            "min": 0.58,
+            "max": 0.94
+          }
         ]
       }
     ],
@@ -3148,15 +4967,18 @@
     "tagline": "Break highlights into soft dots, then let contour memory and bloom breathe through the printed texture.",
     "videoIntent": "Best on faces, costume detail, and practical lights where a halftone surface can remain elegant under feedback.",
     "audioIntent": "Longer gaussian grains should blur into a warm cloud while the shared delay mirrors the visual persistence.",
-    "operatorFocus": ["glyphRender", "structure", "feedback", "brightness"],
+    "operatorFocus": [
+      "glyphRender",
+      "structure",
+      "feedback",
+      "brightness"
+    ],
     "chain": [
       "feedback",
       "timeDisplace",
       "structure",
       "glyphRender",
-      "brightness",
-      "saturate",
-      "contrast"
+      "grade"
     ],
     "render": {
       "look": "cine",
@@ -3187,14 +5009,29 @@
       "glyphRender.contrast": 0.94,
       "glyphRender.invert": 0,
       "glyphRender.colorMode": 1,
-      "brightness.amount": 0.22,
-      "saturate.amount": 1.04,
-      "contrast.amount": 0.96
+      "grade.brightness": 0.22,
+      "grade.saturate": 1.04,
+      "grade.contrast": 0.96
     },
     "automation": {
-      "structure.glow": { "kind": "video", "feature": "edge", "scale": 0.1, "smooth": 0.78 },
-      "glyphRender.cellSize": { "kind": "lfo", "rate": 0.05, "depth": 1, "phase": 0 },
-      "brightness.amount": { "kind": "video", "feature": "luma", "scale": 0.1, "smooth": 0.82 }
+      "structure.glow": {
+        "kind": "video",
+        "feature": "edge",
+        "scale": 0.1,
+        "smooth": 0.78
+      },
+      "glyphRender.cellSize": {
+        "kind": "lfo",
+        "rate": 0.05,
+        "depth": 1,
+        "phase": 0
+      },
+      "brightness.amount": {
+        "kind": "video",
+        "feature": "luma",
+        "scale": 0.1,
+        "smooth": 0.82
+      }
     },
     "macros": [
       {
@@ -3202,9 +5039,21 @@
         "label": "Print",
         "default": 0.48,
         "targets": [
-          { "key": "glyphRender.cellSize", "min": 8, "max": 24 },
-          { "key": "glyphRender.density", "min": 0.68, "max": 1 },
-          { "key": "glyphRender.contrast", "min": 0.82, "max": 1.9 }
+          {
+            "key": "glyphRender.cellSize",
+            "min": 8,
+            "max": 24
+          },
+          {
+            "key": "glyphRender.density",
+            "min": 0.68,
+            "max": 1
+          },
+          {
+            "key": "glyphRender.contrast",
+            "min": 0.82,
+            "max": 1.9
+          }
         ]
       },
       {
@@ -3212,9 +5061,21 @@
         "label": "Bloom",
         "default": 0.62,
         "targets": [
-          { "key": "structure.glow", "min": 0.18, "max": 0.84 },
-          { "key": "structure.memory", "min": 0.18, "max": 0.72 },
-          { "key": "feedback.feedback", "min": 0.46, "max": 0.84 }
+          {
+            "key": "structure.glow",
+            "min": 0.18,
+            "max": 0.84
+          },
+          {
+            "key": "structure.memory",
+            "min": 0.18,
+            "max": 0.72
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.46,
+            "max": 0.84
+          }
         ]
       },
       {
@@ -3222,9 +5083,21 @@
         "label": "Cloud",
         "default": 0.56,
         "targets": [
-          { "key": "audio.granulator.density", "min": 22, "max": 46 },
-          { "key": "audio.granulator.duration", "min": 110, "max": 240 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.16, "max": 0.42 }
+          {
+            "key": "audio.granulator.density",
+            "min": 22,
+            "max": 46
+          },
+          {
+            "key": "audio.granulator.duration",
+            "min": 110,
+            "max": 240
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.16,
+            "max": 0.42
+          }
         ]
       }
     ],
@@ -3260,8 +5133,20 @@
     "tagline": "Pull moving hands into a spiral time ribbon, with block glyphs preserving a rough digital silhouette.",
     "videoIntent": "Best on close movement, dancers, and gestural footage where the spiral scan can bend a body without losing its rhythm.",
     "audioIntent": "Sparse reversing grains and a longer delay should sound like clipped gestures being folded back into the frame.",
-    "operatorFocus": ["slitScan", "flow", "glyphRender", "chromaShift"],
-    "chain": ["slitScan", "flow", "glyphRender", "glyphMotion", "chromaShift", "contrast"],
+    "operatorFocus": [
+      "slitScan",
+      "flow",
+      "glyphRender",
+      "chromaShift"
+    ],
+    "chain": [
+      "slitScan",
+      "flow",
+      "glyphRender",
+      "glyphMotion",
+      "glitch",
+      "grade"
+    ],
     "render": {
       "look": "bleach",
       "quality": "standard",
@@ -3304,13 +5189,19 @@
       "glyphMotion.decay": 0.5,
       "glyphMotion.ring": 0.46,
       "glyphMotion.motionAmount": 0.44,
-      "chromaShift.amount": 0.009,
-      "contrast.amount": 1.16
+      "grade.contrast": 1.16,
+      "glitch.type": 1,
+      "glitch.amount": 0.1125
     },
     "automation": {
       "slitScan.strobe": {
         "kind": "sequence",
-        "values": [0.08, 0.22, 0.42, 0.16],
+        "values": [
+          0.08,
+          0.22,
+          0.42,
+          0.16
+        ],
         "fast": 0.46,
         "smooth": 0.18,
         "ease": "easeInOutCubic",
@@ -3323,7 +5214,12 @@
         "scale": 0.9,
         "smooth": 0.68
       },
-      "chromaShift.amount": { "kind": "video", "feature": "flux", "scale": 0.012, "smooth": 0.82 }
+      "chromaShift.amount": {
+        "kind": "video",
+        "feature": "flux",
+        "scale": 0.012,
+        "smooth": 0.82
+      }
     },
     "macros": [
       {
@@ -3331,9 +5227,21 @@
         "label": "Ribbon",
         "default": 0.52,
         "targets": [
-          { "key": "slitScan.mix", "min": 0.34, "max": 0.98 },
-          { "key": "slitScan.delayAmount", "min": 0.18, "max": 1 },
-          { "key": "slitScan.feedbackBlend", "min": 0.08, "max": 0.92 }
+          {
+            "key": "slitScan.mix",
+            "min": 0.34,
+            "max": 0.98
+          },
+          {
+            "key": "slitScan.delayAmount",
+            "min": 0.18,
+            "max": 1
+          },
+          {
+            "key": "slitScan.feedbackBlend",
+            "min": 0.08,
+            "max": 0.92
+          }
         ]
       },
       {
@@ -3341,9 +5249,21 @@
         "label": "Gesture",
         "default": 0.58,
         "targets": [
-          { "key": "slitScan.scanSpeed", "min": 0.18, "max": 1 },
-          { "key": "slitScan.depth", "min": 0.04, "max": 0.32 },
-          { "key": "glyphMotion.motionAmount", "min": 0.18, "max": 1.1 }
+          {
+            "key": "slitScan.scanSpeed",
+            "min": 0.18,
+            "max": 1
+          },
+          {
+            "key": "slitScan.depth",
+            "min": 0.04,
+            "max": 0.32
+          },
+          {
+            "key": "glyphMotion.motionAmount",
+            "min": 0.18,
+            "max": 1.1
+          }
         ]
       },
       {
@@ -3351,10 +5271,26 @@
         "label": "Fragment",
         "default": 0.48,
         "targets": [
-          { "key": "slitScan.smearWidth", "min": 0.08, "max": 1 },
-          { "key": "glyphRender.mix", "min": 0.14, "max": 0.7 },
-          { "key": "glyphRender.cellSize", "min": 7, "max": 18 },
-          { "key": "audio.granulator.reverseProbability", "min": 0.08, "max": 0.46 }
+          {
+            "key": "slitScan.smearWidth",
+            "min": 0.08,
+            "max": 1
+          },
+          {
+            "key": "glyphRender.mix",
+            "min": 0.14,
+            "max": 0.7
+          },
+          {
+            "key": "glyphRender.cellSize",
+            "min": 7,
+            "max": 18
+          },
+          {
+            "key": "audio.granulator.reverseProbability",
+            "min": 0.08,
+            "max": 0.46
+          }
         ]
       }
     ],
@@ -3390,8 +5326,19 @@
     "tagline": "Bend the clip into a readable vortex and let block cells ride the source rather than replacing it.",
     "videoIntent": "Best on faces, architecture, and saturated footage where the spiral can stay legible and still preserve the original silhouette.",
     "audioIntent": "A looping granulator bed and orbital delay should support the continuous visual pull without smearing the mix flat.",
-    "operatorFocus": ["glyphRender", "glyphMotion", "spiralField", "domainFold"],
-    "chain": ["spiralField", "domainFold", "glyphRender", "glyphMotion", "contrast"],
+    "operatorFocus": [
+      "glyphRender",
+      "glyphMotion",
+      "spiralField",
+      "domainFold"
+    ],
+    "chain": [
+      "spiralField",
+      "domainFold",
+      "glyphRender",
+      "glyphMotion",
+      "grade"
+    ],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -3431,11 +5378,21 @@
       "glyphMotion.decay": 0.56,
       "glyphMotion.ring": 0.42,
       "glyphMotion.motionAmount": 0.2,
-      "contrast.amount": 1.12
+      "grade.contrast": 1.12
     },
     "automation": {
-      "spiralField.phase": { "kind": "lfo", "rate": 0.12, "depth": 0.18, "phase": 0 },
-      "domainFold.angle": { "kind": "lfo", "rate": 0.07, "depth": 0.1, "phase": 1.5707963268 },
+      "spiralField.phase": {
+        "kind": "lfo",
+        "rate": 0.12,
+        "depth": 0.18,
+        "phase": 0
+      },
+      "domainFold.angle": {
+        "kind": "lfo",
+        "rate": 0.07,
+        "depth": 0.1,
+        "phase": 1.5707963268
+      },
       "glyphMotion.midRotate": {
         "kind": "fft",
         "bin": 12,
@@ -3450,9 +5407,21 @@
         "label": "Vortex",
         "default": 0.56,
         "targets": [
-          { "key": "spiralField.twist", "min": 0.8, "max": 3.2 },
-          { "key": "spiralField.mix", "min": 0.18, "max": 0.78 },
-          { "key": "glyphMotion.midRotate", "min": 0.16, "max": 1.2 }
+          {
+            "key": "spiralField.twist",
+            "min": 0.8,
+            "max": 3.2
+          },
+          {
+            "key": "spiralField.mix",
+            "min": 0.18,
+            "max": 0.78
+          },
+          {
+            "key": "glyphMotion.midRotate",
+            "min": 0.16,
+            "max": 1.2
+          }
         ]
       },
       {
@@ -3460,9 +5429,21 @@
         "label": "Fold",
         "default": 0.5,
         "targets": [
-          { "key": "domainFold.mix", "min": 0.08, "max": 0.54 },
-          { "key": "domainFold.folds", "min": 2, "max": 6 },
-          { "key": "domainFold.zoom", "min": 1, "max": 1.22 }
+          {
+            "key": "domainFold.mix",
+            "min": 0.08,
+            "max": 0.54
+          },
+          {
+            "key": "domainFold.folds",
+            "min": 2,
+            "max": 6
+          },
+          {
+            "key": "domainFold.zoom",
+            "min": 1,
+            "max": 1.22
+          }
         ]
       },
       {
@@ -3470,10 +5451,26 @@
         "label": "Choir",
         "default": 0.52,
         "targets": [
-          { "key": "glyphRender.mix", "min": 0.12, "max": 0.54 },
-          { "key": "glyphRender.density", "min": 0.56, "max": 0.94 },
-          { "key": "audio.granulator.density", "min": 18, "max": 38 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.08, "max": 0.34 }
+          {
+            "key": "glyphRender.mix",
+            "min": 0.12,
+            "max": 0.54
+          },
+          {
+            "key": "glyphRender.density",
+            "min": 0.56,
+            "max": 0.94
+          },
+          {
+            "key": "audio.granulator.density",
+            "min": 18,
+            "max": 38
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.08,
+            "max": 0.34
+          }
         ]
       }
     ],
@@ -3509,7 +5506,11 @@
     "tagline": "Return the clip close to a neutral baseline for comparison and reset.",
     "videoIntent": "Use before auditioning another program or when checking how far a clip has drifted.",
     "audioIntent": "The sound should settle back toward the untreated source without muting the chain.",
-    "operatorFocus": ["feedback", "modulate", "scale"],
+    "operatorFocus": [
+      "feedback",
+      "modulate",
+      "scale"
+    ],
     "render": {
       "look": "clean",
       "quality": "standard",
@@ -3524,7 +5525,6 @@
       "scale.amount": 1.0,
       "rotate.angle": 0.0,
       "kaleid.nSides": 1,
-      "chromaShift.amount": 0.0,
       "posterize.bins": 64,
       "posterize.gamma": 1.0
     },
@@ -3557,11 +5557,23 @@
   },
   "kaleidResonance": {
     "title": "Draft / Kaleid Resonance",
-    "tagline": "Geometric kaleidoscope driven by three independent LFOs — rotation sweeps, hue cycles, and modulation depth breathe in overlapping rhythms.",
+    "tagline": "Geometric kaleidoscope driven by three independent LFOs \u2014 rotation sweeps, hue cycles, and modulation depth breathe in overlapping rhythms.",
     "videoIntent": "Best on graphic shapes, architecture, or any clip with clear bilateral symmetry that the kaleid can split and re-fold into a living mandala.",
     "audioIntent": "Granulator should shimmer in a steady mid-density cloud, the feedback delay cycling in the same slow orbital rhythm as the rotating geometry.",
-    "operatorFocus": ["kaleid", "rotate", "modulateRotate", "hue", "chromaShift"],
-    "chain": ["kaleid", "rotate", "modulateRotate", "hue", "chromaShift", "contrast", "saturate"],
+    "operatorFocus": [
+      "kaleid",
+      "rotate",
+      "modulateRotate",
+      "hue",
+      "chromaShift"
+    ],
+    "chain": [
+      "kaleid",
+      "rotate",
+      "modulateRotate",
+      "grade",
+      "glitch"
+    ],
     "render": {
       "look": "silver",
       "quality": "standard",
@@ -3578,12 +5590,13 @@
       "rotate.angle": 0.04,
       "modulateRotate.multiple": 0.18,
       "modulateRotate.offset": 0.0,
-      "hue.amount": 0.22,
-      "chromaShift.amount": 0.007,
-      "contrast.amount": 1.22,
-      "saturate.amount": 1.16,
       "scale.amount": 1.002,
-      "modulate.amount": 0.05
+      "modulate.amount": 0.05,
+      "grade.hue": 0.22,
+      "grade.contrast": 1.22,
+      "grade.saturate": 1.16,
+      "glitch.type": 1,
+      "glitch.amount": 0.0875
     },
     "automation": {
       "rotate.angle": {
@@ -3611,9 +5624,21 @@
         "label": "Orbit",
         "default": 0.5,
         "targets": [
-          { "key": "kaleid.nSides", "min": 4, "max": 12 },
-          { "key": "modulateRotate.multiple", "min": 0.04, "max": 0.52 },
-          { "key": "feedback.feedback", "min": 0.5, "max": 0.84 }
+          {
+            "key": "kaleid.nSides",
+            "min": 4,
+            "max": 12
+          },
+          {
+            "key": "modulateRotate.multiple",
+            "min": 0.04,
+            "max": 0.52
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.5,
+            "max": 0.84
+          }
         ]
       },
       {
@@ -3621,9 +5646,21 @@
         "label": "Colour",
         "default": 0.44,
         "targets": [
-          { "key": "hue.amount", "min": 0.0, "max": 0.5 },
-          { "key": "chromaShift.amount", "min": 0.001, "max": 0.016 },
-          { "key": "saturate.amount", "min": 1.0, "max": 1.5 }
+          {
+            "key": "hue.amount",
+            "min": 0.0,
+            "max": 0.5
+          },
+          {
+            "key": "chromaShift.amount",
+            "min": 0.001,
+            "max": 0.016
+          },
+          {
+            "key": "saturate.amount",
+            "min": 1.0,
+            "max": 1.5
+          }
         ]
       },
       {
@@ -3631,9 +5668,21 @@
         "label": "Grain",
         "default": 0.62,
         "targets": [
-          { "key": "audio.granulator.density", "min": 16, "max": 38 },
-          { "key": "audio.granulator.voiceCount", "min": 14, "max": 28 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.14, "max": 0.44 }
+          {
+            "key": "audio.granulator.density",
+            "min": 16,
+            "max": 38
+          },
+          {
+            "key": "audio.granulator.voiceCount",
+            "min": 14,
+            "max": 28
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.14,
+            "max": 0.44
+          }
         ]
       }
     ],
@@ -3666,11 +5715,22 @@
   },
   "turbulentBloom": {
     "title": "Draft / Turbulent Bloom",
-    "tagline": "Curl-noise vector field and vortex feed a flow smear while video motion and edge detection drive glow and chroma — the visual field breathes with the audio.",
-    "videoIntent": "Best on footage with continuous motion: water, fire, fabric, crowd — anything where the flow field can latch onto real movement and amplify it.",
-    "audioIntent": "Granulator runs dense and warm with high pitch jitter so the cloud reads as texture rather than pitched harmony — audio fog moving with the visual field.",
-    "operatorFocus": ["curlNoise", "vortex", "flow", "structure"],
-    "chain": ["curlNoise", "vortex", "flow", "structure", "saturate", "contrast"],
+    "tagline": "Curl-noise vector field and vortex feed a flow smear while video motion and edge detection drive glow and chroma \u2014 the visual field breathes with the audio.",
+    "videoIntent": "Best on footage with continuous motion: water, fire, fabric, crowd \u2014 anything where the flow field can latch onto real movement and amplify it.",
+    "audioIntent": "Granulator runs dense and warm with high pitch jitter so the cloud reads as texture rather than pitched harmony \u2014 audio fog moving with the visual field.",
+    "operatorFocus": [
+      "curlNoise",
+      "vortex",
+      "flow",
+      "structure"
+    ],
+    "chain": [
+      "curlNoise",
+      "vortex",
+      "flow",
+      "structure",
+      "grade"
+    ],
     "render": {
       "look": "cine",
       "quality": "cinema",
@@ -3704,12 +5764,12 @@
       "structure.displace": 0.32,
       "structure.memory": 0.38,
       "structure.glow": 0.42,
-      "saturate.amount": 1.28,
-      "contrast.amount": 1.18,
       "scale.amount": 1.003,
       "rotate.angle": 0.0,
       "kaleid.nSides": 1,
-      "modulate.amount": 0.06
+      "modulate.amount": 0.06,
+      "grade.saturate": 1.28,
+      "grade.contrast": 1.18
     },
     "automation": {
       "curlNoise.speed": {
@@ -3743,9 +5803,21 @@
         "label": "Storm",
         "default": 0.52,
         "targets": [
-          { "key": "curlNoise.strength", "min": 0.08, "max": 0.48 },
-          { "key": "vortex.strength", "min": 0.1, "max": 0.44 },
-          { "key": "flow.strength", "min": 0.2, "max": 0.72 }
+          {
+            "key": "curlNoise.strength",
+            "min": 0.08,
+            "max": 0.48
+          },
+          {
+            "key": "vortex.strength",
+            "min": 0.1,
+            "max": 0.44
+          },
+          {
+            "key": "flow.strength",
+            "min": 0.2,
+            "max": 0.72
+          }
         ]
       },
       {
@@ -3753,9 +5825,21 @@
         "label": "Bloom",
         "default": 0.58,
         "targets": [
-          { "key": "structure.glow", "min": 0.14, "max": 0.78 },
-          { "key": "flow.chroma", "min": 0.08, "max": 0.48 },
-          { "key": "saturate.amount", "min": 1.0, "max": 1.5 }
+          {
+            "key": "structure.glow",
+            "min": 0.14,
+            "max": 0.78
+          },
+          {
+            "key": "flow.chroma",
+            "min": 0.08,
+            "max": 0.48
+          },
+          {
+            "key": "saturate.amount",
+            "min": 1.0,
+            "max": 1.5
+          }
         ]
       },
       {
@@ -3763,9 +5847,21 @@
         "label": "Grain",
         "default": 0.6,
         "targets": [
-          { "key": "audio.granulator.density", "min": 22, "max": 50 },
-          { "key": "audio.granulator.pitchJitter", "min": 3, "max": 14 },
-          { "key": "feedback.feedback", "min": 0.52, "max": 0.84 }
+          {
+            "key": "audio.granulator.density",
+            "min": 22,
+            "max": 50
+          },
+          {
+            "key": "audio.granulator.pitchJitter",
+            "min": 3,
+            "max": 14
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.52,
+            "max": 0.84
+          }
         ]
       }
     ],
@@ -3798,11 +5894,23 @@
   },
   "chromaticShear": {
     "title": "Draft / Chromatic Shear",
-    "tagline": "Two independent LFOs sweep the slit-scan position while a third slowly drags the datamosh drift — spectral tearing with a sparse, long-grained audio shadow.",
-    "videoIntent": "Best on footage with clear directional motion — the slit scan turns flow into visible time-smear while datamosh holds echo chunks between cuts.",
+    "tagline": "Two independent LFOs sweep the slit-scan position while a third slowly drags the datamosh drift \u2014 spectral tearing with a sparse, long-grained audio shadow.",
+    "videoIntent": "Best on footage with clear directional motion \u2014 the slit scan turns flow into visible time-smear while datamosh holds echo chunks between cuts.",
     "audioIntent": "Sparse classic-mode granulator with long grain durations and high reverse probability so each audio event feels like a captured fragment rather than a continuous tone.",
-    "operatorFocus": ["slitScan", "dataMosh", "pixelSort", "chromaShift"],
-    "chain": ["slitScan", "dataMosh", "pixelSort", "chromaShift", "contrast", "posterize"],
+    "operatorFocus": [
+      "slitScan",
+      "dataMosh",
+      "pixelSort",
+      "chromaShift"
+    ],
+    "chain": [
+      "slitScan",
+      "dataMosh",
+      "pixelSort",
+      "glitch",
+      "grade",
+      "posterize"
+    ],
     "render": {
       "look": "bleach",
       "quality": "standard",
@@ -3827,13 +5935,14 @@
       "pixelSort.threshold": 0.28,
       "pixelSort.direction": 0.0,
       "pixelSort.speed": 0.35,
-      "chromaShift.amount": 0.01,
-      "contrast.amount": 1.26,
       "posterize.bins": 32,
       "posterize.gamma": 0.96,
       "scale.amount": 1.001,
       "rotate.angle": 0.0,
-      "kaleid.nSides": 1
+      "kaleid.nSides": 1,
+      "grade.contrast": 1.26,
+      "glitch.type": 1,
+      "glitch.amount": 0.125
     },
     "automation": {
       "slitScan.slitX": {
@@ -3867,9 +5976,21 @@
         "label": "Slice",
         "default": 0.55,
         "targets": [
-          { "key": "slitScan.scanSpeed", "min": 0.2, "max": 1.0 },
-          { "key": "dataMosh.mix", "min": 0.3, "max": 0.95 },
-          { "key": "pixelSort.threshold", "min": 0.1, "max": 0.55 }
+          {
+            "key": "slitScan.scanSpeed",
+            "min": 0.2,
+            "max": 1.0
+          },
+          {
+            "key": "dataMosh.mix",
+            "min": 0.3,
+            "max": 0.95
+          },
+          {
+            "key": "pixelSort.threshold",
+            "min": 0.1,
+            "max": 0.55
+          }
         ]
       },
       {
@@ -3877,9 +5998,21 @@
         "label": "Degrade",
         "default": 0.42,
         "targets": [
-          { "key": "dataMosh.decay", "min": 0.02, "max": 0.12 },
-          { "key": "dataMosh.chunk", "min": 0.3, "max": 0.78 },
-          { "key": "feedback.feedback", "min": 0.68, "max": 0.94 }
+          {
+            "key": "dataMosh.decay",
+            "min": 0.02,
+            "max": 0.12
+          },
+          {
+            "key": "dataMosh.chunk",
+            "min": 0.3,
+            "max": 0.78
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.68,
+            "max": 0.94
+          }
         ]
       },
       {
@@ -3887,9 +6020,21 @@
         "label": "Spectral",
         "default": 0.48,
         "targets": [
-          { "key": "chromaShift.amount", "min": 0.002, "max": 0.022 },
-          { "key": "posterize.bins", "min": 16, "max": 48 },
-          { "key": "audio.granulator.pitchJitter", "min": 1, "max": 8 }
+          {
+            "key": "chromaShift.amount",
+            "min": 0.002,
+            "max": 0.022
+          },
+          {
+            "key": "posterize.bins",
+            "min": 16,
+            "max": 48
+          },
+          {
+            "key": "audio.granulator.pitchJitter",
+            "min": 1,
+            "max": 8
+          }
         ]
       }
     ],
@@ -3922,31 +6067,83 @@
   },
   "orbitalResonance": {
     "title": "Draft / Orbital Resonance",
-    "tagline": "A routed curl-noise field on bus 1 modulates the kaleidoscope rotation on bus 0 — two independent LFOs set orbital rhythms while video motion colours the loop.",
+    "tagline": "A routed curl-noise field on bus 1 modulates the kaleidoscope rotation on bus 0 \u2014 two independent LFOs set orbital rhythms while video motion colours the loop.",
     "videoIntent": "Best on symmetrical or slow-evolving footage: faces, architecture, clouds. The routed field gives the kaleid a living turbulent modulator instead of a fixed spin.",
-    "audioIntent": "Cloud granulator at medium density with the feedback delay cross-fed at π/4 so stereo rotation tracks the orbital geometry on screen.",
-    "operatorFocus": ["kaleid", "modulateRotateRouted", "curlNoise", "colorama"],
+    "audioIntent": "Cloud granulator at medium density with the feedback delay cross-fed at \u03c0/4 so stereo rotation tracks the orbital geometry on screen.",
+    "operatorFocus": [
+      "kaleid",
+      "modulateRotateRouted",
+      "curlNoise",
+      "colorama"
+    ],
     "chain": [
       "kaleid",
       "rotate",
-      "hue",
+      "grade",
       "curlNoise",
-      "saturate",
-      "modulateRotateRouted",
-      "colorama",
-      "contrast"
+      "modulateRotate",
+      "colorama"
     ],
     "graph": {
       "monitorBus": 0,
       "nodes": [
-        { "target": "kaleid#0", "bus": 0, "inputs": ["source"] },
-        { "target": "rotate#0", "bus": 0, "inputs": ["kaleid#0"] },
-        { "target": "hue#0", "bus": 0, "inputs": ["rotate#0"] },
-        { "target": "curlNoise#0", "bus": 1, "inputs": ["source"] },
-        { "target": "saturate#0", "bus": 1, "inputs": ["curlNoise#0"] },
-        { "target": "modulateRotateRouted#0", "bus": 0, "inputs": ["hue#0", "saturate#0"] },
-        { "target": "colorama#0", "bus": 0, "inputs": ["modulateRotateRouted#0"] },
-        { "target": "contrast#0", "bus": 0, "inputs": ["colorama#0"] }
+        {
+          "target": "kaleid#0",
+          "bus": 0,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "rotate#0",
+          "bus": 0,
+          "inputs": [
+            "kaleid#0"
+          ]
+        },
+        {
+          "target": "hue#0",
+          "bus": 0,
+          "inputs": [
+            "rotate#0"
+          ]
+        },
+        {
+          "target": "curlNoise#0",
+          "bus": 1,
+          "inputs": [
+            "source"
+          ]
+        },
+        {
+          "target": "saturate#0",
+          "bus": 1,
+          "inputs": [
+            "curlNoise#0"
+          ]
+        },
+        {
+          "target": "modulateRotateRouted#0",
+          "bus": 0,
+          "inputs": [
+            "hue#0",
+            "saturate#0"
+          ]
+        },
+        {
+          "target": "colorama#0",
+          "bus": 0,
+          "inputs": [
+            "modulateRotateRouted#0"
+          ]
+        },
+        {
+          "target": "contrast#0",
+          "bus": 0,
+          "inputs": [
+            "colorama#0"
+          ]
+        }
       ]
     },
     "render": {
@@ -3963,19 +6160,20 @@
       "kaleid.drive": 0.32,
       "kaleid.mix": 0.88,
       "rotate.angle": 0.06,
-      "hue.amount": 0.2,
       "curlNoise.mix": 1.0,
       "curlNoise.strength": 0.28,
       "curlNoise.scale": 2.4,
       "curlNoise.speed": 0.42,
       "curlNoise.warp": 0.55,
-      "saturate.amount": 1.24,
-      "modulateRotateRouted.multiple": 0.22,
-      "modulateRotateRouted.offset": 0.0,
+      "modulateRotate.multiple": 0.22,
+      "modulateRotate.source": 1,
+      "modulateRotate.offset": 0.0,
       "colorama.amount": 0.38,
-      "contrast.amount": 1.2,
       "scale.amount": 1.002,
-      "modulate.amount": 0.04
+      "modulate.amount": 0.04,
+      "grade.hue": 0.2,
+      "grade.saturate": 1.24,
+      "grade.contrast": 1.2
     },
     "automation": {
       "rotate.angle": {
@@ -4009,9 +6207,21 @@
         "label": "Orbit",
         "default": 0.5,
         "targets": [
-          { "key": "kaleid.nSides", "min": 4, "max": 10 },
-          { "key": "modulateRotateRouted.multiple", "min": 0.08, "max": 0.48 },
-          { "key": "feedback.feedback", "min": 0.52, "max": 0.84 }
+          {
+            "key": "kaleid.nSides",
+            "min": 4,
+            "max": 10
+          },
+          {
+            "key": "modulateRotateRouted.multiple",
+            "min": 0.08,
+            "max": 0.48
+          },
+          {
+            "key": "feedback.feedback",
+            "min": 0.52,
+            "max": 0.84
+          }
         ]
       },
       {
@@ -4019,9 +6229,21 @@
         "label": "Colour",
         "default": 0.46,
         "targets": [
-          { "key": "colorama.amount", "min": 0.1, "max": 0.7 },
-          { "key": "hue.amount", "min": 0.0, "max": 0.44 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.12, "max": 0.38 }
+          {
+            "key": "colorama.amount",
+            "min": 0.1,
+            "max": 0.7
+          },
+          {
+            "key": "hue.amount",
+            "min": 0.0,
+            "max": 0.44
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.12,
+            "max": 0.38
+          }
         ]
       },
       {
@@ -4029,9 +6251,21 @@
         "label": "Field",
         "default": 0.52,
         "targets": [
-          { "key": "curlNoise.strength", "min": 0.1, "max": 0.52 },
-          { "key": "curlNoise.warp", "min": 0.2, "max": 0.85 },
-          { "key": "audio.granulator.density", "min": 16, "max": 36 }
+          {
+            "key": "curlNoise.strength",
+            "min": 0.1,
+            "max": 0.52
+          },
+          {
+            "key": "curlNoise.warp",
+            "min": 0.2,
+            "max": 0.85
+          },
+          {
+            "key": "audio.granulator.density",
+            "min": 16,
+            "max": 36
+          }
         ]
       }
     ],
@@ -4073,7 +6307,7 @@
       "retroDisplay"
     ],
     "chain": [
-      "signalDamage",
+      "glitch",
       "filmGrade",
       "retroDisplay"
     ],
@@ -4086,14 +6320,6 @@
     },
     "values": {
       "clock.rate": 0.32,
-      "signalDamage.mix": 1.0,
-      "signalDamage.displace": 0.42,
-      "signalDamage.block": 92,
-      "signalDamage.damage": 0.58,
-      "signalDamage.quantize": 0.46,
-      "signalDamage.tint": 0.62,
-      "signalDamage.overlay": 0.38,
-      "signalDamage.jitter": 0.32,
       "filmGrade.mix": 1.0,
       "filmGrade.exposure": 0.12,
       "filmGrade.gamma": 1.14,
@@ -4112,7 +6338,16 @@
       "retroDisplay.bleed": 0.22,
       "retroDisplay.phosphor": 0.1,
       "retroDisplay.noise": 0.16,
-      "retroDisplay.roll": 0.0
+      "retroDisplay.roll": 0.0,
+      "glitch.amount": 1.0,
+      "glitch.displace": 0.42,
+      "glitch.block": 92,
+      "glitch.damage": 0.58,
+      "glitch.quantize": 0.46,
+      "glitch.tint": 0.62,
+      "glitch.overlay": 0.38,
+      "glitch.jitter": 0.32,
+      "glitch.type": 0
     },
     "automation": {
       "signalDamage.damage": {
@@ -4146,9 +6381,21 @@
         "label": "Damage",
         "default": 0.56,
         "targets": [
-          { "key": "signalDamage.damage", "min": 0.32, "max": 0.82 },
-          { "key": "signalDamage.quantize", "min": 0.18, "max": 0.78 },
-          { "key": "retroDisplay.noise", "min": 0.08, "max": 0.24 }
+          {
+            "key": "signalDamage.damage",
+            "min": 0.32,
+            "max": 0.82
+          },
+          {
+            "key": "signalDamage.quantize",
+            "min": 0.18,
+            "max": 0.78
+          },
+          {
+            "key": "retroDisplay.noise",
+            "min": 0.08,
+            "max": 0.24
+          }
         ]
       },
       {
@@ -4156,9 +6403,21 @@
         "label": "Signal",
         "default": 0.48,
         "targets": [
-          { "key": "signalDamage.displace", "min": 0.18, "max": 0.7 },
-          { "key": "signalDamage.block", "min": 144, "max": 56 },
-          { "key": "retroDisplay.scanlines", "min": 0.12, "max": 0.48 }
+          {
+            "key": "signalDamage.displace",
+            "min": 0.18,
+            "max": 0.7
+          },
+          {
+            "key": "signalDamage.block",
+            "min": 144,
+            "max": 56
+          },
+          {
+            "key": "retroDisplay.scanlines",
+            "min": 0.12,
+            "max": 0.48
+          }
         ]
       },
       {
@@ -4166,9 +6425,21 @@
         "label": "Finish",
         "default": 0.5,
         "targets": [
-          { "key": "filmGrade.vignette", "min": 0.18, "max": 0.62 },
-          { "key": "filmGrade.shoulder", "min": 0.08, "max": 0.34 },
-          { "key": "audio.feedbackDelay.mix", "min": 0.1, "max": 0.28 }
+          {
+            "key": "filmGrade.vignette",
+            "min": 0.18,
+            "max": 0.62
+          },
+          {
+            "key": "filmGrade.shoulder",
+            "min": 0.08,
+            "max": 0.34
+          },
+          {
+            "key": "audio.feedbackDelay.mix",
+            "min": 0.1,
+            "max": 0.28
+          }
         ]
       }
     ],

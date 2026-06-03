@@ -1,6 +1,6 @@
 {
   "id": "audit-channel-isolate",
-  "title": "Channel selectors (r/g/b/a) isolate on decoded media",
+  "title": "Channel selector (r/g/b/a modes) isolates on decoded media",
   "source": {
     "kind": "video",
     "fixture": "qa/fixtures/ci-smoke.mp4"
@@ -24,23 +24,30 @@
     "kind": "isolate",
     "path": "operator-regression",
     "expectedVideo": [
-      "routing r/g/b to its own bus and previewing that bus should show a single greyscale channel from the decoded fixture (red bar → bright on r, dim on g/b, etc.)",
-      "routing a to its own bus should show the alpha-or-luma fallback brightness (the channel.frag uses max(c.a, luma(c.rgb)) so a fully-opaque clip reads as luma)",
-      "no NaN or black frames at any selector"
+      "setting channel.mode to 0/1/2/3 and previewing bus 1 should show a single greyscale channel from the decoded fixture (red bar → bright on r, dim on g/b, etc.)",
+      "mode=3 (alpha) on a fully-opaque clip reads as luma via max(c.a, luma(c.rgb)) in channel.frag",
+      "no NaN or black frames at any mode"
     ],
     "expectedAudio": [
-      "channel selectors are visual-only; the audio mix is unchanged across r/g/b/a routings"
+      "channel selector is visual-only; the audio mix is unchanged across mode changes"
     ],
     "manualChecks": [
-      "Do r/g/b each produce a distinct greyscale image consistent with the fixture's colour bars?",
-      "Does the alpha branch (no real alpha source) read as a luma proxy rather than collapsing to black?",
-      "Does routing each selector to a non-default bus leave the rest of the chain unaffected?"
+      "Do modes 0/1/2 each produce a distinct greyscale image consistent with the fixture's colour bars?",
+      "Does mode 3 (alpha fallback) read as a luma proxy rather than collapsing to black?",
+      "Does routing channel to a non-default bus leave the rest of the chain unaffected?"
     ]
   },
   "steps": [
     {
+      "type": "set-operator-param",
+      "op": "channel",
+      "paramId": "mode",
+      "value": 0,
+      "screenshot": "channel-mode-r"
+    },
+    {
       "type": "set-node-bus",
-      "op": "r",
+      "op": "channel",
       "bus": 1,
       "screenshot": "channel-r-bus1"
     },
@@ -55,16 +62,11 @@
       "screenshot": "channel-r-hold"
     },
     {
-      "type": "set-node-bus",
-      "op": "r",
-      "bus": 0,
-      "screenshot": "channel-r-bus0"
-    },
-    {
-      "type": "set-node-bus",
-      "op": "g",
-      "bus": 1,
-      "screenshot": "channel-g-bus1"
+      "type": "set-operator-param",
+      "op": "channel",
+      "paramId": "mode",
+      "value": 1,
+      "screenshot": "channel-mode-g"
     },
     {
       "type": "wait",
@@ -72,16 +74,11 @@
       "screenshot": "channel-g-hold"
     },
     {
-      "type": "set-node-bus",
-      "op": "g",
-      "bus": 0,
-      "screenshot": "channel-g-bus0"
-    },
-    {
-      "type": "set-node-bus",
-      "op": "b",
-      "bus": 1,
-      "screenshot": "channel-b-bus1"
+      "type": "set-operator-param",
+      "op": "channel",
+      "paramId": "mode",
+      "value": 2,
+      "screenshot": "channel-mode-b"
     },
     {
       "type": "wait",
@@ -89,16 +86,11 @@
       "screenshot": "channel-b-hold"
     },
     {
-      "type": "set-node-bus",
-      "op": "b",
-      "bus": 0,
-      "screenshot": "channel-b-bus0"
-    },
-    {
-      "type": "set-node-bus",
-      "op": "a",
-      "bus": 1,
-      "screenshot": "channel-a-bus1"
+      "type": "set-operator-param",
+      "op": "channel",
+      "paramId": "mode",
+      "value": 3,
+      "screenshot": "channel-mode-a"
     },
     {
       "type": "wait",
@@ -106,10 +98,15 @@
       "screenshot": "channel-a-hold"
     },
     {
+      "type": "set-operator-param",
+      "op": "channel",
+      "paramId": "mode",
+      "value": 0
+    },
+    {
       "type": "set-node-bus",
-      "op": "a",
-      "bus": 0,
-      "screenshot": "channel-a-bus0"
+      "op": "channel",
+      "bus": 0
     },
     {
       "type": "set-monitor-bus",

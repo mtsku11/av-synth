@@ -1,0 +1,117 @@
+{
+  "id": "audit-extract-mode-sweep",
+  "title": "Extract (luma/thresh/invert) mode and amount sweep on osc source",
+  "source": {
+    "kind": "osc"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1200
+  },
+  "recording": {
+    "filename": "audit-extract-mode-sweep",
+    "tailMs": 600
+  },
+  "expectations": {
+    "sourceKind": "osc",
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"]
+  },
+  "audit": {
+    "family": "finish",
+    "operator": "extract",
+    "kind": "sweep",
+    "path": "operator-regression",
+    "expectedVideo": [
+      "mode=0 amount=1: luma key — bright pixels pass, dark pixels become transparent",
+      "mode=1 amount=1: hard binary threshold — image becomes black and white",
+      "mode=2 amount=1: colour invert — complement of original palette",
+      "amount=0 for any mode should be bypass/identity"
+    ],
+    "expectedAudio": [],
+    "manualChecks": [
+      "Does amount=0 restore the original image for each mode?",
+      "Does mode=0 flip=1 invert the key so dark areas pass?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "set-operator-param",
+      "op": "extract",
+      "paramId": "mode",
+      "value": 0
+    },
+    {
+      "type": "set-operator-param",
+      "op": "extract",
+      "paramId": "amount",
+      "value": 1.0,
+      "screenshot": "extract-luma-amount-1"
+    },
+    {
+      "type": "wait",
+      "ms": 250,
+      "screenshot": "extract-luma-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "extract",
+      "paramId": "amount",
+      "value": 0
+    },
+    {
+      "type": "set-operator-param",
+      "op": "extract",
+      "paramId": "mode",
+      "value": 1
+    },
+    {
+      "type": "set-operator-param",
+      "op": "extract",
+      "paramId": "amount",
+      "value": 1.0,
+      "screenshot": "extract-thresh-amount-1"
+    },
+    {
+      "type": "wait",
+      "ms": 250,
+      "screenshot": "extract-thresh-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "extract",
+      "paramId": "amount",
+      "value": 0
+    },
+    {
+      "type": "set-operator-param",
+      "op": "extract",
+      "paramId": "mode",
+      "value": 2
+    },
+    {
+      "type": "set-operator-param",
+      "op": "extract",
+      "paramId": "amount",
+      "value": 1.0,
+      "screenshot": "extract-invert-amount-1"
+    },
+    {
+      "type": "wait",
+      "ms": 250,
+      "screenshot": "extract-invert-hold"
+    },
+    {
+      "type": "set-operator-param",
+      "op": "extract",
+      "paramId": "amount",
+      "value": 0
+    },
+    {
+      "type": "set-operator-param",
+      "op": "extract",
+      "paramId": "mode",
+      "value": 0
+    }
+  ]
+}

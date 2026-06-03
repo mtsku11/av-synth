@@ -5,22 +5,35 @@ import {
   passthroughParam,
   PREV_FRAME_UNIFORM,
   PRIMARY_SOURCE_UNIFORM,
+  ROUTED_SOURCE_UNIFORM,
 } from './shared';
 
 export const modulateRepeatDef = createVideoOperatorDef({
   op: 'modulateRepeat',
   frag,
+  inputArity: 2,
   uniforms: [
     PRIMARY_SOURCE_UNIFORM,
     PREV_FRAME_UNIFORM,
+    ROUTED_SOURCE_UNIFORM,
+    paramUniform('u_source', 'source', 0),
     paramUniform('u_repeatX', 'repeatX', 1),
     paramUniform('u_repeatY', 'repeatY', 1),
     paramUniform('u_offsetX', 'offsetX', 0),
     paramUniform('u_offsetY', 'offsetY', 0),
   ],
-  paramOrder: ['repeatX', 'repeatY', 'offsetX', 'offsetY'],
-  defaults: { repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0 },
+  paramOrder: ['source', 'repeatX', 'repeatY', 'offsetX', 'offsetY'],
+  defaults: { source: 0, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0 },
   params: {
+    source: passthroughParam({
+      id: 'source',
+      label: 'source',
+      range: [0, 1],
+      default: 0,
+      curve: 'lin',
+      unit: 'norm',
+      hint: '0=prev frame self-modulates, 1=routed second input',
+    }),
     repeatX: passthroughParam({
       id: 'repeatX',
       label: 'repeatX',

@@ -6,6 +6,8 @@ out vec4 o_color;
 
 uniform sampler2D u_tex;
 uniform sampler2D u_prev_frame;
+uniform sampler2D u_tex_b;
+uniform float u_source; // 0=prev_frame, 1=routed u_tex_b
 uniform float u_amount;
 
 vec3 rotateHue(vec3 rgb, float radians) {
@@ -23,7 +25,7 @@ vec3 rotateHue(vec3 rgb, float radians) {
 
 void main() {
   vec4 c = texture(u_tex, v_uv);
-  float modSample = texture(u_prev_frame, v_uv).r * 2.0 - 1.0;
+  float modSample = mix(texture(u_prev_frame, v_uv), texture(u_tex_b, v_uv), u_source).r * 2.0 - 1.0;
   vec3 rgb = rotateHue(c.rgb, modSample * u_amount * 6.283185307179586);
   o_color = vec4(rgb, c.a);
 }

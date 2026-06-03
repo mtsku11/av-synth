@@ -17,6 +17,7 @@ import {
   paramUniform,
   passthroughParam,
   PRIMARY_SOURCE_UNIFORM,
+  ROUTED_SOURCE_UNIFORM,
   RATE_UNIFORM,
   TIME_UNIFORM,
 } from './shared';
@@ -24,15 +25,27 @@ import {
 export const modulateDef = createVideoOperatorDef({
   op: 'modulate',
   frag,
+  inputArity: 2,
   uniforms: [
     PRIMARY_SOURCE_UNIFORM,
+    ROUTED_SOURCE_UNIFORM,
+    paramUniform('u_source', 'source', 0),
     paramUniform('u_amount', 'amount', 0),
     TIME_UNIFORM,
     RATE_UNIFORM,
   ],
-  paramOrder: ['amount'],
-  defaults: { amount: 0 },
+  paramOrder: ['source', 'amount'],
+  defaults: { source: 0, amount: 0 },
   params: {
+    source: passthroughParam({
+      id: 'source',
+      label: 'source',
+      range: [0, 1],
+      default: 0,
+      curve: 'lin',
+      unit: 'norm',
+      hint: '0=internal oscillator, 1=routed second input',
+    }),
     amount: passthroughParam({
       id: 'amount',
       label: 'modulate',

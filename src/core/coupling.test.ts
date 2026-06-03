@@ -4,8 +4,8 @@ import { EMPTY_AUDIO_BANDS, EMPTY_VIDEO_FEATURES, evaluateVideoParams } from './
 import { createDefaultGlobalLfoBank } from './mod-bank';
 import type { OperatorInstance } from './operators';
 import { isNeutralInstance } from './operators';
-import { blendDef, layerDef, maskDef } from '../ops/blend';
-import { aDef, rDef } from '../ops/channel';
+import { compositeDef } from '../ops/composite';
+import { channelDef } from '../ops/channel';
 import { colorDef } from '../ops/color';
 import { grainDef } from '../ops/grain';
 import { kaleidDef } from '../ops/kaleid';
@@ -51,17 +51,21 @@ describe('evaluateVideoParams', () => {
     expect(evaluateVideoParams(colorDef.coupling, { r: 1.2, g: 0.8, b: 1.5, a: 0.9 }, ctx)).toEqual(
       { r: 1.2, g: 0.8, b: 1.5, a: 0.9 },
     );
-    expect(evaluateVideoParams(blendDef.coupling, { amount: 0.35 }, ctx)).toEqual({
-      amount: 0.35,
+    expect(evaluateVideoParams(compositeDef.coupling, { amount: 0.35 }, ctx)).toEqual({
       mode: 0,
+      amount: 0.35,
+      threshold: 0.5,
+      tolerance: 0.12,
+      invert: 0,
     });
     expect(
       evaluateVideoParams(sumDef.coupling, { amount: 0.42, r: 1.6, g: 0.2, a: 1.1 }, ctx),
     ).toEqual({ amount: 0.42, r: 1.6, g: 0.2, b: 1, a: 1.1 });
     expect(
-      evaluateVideoParams(maskDef.coupling, { amount: 0.8, threshold: 0.4, invert: 1 }, ctx),
-    ).toEqual({ amount: 0.8, threshold: 0.4, tolerance: 0.12, invert: 1 });
-    expect(evaluateVideoParams(layerDef.coupling, { amount: 0.5, tolerance: 0.2 }, ctx)).toEqual({
+      evaluateVideoParams(compositeDef.coupling, { amount: 0.8, mode: 7, threshold: 0.4, invert: 1 }, ctx),
+    ).toEqual({ mode: 7, amount: 0.8, threshold: 0.4, tolerance: 0.12, invert: 1 });
+    expect(evaluateVideoParams(compositeDef.coupling, { amount: 0.5, mode: 6, tolerance: 0.2 }, ctx)).toEqual({
+      mode: 6,
       amount: 0.5,
       threshold: 0.5,
       tolerance: 0.2,
@@ -108,31 +112,32 @@ describe('evaluateVideoParams', () => {
 
   it('keeps the modulate family params untouched on the video side', () => {
     expect(
-      evaluateVideoParams(modulateRotateDef.coupling, { multiple: 0.003, offset: -0.12 }, ctx),
-    ).toEqual({ multiple: 0.003, offset: -0.12 });
+      evaluateVideoParams(modulateRotateDef.coupling, { source: 0, multiple: 0.003, offset: -0.12 }, ctx),
+    ).toEqual({ source: 0, multiple: 0.003, offset: -0.12 });
     expect(
-      evaluateVideoParams(modulateScaleDef.coupling, { multiple: 0.4, offset: 1.1 }, ctx),
-    ).toEqual({ multiple: 0.4, offset: 1.1 });
+      evaluateVideoParams(modulateScaleDef.coupling, { source: 0, multiple: 0.4, offset: 1.1 }, ctx),
+    ).toEqual({ source: 0, multiple: 0.4, offset: 1.1 });
     expect(
-      evaluateVideoParams(modulatePixelateDef.coupling, { multiple: 80, offset: 320 }, ctx),
-    ).toEqual({ multiple: 80, offset: 320 });
+      evaluateVideoParams(modulatePixelateDef.coupling, { source: 0, multiple: 80, offset: 320 }, ctx),
+    ).toEqual({ source: 0, multiple: 80, offset: 320 });
     expect(
       evaluateVideoParams(
         modulateRepeatDef.coupling,
-        { repeatX: 4, repeatY: 6, offsetX: 0.2, offsetY: 0.7 },
+        { source: 0, repeatX: 4, repeatY: 6, offsetX: 0.2, offsetY: 0.7 },
         ctx,
       ),
-    ).toEqual({ repeatX: 4, repeatY: 6, offsetX: 0.2, offsetY: 0.7 });
+    ).toEqual({ source: 0, repeatX: 4, repeatY: 6, offsetX: 0.2, offsetY: 0.7 });
     expect(
       evaluateVideoParams(modulateScrollXDef.coupling, { amount: 0.4, speed: -1.2 }, ctx),
     ).toEqual({ amount: 0.4, speed: -1.2 });
     expect(
-      evaluateVideoParams(modulateScrollYDef.coupling, { amount: 0.4, speed: -1.2 }, ctx),
-    ).toEqual({ amount: 0.4, speed: -1.2 });
+      evaluateVideoParams(modulateScrollYDef.coupling, { source: 0, amount: 0.4, speed: -1.2 }, ctx),
+    ).toEqual({ source: 0, amount: 0.4, speed: -1.2 });
     expect(evaluateVideoParams(modulateKaleidDef.coupling, { nSides: 9 }, ctx)).toEqual({
       nSides: 9,
     });
-    expect(evaluateVideoParams(modulateHueDef.coupling, { amount: -0.65 }, ctx)).toEqual({
+    expect(evaluateVideoParams(modulateHueDef.coupling, { source: 0, amount: -0.65 }, ctx)).toEqual({
+      source: 0,
       amount: -0.65,
     });
     expect(
@@ -168,25 +173,25 @@ describe('neutral instances', () => {
     expect(isNeutralInstance(neutral)).toBe(true);
   });
 
-  it('treats blend at amount 0 as neutral', () => {
+  it('treats composite at amount 0 as neutral', () => {
     const neutral = {
-      def: blendDef,
-      params: { amount: 0 },
+      def: compositeDef,
+      params: { mode: 0, amount: 0, threshold: 0.5, tolerance: 0.12, invert: 0 },
       lfoAssignments: {},
     } as unknown as OperatorInstance;
 
     expect(isNeutralInstance(neutral)).toBe(true);
   });
 
-  it('treats paramless swizzle nodes as active transforms', () => {
+  it('treats channel as always active (neutralDefault: false)', () => {
     const red = {
-      def: rDef,
-      params: {},
+      def: channelDef,
+      params: { mode: 0 },
       lfoAssignments: {},
     } as unknown as OperatorInstance;
     const alpha = {
-      def: aDef,
-      params: {},
+      def: channelDef,
+      params: { mode: 3 },
       lfoAssignments: {},
     } as unknown as OperatorInstance;
 
