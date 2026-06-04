@@ -85,6 +85,7 @@ describe('operator UI metadata', () => {
   it('groups product-surface operators into stable user-facing families', () => {
     expect(listOperatorFamilies()).toEqual([
       'Motion',
+      'Modulate',
       'Color',
       'Texture',
       'Feedback',
@@ -95,7 +96,7 @@ describe('operator UI metadata', () => {
     expect(getOperatorUiMeta('rotate').family).toBe('Motion');
     expect(getOperatorUiMeta('extract').family).toBe('Finish');
     expect(getOperatorUiMeta('grain').family).toBe('Audio Character');
-    expect(getOperatorUiMeta('modulateDisplace').family).toBe('Blend/Composite');
+    expect(getOperatorUiMeta('modulateDisplace').family).toBe('Modulate');
     expect(getOperatorUiMeta('channel').family).toBe('Finish');
     expect(getOperatorUiMeta('sum').family).toBe('Finish');
     expect(getOperatorUiMeta('warp').family).toBe('Feedback');

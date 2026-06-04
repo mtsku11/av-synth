@@ -150,6 +150,7 @@ export interface OperatorDef {
 
 export type OperatorFamily =
   | 'Motion'
+  | 'Modulate'
   | 'Color'
   | 'Texture'
   | 'Feedback'
@@ -177,6 +178,7 @@ const defs = new Map<string, OperatorDef>();
 
 const OPERATOR_FAMILY_ORDER: readonly OperatorFamily[] = [
   'Motion',
+  'Modulate',
   'Color',
   'Texture',
   'Feedback',
@@ -375,63 +377,63 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     coreParams: ['mix', 'size', 'density', 'spray', 'pitch'],
   },
   modulate: {
-    family: 'Feedback',
-    blurb: 'UV warp from internal oscillator or routed second input',
-    intents: ['feedback', 'video texture'],
+    family: 'Modulate',
+    blurb: 'UV warp driven by an internal oscillator or a routed second source',
+    intents: ['modulate', 'video texture', 'motion'],
     coreParams: ['source', 'amount'],
   },
   modulateDisplace: {
-    family: 'Blend/Composite',
-    blurb: 'displace one branch with another routed modulator',
-    intents: ['composite', 'video texture', 'audio-reactive'],
+    family: 'Modulate',
+    blurb: 'displace one branch\'s UVs using colour channels of a second source',
+    intents: ['modulate', 'video texture', 'motion'],
     coreParams: ['amount', 'bias'],
   },
   modulateRotate: {
-    family: 'Feedback',
-    blurb: 'rotational drift from prev frame or routed second input',
-    intents: ['feedback', 'motion'],
+    family: 'Modulate',
+    blurb: 'per-pixel rotation angle driven by a second source',
+    intents: ['modulate', 'motion'],
     coreParams: ['source', 'multiple', 'offset'],
   },
   modulateScale: {
-    family: 'Feedback',
-    blurb: 'zoom from prev frame or routed second input',
-    intents: ['feedback', 'motion'],
+    family: 'Modulate',
+    blurb: 'per-pixel zoom driven by a second source',
+    intents: ['modulate', 'motion'],
     coreParams: ['source', 'multiple', 'offset'],
   },
   modulatePixelate: {
-    family: 'Feedback',
-    blurb: 'block resample from prev frame or routed second input',
-    intents: ['feedback', 'video texture'],
+    family: 'Modulate',
+    blurb: 'block size driven by a second source',
+    intents: ['modulate', 'video texture'],
     coreParams: ['source', 'multiple', 'offset'],
   },
   modulateRepeat: {
-    family: 'Feedback',
-    blurb: 'tile density from prev frame or routed second input',
-    intents: ['feedback', 'video texture'],
+    family: 'Modulate',
+    blurb: 'tile density and offset driven by a second source',
+    intents: ['modulate', 'video texture'],
     coreParams: ['source', 'repeatX', 'repeatY', 'offsetX', 'offsetY'],
   },
   modulateScrollX: {
-    family: 'Feedback',
-    blurb: 'horizontal drift with self-driven phase offset',
-    intents: ['feedback', 'motion'],
+    family: 'Modulate',
+    blurb: 'horizontal scroll amount driven by a second source',
+    intents: ['modulate', 'motion'],
     coreParams: ['amount', 'speed'],
   },
   modulateScrollY: {
-    family: 'Feedback',
-    blurb: 'vertical drift from prev frame or routed second input',
-    intents: ['feedback', 'motion'],
+    family: 'Modulate',
+    blurb: 'vertical scroll amount driven by a second source',
+    intents: ['modulate', 'motion'],
     coreParams: ['source', 'amount', 'speed'],
   },
   modulateKaleid: {
-    family: 'Feedback',
-    blurb: 'self-driven reflective folding',
-    intents: ['feedback', 'video texture'],
+    family: 'Modulate',
+    blurb: 'kaleid segment count driven by a second source',
+    intents: ['modulate', 'video texture'],
     coreParams: ['nSides'],
   },
   modulateHue: {
-    family: 'Feedback',
-    blurb: 'hue rotation from prev frame or routed second input',
-    intents: ['feedback', 'finishing'],
+    family: 'Modulate',
+    blurb: 'per-pixel hue rotation driven by a second source',
+    intents: ['modulate', 'color'],
     coreParams: ['source', 'amount'],
   },
   selfMod: {
