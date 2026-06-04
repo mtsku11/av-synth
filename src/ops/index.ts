@@ -2,7 +2,6 @@
 
 import { registerOp } from '../core/operators';
 import { feedbackDef } from './feedback';
-import { timeDisplaceDef } from './timeDisplace';
 import { slitScanDef } from './slitScan';
 import { glyphRenderDef } from './glyphRender';
 import { glyphMotionDef } from './glyphMotion';
@@ -66,7 +65,6 @@ export function registerAllOps(): void {
   if (registered) return;
   registered = true;
   registerOp(feedbackDef);
-  registerOp(timeDisplaceDef);
   registerOp(slitScanDef);
   registerOp(glyphRenderDef);
   registerOp(glyphMotionDef);
@@ -132,7 +130,6 @@ export function registerAllOps(): void {
 // then pixel quantisation) so each subsequent op sees the post-warped grid.
 export const DEFAULT_CHAIN: readonly string[] = [
   'feedback',
-  'timeDisplace',
   'slitScan',
   'glyphRender',
   'glyphMotion',

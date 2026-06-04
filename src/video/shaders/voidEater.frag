@@ -1,151 +1,127 @@
 #version 300 es
 precision highp float;
 
-in vec2 v_uv;
-out vec4 o_color;
+// voidEater — Flockaroo-style fluid advection with pixel-block quantization
+// and a forced spiral vortex drain.
+//
+// Two ownedState FBOs (MRT):
+//   layout(location=0) → dye buffer  (ownedState,  bindAsPrevFrame, TEXTURE1)
+//   layout(location=1) → velocity    (ownedState2, TEXTURE7) — rg=[0,1], 0.5=rest
+//
+// Frame sequence:
+//   1. Flockaroo multi-scale curl from prev velocity.
+//   2. Advect + rotate velocity; apply forced spiral vortex at (cx, cy).
+//   3. Back-trace dye through velocity at pixel-quantized coordinates.
+//   4. Decay dye (trail), inject fresh source.
 
-uniform sampler2D u_tex;
-uniform sampler2D u_owned_state;
-uniform vec2 u_resolution;
-uniform float u_state_initialized;
-uniform float u_time;
+in vec2 v_uv;
+layout(location = 0) out vec4 o_dye;
+layout(location = 1) out vec4 o_vel;
+
+uniform sampler2D u_tex;      // TEXTURE0: live video
+uniform sampler2D u_prev_dye; // TEXTURE1: previous dye (ownedState, bindAsPrevFrame)
+uniform sampler2D u_prev_vel; // TEXTURE7: previous velocity (ownedState2)
+
 uniform float u_mix;
-uniform float u_feedback;
-uniform float u_edge_gain;
-uniform float u_threshold;
-uniform float u_growth;
-uniform float u_spread;
-uniform float u_decay;
-uniform float u_ink;
-uniform float u_twirl;
-uniform float u_radius;
-uniform vec2 u_center;
-uniform float u_pixel_snap;
-uniform float u_hardness;
+uniform float u_twirl;      // spiral rotation strength, signed (+ = CCW)
+uniform float u_sink;       // inward radial pull strength [0, 1]
+uniform float u_pixel_size; // quantization block size in pixels [1, 64]
+uniform float u_inject;     // fresh video injection rate [0, 1]
+uniform float u_trail;      // dye persistence [0,1] → actual [0.82, 1.0]
+uniform float u_scale;      // advection spatial scale [0.5, 4]
+uniform float u_radius;     // vortex envelope radius [0.05, 1.5]
+uniform vec2  u_center;     // vortex center in UV coords
+uniform vec2  u_resolution; // FBO pixel dimensions for quantization
 
 const float TAU = 6.28318530718;
-
-float luma(vec3 c) {
-  return dot(c, vec3(0.2126, 0.7152, 0.0722));
-}
+#define ROT_NUM 3
+// 120° CCW rotation matrix (column-major)
+const mat2 ROT_M = mat2(-0.5, 0.866025, -0.866025, -0.5);
 
 float hash21(vec2 p) {
-  p = fract(p * vec2(234.34, 435.45));
-  p += dot(p, p + 34.23);
-  return fract(p.x * p.y);
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
-vec2 warp_uv(vec2 uv) {
+// Flockaroo: mean signed curl sampled at ROT_NUM equally-spaced points on a
+// circle of radius sc. Returns the local rotation rate of the velocity field.
+float getRot(vec2 uv, float sc) {
+  float startAng = hash21(uv) * TAU / float(ROT_NUM);
+  vec2 p = vec2(cos(startAng), sin(startAng)) * sc;
+  float rot = 0.0;
+  for (int i = 0; i < ROT_NUM; i++) {
+    vec2 v = texture(u_prev_vel, fract(uv + p)).rg - vec2(0.5);
+    rot += (v.x * p.y - v.y * p.x) / max(dot(p, p), 1e-6);
+    p = ROT_M * p;
+  }
+  return rot / float(ROT_NUM);
+}
+
+// Snap UV to pixel-block centres.
+vec2 quantize(vec2 uv) {
+  if (u_pixel_size < 1.5) return uv;
   vec2 res = max(u_resolution, vec2(1.0));
-  vec2 center = clamp(u_center, vec2(0.0), vec2(1.0));
-  vec2 delta = uv - center;
-  float dist = max(length(delta), 1e-5);
-  float reach = max(u_radius, 0.05);
-  float edge = clamp(1.0 - dist / reach, 0.0, 1.0);
-  float hardness = clamp(u_hardness, 0.0, 1.0);
-  float envelope = pow(edge, mix(2.8, 0.7, hardness));
-  float angle = atan(delta.y, delta.x);
-  float twist = u_twirl * envelope * (0.4 + 0.6 * clamp(u_feedback, 0.0, 1.0));
-  float cellNoise = hash21(floor(uv * res * 0.25));
-  float wobbleAmp =
-    (1.0 - clamp(u_pixel_snap, 0.0, 1.0)) *
-    (0.0015 + 0.006 * clamp(u_growth, 0.0, 1.0)) *
-    (0.4 + 0.6 * min(abs(u_twirl), 1.0));
-  vec2 wobble =
-    vec2(
-      sin(u_time * 0.83 + uv.y * 17.0 + cellNoise * TAU),
-      cos(u_time * 0.67 + uv.x * 13.0 + cellNoise * TAU)
-    ) * wobbleAmp * envelope;
-
-  vec2 warped = center + vec2(cos(angle + twist), sin(angle + twist)) * dist + wobble;
-  vec2 clampedUv = clamp(warped, vec2(0.0), vec2(1.0));
-  vec2 snappedUv = (floor(clampedUv * res) + 0.5) / res;
-  return mix(clampedUv, snappedUv, clamp(u_pixel_snap, 0.0, 1.0));
-}
-
-vec3 sample_edge_source(vec2 uv) {
-  vec3 live = texture(u_tex, clamp(uv, vec2(0.0), vec2(1.0))).rgb;
-  vec3 prev = texture(u_owned_state, warp_uv(uv)).rgb;
-  return mix(live, prev, clamp(u_feedback, 0.0, 0.98) * 0.35);
-}
-
-float sobel_edge(vec2 uv) {
-  vec2 px = 1.0 / max(u_resolution, vec2(1.0));
-
-  float tl = luma(sample_edge_source(uv + vec2(-px.x, -px.y)));
-  float tc = luma(sample_edge_source(uv + vec2(0.0, -px.y)));
-  float tr = luma(sample_edge_source(uv + vec2(px.x, -px.y)));
-  float ml = luma(sample_edge_source(uv + vec2(-px.x, 0.0)));
-  float mr = luma(sample_edge_source(uv + vec2(px.x, 0.0)));
-  float bl = luma(sample_edge_source(uv + vec2(-px.x, px.y)));
-  float bc = luma(sample_edge_source(uv + vec2(0.0, px.y)));
-  float br = luma(sample_edge_source(uv + vec2(px.x, px.y)));
-
-  float gx = -tl - 2.0 * ml - bl + tr + 2.0 * mr + br;
-  float gy = -tl - 2.0 * tc - tr + bl + 2.0 * bc + br;
-  return sqrt(gx * gx + gy * gy);
-}
-
-float previous_blackness(vec2 uv) {
-  return clamp(
-    1.0 - luma(texture(u_owned_state, clamp(uv, vec2(0.0), vec2(1.0))).rgb),
-    0.0,
-    1.0
-  );
+  vec2 block = floor(uv * res / u_pixel_size) * u_pixel_size + vec2(u_pixel_size * 0.5);
+  return clamp(block / res, vec2(0.0), vec2(1.0));
 }
 
 void main() {
-  vec3 live = texture(u_tex, v_uv).rgb;
-  if (u_state_initialized < 0.5) {
-    o_color = vec4(live, 1.0);
+  if (u_mix < 0.0005) {
+    o_dye = vec4(texture(u_tex, v_uv).rgb, 1.0);
+    o_vel = texture(u_prev_vel, v_uv);
     return;
   }
 
-  float mixAmount = clamp(u_mix, 0.0, 1.0);
-  float feedback = clamp(u_feedback, 0.0, 0.98);
-  float growth = clamp(u_growth, 0.0, 1.0);
-  float spread = clamp(u_spread, 0.0, 1.0);
-  float decay = clamp(u_decay, 0.0, 0.2);
-  float hardness = clamp(u_hardness, 0.0, 1.0);
-  float ink = clamp(u_ink, 0.0, 1.0);
+  // Source frame sampled at quantized coords — blocky pixels throughout.
+  vec3 src = texture(u_tex, quantize(v_uv)).rgb;
 
-  vec2 warpedUv = warp_uv(v_uv);
-  vec3 prevWarped = texture(u_owned_state, warpedUv).rgb;
-  vec3 base = mix(live, prevWarped, feedback);
+  // ── Flockaroo velocity update ─────────────────────────────────────────────
+  float rot = 0.0;
+  float sc = u_scale * 0.003;
+  for (int i = 0; i < 4; i++) {
+    rot += getRot(v_uv, sc);
+    sc *= 2.0;
+  }
+  rot *= 0.28;
 
-  float edge = sobel_edge(v_uv);
-  float edgeNorm = clamp(edge * max(u_edge_gain, 0.0) * 0.25, 0.0, 1.0);
-  float thresholdSoftness = mix(0.24, 0.015, hardness);
-  float seeded = smoothstep(
-    clamp(u_threshold - thresholdSoftness, 0.0, 1.0),
-    clamp(u_threshold + thresholdSoftness, 0.0, 1.0),
-    edgeNorm
+  vec2 vel = texture(u_prev_vel, v_uv).rg - vec2(0.5);
+  vec2 velAdvUV = fract(v_uv - vel * u_scale * 0.01);
+  vec2 advVel = texture(u_prev_vel, velAdvUV).rg - vec2(0.5);
+
+  float cosR = cos(rot), sinR = sin(rot);
+  vec2 newVel = vec2(
+    cosR * advVel.x - sinR * advVel.y,
+    sinR * advVel.x + cosR * advVel.y
   );
-  seeded = pow(seeded, mix(1.6, 0.75, hardness));
-  float seedBlack = clamp(seeded * (0.12 + growth * 1.88), 0.0, 1.0);
+  newVel *= 0.997; // mild decay toward rest
 
-  vec2 px = 1.0 / max(u_resolution, vec2(1.0));
-  float spreadDistance = mix(0.75, 2.5, spread);
-  vec2 dx = vec2(px.x * spreadDistance, 0.0);
-  vec2 dy = vec2(0.0, px.y * spreadDistance);
+  // ── Forced spiral vortex at center ────────────────────────────────────────
+  vec2 d    = v_uv - clamp(u_center, vec2(0.02), vec2(0.98));
+  float r   = length(d);
+  float reach = max(u_radius, 0.05);
+  // Envelope: zero at origin (avoids singularity), falls off beyond radius.
+  float env = smoothstep(0.0, 0.04, r) * exp(-r / reach);
+  vec2 tangent = r > 0.001 ? vec2(-d.y, d.x) / r : vec2(0.0, 1.0); // CCW tangent
+  vec2 inward  = r > 0.001 ? -d / r : vec2(0.0);                    // toward center
+  vec2 force   = (tangent * u_twirl + inward * u_sink) * env * 0.38;
 
-  float prevBlack = previous_blackness(warpedUv);
-  float dilated = prevBlack;
-  dilated = max(dilated, previous_blackness(warpedUv + dx));
-  dilated = max(dilated, previous_blackness(warpedUv - dx));
-  dilated = max(dilated, previous_blackness(warpedUv + dy));
-  dilated = max(dilated, previous_blackness(warpedUv - dy));
-  dilated = max(dilated, previous_blackness(warpedUv + dx + dy));
-  dilated = max(dilated, previous_blackness(warpedUv + dx - dy));
-  dilated = max(dilated, previous_blackness(warpedUv - dx + dy));
-  dilated = max(dilated, previous_blackness(warpedUv - dx - dy));
+  // Gently steer velocity toward the forced direction each frame.
+  float forceMix = clamp((abs(u_twirl) * 0.018 + u_sink * 0.012), 0.0, 0.06);
+  newVel = mix(newVel, force, forceMix);
 
-  float carried = mix(prevBlack, dilated, spread);
-  float retained = max(carried - decay, 0.0);
-  float voidMask = clamp(max(retained, seedBlack), 0.0, 1.0);
-  voidMask = clamp(max(voidMask, retained + seedBlack * (0.2 + 0.8 * growth)), 0.0, 1.0);
-  voidMask = pow(voidMask, mix(1.15, 0.7, hardness));
+  newVel = clamp(newVel, vec2(-0.49), vec2(0.49));
+  o_vel  = vec4(newVel + vec2(0.5), 0.0, 1.0);
 
-  vec3 result = mix(base, vec3(0.0), clamp(voidMask * ink, 0.0, 1.0));
-  o_color = vec4(mix(live, result, mixAmount), 1.0);
+  // ── Dye advection ─────────────────────────────────────────────────────────
+  // Back-trace: where did the dye at v_uv come from last frame?
+  vec2 dyeUV  = quantize(fract(v_uv - vel * u_scale * 0.012));
+  vec3 advDye = texture(u_prev_dye, dyeUV).rgb;
+
+  // Trail decay: 1.0 → no fade (0% decay), 0.0 → 2% decay per frame.
+  // Deliberately tight range so the dye stays bright and spiral motion is visible.
+  advDye *= 0.98 + u_trail * 0.02;
+
+  // Inject fresh source pixels at a controlled rate.
+  vec3 newDye = mix(advDye, src, u_inject * 0.14);
+
+  o_dye = vec4(mix(src, newDye, u_mix), 1.0);
 }

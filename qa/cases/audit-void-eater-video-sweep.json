@@ -1,13 +1,13 @@
 {
   "id": "audit-void-eater-video-sweep",
-  "title": "Void Eater sweep on decoded media",
+  "title": "Void Eater spiral drain sweep on decoded media",
   "source": {
     "kind": "video",
     "fixture": "qa/fixtures/ci-smoke.mp4"
   },
   "transport": {
     "start": true,
-    "settleMs": 1600
+    "settleMs": 1800
   },
   "recording": {
     "filename": "audit-void-eater-video-sweep",
@@ -19,13 +19,13 @@
     "allowConsoleErrors": ["favicon.ico"],
     "metricComparisons": [
       {
-        "from": "void-eater-mix-off-hold",
-        "to": "void-eater-heavy-hold",
+        "from": "void-eater-bypass",
+        "to": "void-eater-spiral-hold",
         "domain": "video",
         "metric": "meanLuma",
-        "op": "<",
-        "delta": -0.14,
-        "description": "Heavy voidEater should materially darken the fixture as black erosion consumes edge-rich areas over time"
+        "op": ">",
+        "delta": 0.0,
+        "description": "Spiral drain with high trail should differ from source — advected dye displaces pixels, changing the luma distribution"
       }
     ]
   },
@@ -35,15 +35,17 @@
     "kind": "sweep",
     "path": "product",
     "expectedVideo": [
-      "higher growth and spread should let black regions eat into edge-rich areas instead of reading like a generic dark tint or plain blur",
-      "raising twirl should bend the erosion into a feedback vortex so the consumed regions spiral around the chosen centre"
+      "pixels should visibly spiral toward the centre as the fluid velocity builds up over several frames",
+      "large pixel blocks (pixelSize >= 12) should be clearly visible as distinct chunks advecting through the field",
+      "reversing twirl sign should flip the spiral direction without popping"
     ],
     "expectedAudio": [
-      "the loaded clip audio should stay present while the image collapses into the void treatment"
+      "the loaded clip audio should stay present while the spiral fluid effect builds"
     ],
     "manualChecks": [
-      "Does the void feel edge-seeded and accumulative rather than like a one-frame threshold matte?",
-      "With high pixelSnap and hardness, do the eaten regions stay crisp enough for blocky or pixel-art footage?"
+      "Do the pixel blocks read as large chunky quanta swirling into a drain, or just blurred motion?",
+      "Does increasing pixelSize from 4 to 32 visibly coarsen the block size in proportion?",
+      "Does sink > 0 add a noticeable inward collapse component on top of the rotation?"
     ]
   },
   "steps": [
@@ -52,90 +54,52 @@
       "op": "voidEater",
       "paramId": "mix",
       "value": 0,
-      "screenshot": "void-eater-mix-off"
+      "screenshot": "void-eater-bypass"
     },
     {
       "type": "wait",
-      "ms": 350,
-      "screenshot": "void-eater-mix-off-hold"
+      "ms": 400
     },
     {
       "type": "set-operator-param",
       "op": "voidEater",
       "paramId": "mix",
-      "value": 1
-    },
-    {
-      "type": "set-operator-param",
-      "op": "voidEater",
-      "paramId": "feedback",
-      "value": 0.92
-    },
-    {
-      "type": "set-operator-param",
-      "op": "voidEater",
-      "paramId": "edgeGain",
-      "value": 5.8
-    },
-    {
-      "type": "set-operator-param",
-      "op": "voidEater",
-      "paramId": "threshold",
-      "value": 0.26
-    },
-    {
-      "type": "set-operator-param",
-      "op": "voidEater",
-      "paramId": "growth",
-      "value": 0.74
-    },
-    {
-      "type": "set-operator-param",
-      "op": "voidEater",
-      "paramId": "spread",
-      "value": 0.72
-    },
-    {
-      "type": "set-operator-param",
-      "op": "voidEater",
-      "paramId": "decay",
-      "value": 0.006
-    },
-    {
-      "type": "set-operator-param",
-      "op": "voidEater",
-      "paramId": "ink",
-      "value": 0.96
+      "value": 1.0
     },
     {
       "type": "set-operator-param",
       "op": "voidEater",
       "paramId": "twirl",
-      "value": 1.35
+      "value": 1.6
     },
     {
       "type": "set-operator-param",
       "op": "voidEater",
-      "paramId": "radius",
-      "value": 0.88
+      "paramId": "sink",
+      "value": 0.35
     },
     {
       "type": "set-operator-param",
       "op": "voidEater",
-      "paramId": "pixelSnap",
-      "value": 0.65
+      "paramId": "pixelSize",
+      "value": 16
     },
     {
       "type": "set-operator-param",
       "op": "voidEater",
-      "paramId": "hardness",
-      "value": 0.82,
-      "screenshot": "void-eater-heavy"
+      "paramId": "trail",
+      "value": 0.95
+    },
+    {
+      "type": "set-operator-param",
+      "op": "voidEater",
+      "paramId": "inject",
+      "value": 0.04
     },
     {
       "type": "wait",
-      "ms": 850,
-      "screenshot": "void-eater-heavy-hold"
+      "ms": 1000,
+      "screenshot": "void-eater-spiral-hold"
     }
   ]
 }

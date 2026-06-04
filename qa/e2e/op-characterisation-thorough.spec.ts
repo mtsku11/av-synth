@@ -76,7 +76,6 @@ const NOISY_OPS: ReadonlySet<string> = new Set([
   'flow',
   'glyphMotion',
   'matrixRain',
-  'timeDisplace',
   'structure',
   'feedback',
   'voidEater',

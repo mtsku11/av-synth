@@ -192,12 +192,6 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     intents: ['feedback', 'motion trails'],
     coreParams: ['feedback'],
   },
-  timeDisplace: {
-    family: 'Feedback',
-    blurb: 'multi-frame slit-scan smear and luma-driven time drag',
-    intents: ['feedback', 'motion trails', 'video texture'],
-    coreParams: ['mix', 'depth', 'scan', 'smear'],
-  },
   slitScan: {
     family: 'Feedback',
     blurb: 'vertical, horizontal, radial, or spiral slit-scan over shared frame history',
@@ -328,9 +322,9 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
   },
   voidEater: {
     family: 'Feedback',
-    blurb: 'edge-seeded black erosion inside a twirled owned-state feedback loop',
-    intents: ['feedback', 'contours', 'glitch', 'video texture'],
-    coreParams: ['mix', 'feedback', 'edgeGain', 'growth', 'twirl', 'ink'],
+    blurb: 'Flockaroo fluid advection with pixel-block quantization and a forced spiral vortex drain',
+    intents: ['feedback', 'fluid', 'motion', 'video texture'],
+    coreParams: ['mix', 'twirl', 'sink', 'pixelSize', 'trail'],
   },
   magneticDipole: {
     family: 'Feedback',
@@ -613,7 +607,8 @@ export function disposeInstance(instance: OperatorInstance, gl: WebGL2RenderingC
 }
 
 export function isNeutralInstance(instance: OperatorInstance): boolean {
-  for (const assignment of Object.values(instance.lfoAssignments)) {
+  for (const paramId in instance.lfoAssignments) {
+    const assignment = instance.lfoAssignments[paramId];
     if ((assignment?.lfoIndex ?? null) !== null || (assignment?.videoFeature ?? null) !== null)
       return false;
   }

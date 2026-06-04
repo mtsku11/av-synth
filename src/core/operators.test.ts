@@ -15,7 +15,6 @@ registerAllOps();
 
 const EXPECTED_OPERATOR_IDS = [
   'feedback',
-  'timeDisplace',
   'slitScan',
   'glyphRender',
   'glyphMotion',

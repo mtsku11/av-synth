@@ -792,6 +792,8 @@ export class VideoRenderer {
   #previewMode: PreviewMode = 'single';
   #hasSourceHistory = false;
   #motionReadbackBuffer: Uint8Array = new Uint8Array(0);
+  // True whenever node targets need re-sync (plan changed or canvas resized).
+  #planNodesDirty = true;
 
   #running = false;
   #rafId = 0;
@@ -1252,6 +1254,7 @@ export class VideoRenderer {
 
   setPlan(plan: GraphExecutionPlan): void {
     this.#plan = plan;
+    this.#planNodesDirty = true;
     this.#instances = plan.executableInstances;
     this.#instanceScratch.clear();
     for (const step of plan.steps) {
@@ -2108,6 +2111,8 @@ export class VideoRenderer {
   }
 
   #syncNodeTargets(): void {
+    if (!this.#planNodesDirty) return;
+    this.#planNodesDirty = false;
     const width = this.canvas.width;
     const height = this.canvas.height;
     const nextIds = new Set(this.#plan.steps.map((step) => step.id));
@@ -2333,6 +2338,7 @@ export class VideoRenderer {
     this.#clearTarget(this.#motionFieldTarget);
     this.#clearTarget(this.#prevMotionFieldTarget);
     this.resetTemporalState();
+    this.#planNodesDirty = true;
     this.#syncNodeTargets();
   }
 
