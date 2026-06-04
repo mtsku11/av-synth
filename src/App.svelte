@@ -40,6 +40,11 @@
     GRANULATOR_PARAM_SPECS,
     type GranulatorSliderParam,
   } from './audio/granulator-params';
+  import {
+    clampGranulatorSourceBalance,
+    createMixedGranulatorSourceBuffer,
+    type GranulatorInputSource,
+  } from './audio/granulator-source';
   import { GrainBuffer, planGrainBuffer } from './video/grain-buffer';
   import { estimateVideoFpsFromMediaTimes } from './video/clip-fps';
   import { GrainScheduler } from './core/grain-scheduler';
@@ -142,7 +147,12 @@
   // MidiRouter directly into the granulator's ParamSink (and worklet trigger).
   let granulator = $state<Granulator | null>(null);
   let granulatorEnabled = $state(false);
-  let granulatorLoadedSrc: string | null = null;
+  let granulatorLoadedSourceKey: string | null = null;
+  let granulatorInputSource = $state<GranulatorInputSource>('a');
+  let granulatorSourceBalance = $state(0.5);
+  let granulatorSourceLoadSeq = 0;
+  let granulatorSourceCacheA: { src: string; buffer: AudioBuffer } | null = null;
+  let granulatorSourceCacheB: { src: string; buffer: AudioBuffer } | null = null;
   let granulatorEnvelope = $state<GranulatorEnvelope>('hann');
   let granulatorMode = $state<GranulatorMode>('classic');
   let granulatorQuality = $state<GranulatorQuality>('balanced');
@@ -398,6 +408,8 @@
     setProgramMacro(id: string, value: number): Promise<boolean>;
     setGranulatorParam(name: string, value: number): Promise<boolean>;
     setGranulatorEnabled(enabled: boolean): Promise<boolean>;
+    setGranulatorInputSource(source: GranulatorInputSource): Promise<boolean>;
+    setGranulatorSourceBalance(balance: number): Promise<boolean>;
     setGranulatorDiagnostics(options: {
       emitInterpModeMessages?: boolean;
       forceNoSpawn?: boolean;
@@ -407,6 +419,11 @@
     }): Promise<boolean>;
     getGranulatorRuntimeDiagnostics(): GranulatorRuntimeSnapshot[];
     getGranulatorControlAudit(): Promise<GranulatorControlAudit | null>;
+    getGranulatorInputState(): {
+      source: GranulatorInputSource;
+      balance: number;
+      loaded: boolean;
+    };
     setFeedbackDelayParam(name: string, value: number): Promise<boolean>;
     getAudioContext(): AudioContext | null;
     getMasterPeak(): number | null;
@@ -619,11 +636,68 @@
 
   function syncVideoSourceDryGain(): void {
     if (!audio.isInitialised) return;
-    const currentSrc = videoEl?.src ?? null;
+    const selectedSourceKey = getGranulatorSourceKey();
     const granulatorReady =
-      !!granulator && granulatorEnabled && !!currentSrc && granulatorLoadedSrc === currentSrc;
+      !!granulator &&
+      granulatorEnabled &&
+      !!selectedSourceKey &&
+      granulatorLoadedSourceKey === selectedSourceKey;
     const mix = granulatorReady ? Math.max(0, Math.min(1, granulatorRawParams.mix)) : 0;
     audio.setSourceGain(1 - mix);
+  }
+
+  function getGranulatorSourceKey(): string | null {
+    const sourceA = videoEl?.src || null;
+    const sourceB = sourceBLoaded ? videoElB?.src || null : null;
+    if (granulatorInputSource === 'a') return sourceA ? `a:${sourceA}` : null;
+    if (granulatorInputSource === 'b') return sourceB ? `b:${sourceB}` : null;
+    if (!sourceA || !sourceB) return null;
+    return `ab:${sourceA}|${sourceB}|${granulatorSourceBalance.toFixed(3)}`;
+  }
+
+  async function decodeGranulatorSource(src: string, source: 'a' | 'b'): Promise<AudioBuffer> {
+    const cache = source === 'a' ? granulatorSourceCacheA : granulatorSourceCacheB;
+    if (cache?.src === src) return cache.buffer;
+
+    const ab = await fetch(src).then((r) => r.arrayBuffer());
+    const buffer = await audio.ctx.decodeAudioData(ab.slice(0));
+    const next = { src, buffer };
+    if (source === 'a') {
+      granulatorSourceCacheA = next;
+    } else {
+      granulatorSourceCacheB = next;
+    }
+    return buffer;
+  }
+
+  async function resolveGranulatorSourceBuffer(): Promise<{
+    key: string;
+    buffer: AudioBuffer;
+  } | null> {
+    const key = getGranulatorSourceKey();
+    if (!key) return null;
+    const sourceA = videoEl?.src || null;
+    const sourceB = sourceBLoaded ? videoElB?.src || null : null;
+
+    if (granulatorInputSource === 'a') {
+      if (!sourceA) return null;
+      return { key, buffer: await decodeGranulatorSource(sourceA, 'a') };
+    }
+    if (granulatorInputSource === 'b') {
+      if (!sourceB) return null;
+      return { key, buffer: await decodeGranulatorSource(sourceB, 'b') };
+    }
+    if (!sourceA || !sourceB) return null;
+    const bufferA = await decodeGranulatorSource(sourceA, 'a');
+    const bufferB = await decodeGranulatorSource(sourceB, 'b');
+    return {
+      key,
+      buffer: createMixedGranulatorSourceBuffer(audio.ctx, {
+        sourceA: bufferA,
+        sourceB: bufferB,
+        balance: granulatorSourceBalance,
+      }),
+    };
   }
 
   async function waitForVideoFrame(video: HTMLVideoElement): Promise<void> {
@@ -1319,6 +1393,26 @@
     }
   }
 
+  function setGranulatorInputSource(next: GranulatorInputSource): void {
+    if (next !== 'a' && next !== 'b' && next !== 'ab') return;
+    if ((next === 'b' || next === 'ab') && !sourceBLoaded) return;
+    if (granulatorInputSource === next) return;
+    granulatorInputSource = next;
+    granulatorLoadedSourceKey = null;
+    syncVideoSourceDryGain();
+    if (audio.isInitialised && granulator) void ensureGranulatorClipLoaded();
+  }
+
+  function setGranulatorSourceBalance(next: number): void {
+    const clamped = clampGranulatorSourceBalance(next);
+    if (granulatorSourceBalance === clamped) return;
+    granulatorSourceBalance = clamped;
+    if (granulatorInputSource !== 'ab') return;
+    granulatorLoadedSourceKey = null;
+    syncVideoSourceDryGain();
+    if (audio.isInitialised && granulator) void ensureGranulatorClipLoaded();
+  }
+
   function setGranulatorEnvelope(next: GranulatorEnvelope): void {
     granulatorEnvelope = next;
     granulator?.setEnvelope(next);
@@ -1376,19 +1470,24 @@
   }
 
   async function ensureGranulatorClipLoaded(): Promise<boolean> {
-    if (!granulator || !videoEl?.src || !audio.isInitialised) return false;
-    if (granulatorLoadedSrc === videoEl.src) {
+    if (!granulator || !audio.isInitialised) return false;
+    const sourceKey = getGranulatorSourceKey();
+    if (!sourceKey) return false;
+    if (granulatorLoadedSourceKey === sourceKey) {
       granulator.setEnabled(true);
       granulatorEnabled = true;
       syncVideoSourceDryGain();
       return true;
     }
+    const loadSeq = ++granulatorSourceLoadSeq;
     try {
-      const ab = await fetch(videoEl.src).then((r) => r.arrayBuffer());
-      await granulator.loadFromArrayBuffer(audio.ctx, ab);
+      const source = await resolveGranulatorSourceBuffer();
+      if (!source || source.key !== sourceKey || loadSeq !== granulatorSourceLoadSeq) return false;
+      await granulator.loadFromAudioBuffer(source.buffer);
+      if (loadSeq !== granulatorSourceLoadSeq) return false;
       granulator.setEnabled(true);
       granulatorEnabled = true;
-      granulatorLoadedSrc = videoEl.src;
+      granulatorLoadedSourceKey = source.key;
       syncVideoSourceDryGain();
       return true;
     } catch {
@@ -1683,6 +1782,18 @@
         await tick();
         return true;
       },
+      setGranulatorInputSource: async (source) => {
+        if (!granulator) return false;
+        setGranulatorInputSource(source);
+        await tick();
+        return granulatorInputSource === source;
+      },
+      setGranulatorSourceBalance: async (balance) => {
+        if (!granulator) return false;
+        setGranulatorSourceBalance(balance);
+        await tick();
+        return granulatorSourceBalance === clampGranulatorSourceBalance(balance);
+      },
       setGranulatorDiagnostics: async (options) => {
         if (typeof options.emitInterpModeMessages === 'boolean') {
           granulatorEmitInterpModeMessages = options.emitInterpModeMessages;
@@ -1708,6 +1819,12 @@
       },
       getGranulatorRuntimeDiagnostics: () => granulator?.readRuntimeDiagnostics() ?? [],
       getGranulatorControlAudit: () => granulator?.readControlAudit() ?? Promise.resolve(null),
+      getGranulatorInputState: () => ({
+        source: granulatorInputSource,
+        balance: granulatorSourceBalance,
+        loaded:
+          !!getGranulatorSourceKey() && granulatorLoadedSourceKey === getGranulatorSourceKey(),
+      }),
       setFeedbackDelayParam: async (name, value) => {
         if (!feedbackDelay) return false;
         setFeedbackDelayParam(name as FeedbackDelayParamName, value);
@@ -2146,20 +2263,15 @@
     }
   }
 
-  // Load the currently-active video clip's audio track into the granulator. Decoded
-  // once per file; the granulator runs in parallel to the operator rack, so the
-  // user hears the grain cloud on top of (or instead of, when video source is the
-  // grain composite) the operator-processed video audio.
-  async function loadClipIntoGranulator(file: File): Promise<void> {
+  // Load the selected granulator input. The public surface remains one granulator;
+  // Source B and A+B are resolved into a single decoded buffer before entering the worklet.
+  async function loadSelectedClipIntoGranulator(): Promise<void> {
     if (!granulator) return;
-    try {
-      const ab = await file.arrayBuffer();
-      await granulator.loadFromArrayBuffer(audio.ctx, ab);
-      granulator.setEnabled(granulatorEnabled);
-      granulatorLoadedSrc = videoEl?.src ?? loadedVideoName;
-      syncVideoSourceDryGain();
-    } catch (e) {
-      initError = e instanceof Error ? e.message : String(e);
+    const loaded = await ensureGranulatorClipLoaded();
+    if (!loaded) {
+      const inputLabel =
+        granulatorInputSource === 'ab' ? 'A+B' : granulatorInputSource.toUpperCase();
+      initError = `could not load Source ${inputLabel} audio into granulator`;
     }
   }
 
@@ -2673,7 +2785,8 @@
     grainDecodedSrc = null;
     grainDecodeStatus = null;
     grainVideoFps = null;
-    granulatorLoadedSrc = null;
+    granulatorLoadedSourceKey = null;
+    granulatorSourceCacheA = null;
     if (grainCompositeSource) {
       grainCompositeSource.dispose(renderer.gl);
       grainCompositeSource = null;
@@ -2697,7 +2810,7 @@
       await audio.init();
     }
     await ensureGranulatorPipeline();
-    void loadClipIntoGranulator(file);
+    void loadSelectedClipIntoGranulator();
     try {
       audio.setSource(new VideoElementAudioSource(audio.ctx, videoEl), {});
       syncVideoSourceDryGain();
@@ -2714,6 +2827,9 @@
     const file = input.files?.[0];
     if (!file || !renderer || !videoElB) return;
     if (sourceBObjectUrl) URL.revokeObjectURL(sourceBObjectUrl);
+    granulatorSourceCacheB = null;
+    const granulatorUsesSourceB = granulatorInputSource === 'b' || granulatorInputSource === 'ab';
+    if (granulatorUsesSourceB) granulatorLoadedSourceKey = null;
     const url = URL.createObjectURL(file);
     sourceBObjectUrl = url;
     loadedVideoBName = file.name;
@@ -2735,6 +2851,9 @@
     void videoElB.play().catch(() => {});
     renderer.setSourceB(new VideoElementSource(renderer.gl, videoElB));
     sourceBLoaded = true;
+    if (audio.isInitialised && granulator && granulatorUsesSourceB) {
+      void loadSelectedClipIntoGranulator();
+    }
   }
 
   function clearSourceB(): void {
@@ -2747,8 +2866,14 @@
       URL.revokeObjectURL(sourceBObjectUrl);
       sourceBObjectUrl = null;
     }
+    granulatorSourceCacheB = null;
+    if (granulatorInputSource === 'b' || granulatorInputSource === 'ab') {
+      granulatorLoadedSourceKey = null;
+      granulatorInputSource = 'a';
+    }
     sourceBLoaded = false;
     loadedVideoBName = null;
+    if (audio.isInitialised && granulator) void loadSelectedClipIntoGranulator();
   }
 
   function onKeyDown(e: KeyboardEvent): void {
@@ -3107,6 +3232,9 @@
             mode={granulatorMode}
             quality={granulatorQuality}
             adaptiveQuality={granulatorAdaptiveQuality}
+            inputSource={granulatorInputSource}
+            sourceBAvailable={sourceBLoaded}
+            sourceBalance={granulatorSourceBalance}
             runtimeSnapshot={granulatorRuntimeSnapshot}
             values={granulatorRawParams}
             lfoBank={clock.lfoBank}
@@ -3116,6 +3244,8 @@
             onSetMode={setGranulatorMode}
             onSetQuality={setGranulatorQuality}
             onSetAdaptiveQuality={setGranulatorAdaptiveQuality}
+            onSetInputSource={setGranulatorInputSource}
+            onSetSourceBalance={setGranulatorSourceBalance}
             onSetParam={setGranulatorParam}
             onSetParamLfo={setGranulatorModSource}
             feedbackDelayValues={feedbackDelayParams}

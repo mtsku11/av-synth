@@ -25,6 +25,7 @@
     GRAIN_SOFTNESS_SPEC,
     type GrainCompositeParamName,
   } from '../video/grain-composite-params';
+  import type { GranulatorInputSource } from '../audio/granulator-source';
   import type { MidiBinding, MidiRouter } from '../core/midi';
   import { listGlobalLfoOptions, type GlobalLfo, type ParamLfoAssignments } from '../core/mod-bank';
   import type { ParamSpec } from '../core/params';
@@ -38,6 +39,9 @@
     mode: GranulatorMode;
     quality: GranulatorQuality;
     adaptiveQuality: boolean;
+    inputSource: GranulatorInputSource;
+    sourceBAvailable: boolean;
+    sourceBalance: number;
     runtimeSnapshot: GranulatorRuntimeSnapshot | null;
     values: Readonly<Record<GranulatorSliderParam, number>>;
     lfoBank: readonly GlobalLfo[];
@@ -47,6 +51,8 @@
     onSetMode: (next: GranulatorMode) => void;
     onSetQuality: (next: GranulatorQuality) => void;
     onSetAdaptiveQuality: (next: boolean) => void;
+    onSetInputSource: (next: GranulatorInputSource) => void;
+    onSetSourceBalance: (next: number) => void;
     onSetParam: (name: GranulatorSliderParam, value: number) => void;
     onSetParamLfo: (name: GranulatorSliderParam, encoded: string) => void;
     feedbackDelayValues: Readonly<Record<FeedbackDelayParamName, number>>;
@@ -63,6 +69,9 @@
     mode,
     quality,
     adaptiveQuality,
+    inputSource,
+    sourceBAvailable,
+    sourceBalance,
     runtimeSnapshot,
     values,
     lfoBank,
@@ -72,6 +81,8 @@
     onSetMode,
     onSetQuality,
     onSetAdaptiveQuality,
+    onSetInputSource,
+    onSetSourceBalance,
     onSetParam,
     onSetParamLfo,
     feedbackDelayValues,
@@ -195,6 +206,57 @@
       {/if}
     </p>
   </header>
+
+  <section class="input-row">
+    <div class="picker">
+      <span class="picker-label">input</span>
+      <div class="picker-buttons">
+        <button
+          type="button"
+          class:active={inputSource === 'a'}
+          onclick={() => onSetInputSource('a')}
+          disabled={!granulator}
+          data-qa="gran-input-a"
+        >
+          A
+        </button>
+        <button
+          type="button"
+          class:active={inputSource === 'b'}
+          onclick={() => onSetInputSource('b')}
+          disabled={!granulator || !sourceBAvailable}
+          data-qa="gran-input-b"
+        >
+          B
+        </button>
+        <button
+          type="button"
+          class:active={inputSource === 'ab'}
+          onclick={() => onSetInputSource('ab')}
+          disabled={!granulator || !sourceBAvailable}
+          data-qa="gran-input-ab"
+        >
+          A+B
+        </button>
+      </div>
+    </div>
+    {#if inputSource === 'ab'}
+      <label class="balance-control">
+        <span>A</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={sourceBalance}
+          onchange={(e) => onSetSourceBalance(Number((e.currentTarget as HTMLInputElement).value))}
+          disabled={!granulator || !sourceBAvailable}
+          data-qa="gran-input-balance"
+        />
+        <span>B</span>
+      </label>
+    {/if}
+  </section>
 
   <section class="mode-row">
     <div class="picker">
@@ -412,10 +474,31 @@
     flex-wrap: wrap;
     align-items: center;
   }
+  .input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 5px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
   .picker {
     display: flex;
     align-items: center;
     gap: 4px;
+  }
+  .balance-control {
+    display: inline-grid;
+    grid-template-columns: auto minmax(6rem, 1fr) auto;
+    align-items: center;
+    gap: 4px;
+    min-width: 8rem;
+    max-width: 12rem;
+    color: var(--muted);
+    font-size: 0.62rem;
+  }
+  .balance-control input {
+    min-width: 0;
+    accent-color: var(--accent);
   }
   .adaptive-toggle {
     display: inline-flex;

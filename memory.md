@@ -3332,3 +3332,17 @@ another bloom stack or a one-off post shader.
   look stays reusable by other programs instead of hard-coding lfscD7 logic into one preset.
 - This closes the extraction plan without widening the renderer architecture or breaking the product
   boundary around uploaded-video treatment.
+
+### 2026-06-04 — Source B audio goes through the one granulator, not a second public engine
+
+**Decision**: when two clips are loaded, expose Source A, Source B, and A+B as input options on the
+existing granulator. A+B is decoded/mixed on the main thread into one stereo buffer before loading the
+worklet; the feedback delay and limiter remain downstream of that single granulator.
+
+**Why**:
+
+- Users can granulate either clip or both clips without reviving the old multi-engine audio rack.
+- One shared grain parameter set keeps the Audio tab compact and matches the public direction:
+  granulator + feedback delay + master limiter.
+- Keeping the worklet input singular avoids scheduler/voice-pool duplication and preserves the
+  current zero-allocation render path.

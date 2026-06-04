@@ -891,6 +891,7 @@ This section is now a **summary and release-policy wrapper** around the real eng
 ### 14.1 Product rule
 
 - The shipped audio surface is: **granulator + feedback delay + master limiter**.
+- When two clips are loaded, Source B audio enters the public surface only through the one granulator's input selector: Source A, Source B, or a pre-mixed A+B buffer with one balance control. This is not a second granulator and not a revived multi-engine rack.
 - The shipped video surface is: **video grain engine feeding the existing Hydra-style FX rack** from §1–§7.
 - The shared public modulation surface is: **six global LFOs first**, with MIDI/MPE and selected video-derived features joining through the same routing model.
 - The old multi-engine audio rack and the old "every Hydra op has an audio twin" framing are historical context only.
@@ -977,6 +978,8 @@ Model now in place (G1–G5 + G8 landed 2026-05-28; G6/G7 deferred and tracked i
 - The dedicated `sourceBlend` op becomes redundant with `blend(primary=source, secondary=sourceB)` — kept for now, deprecation deferred.
 
 This is a routing / coupling change, not a shader or operator-set change. No new audio engines, no expansion of the granulator surface. It is compatible with both the granulator-first audio direction (§0a) and the Hydra-shaped video rack (§1–§7).
+
+Audio follow-up landed 2026-06-04: the single public granulator now has a compact input selector for Source A, Source B, and A+B. A+B is mixed on the main thread into one decoded stereo buffer before entering the existing worklet, so the worklet/scheduler/feedback topology stays singular.
 
 If the routing model ever needs to scale to N sources (live webcam, procedural patterns, MIDI-selected clip slots), the same node-in-graph pattern generalises — `sourceC`, `sourceD`, etc. — without changing the two-input operator surface. v1 ships with exactly two sources.
 
