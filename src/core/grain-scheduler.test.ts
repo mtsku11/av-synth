@@ -8,6 +8,7 @@ import {
   ENV_HANN,
   ENV_REXPDEC,
   ENV_TUKEY25,
+  GRAIN_EVENT_RING_FIELDS,
   GrainScheduler,
   type GrainEventRingTransport,
   computeEnvelopeAlpha,
@@ -197,7 +198,9 @@ describe('GrainScheduler', () => {
     const sched = new GrainScheduler(node);
     const capacity = 8;
     const header = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
-    const data = new SharedArrayBuffer(Float64Array.BYTES_PER_ELEMENT * capacity * 10);
+    const data = new SharedArrayBuffer(
+      Float64Array.BYTES_PER_ELEMENT * capacity * GRAIN_EVENT_RING_FIELDS,
+    );
     const headerView = new Int32Array(header);
     const dataView = new Float64Array(data);
     node.port.onmessage?.({
@@ -227,7 +230,9 @@ describe('GrainScheduler', () => {
   it('can attach a shared ring directly without waiting for a port message', () => {
     const capacity = 8;
     const header = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
-    const data = new SharedArrayBuffer(Float64Array.BYTES_PER_ELEMENT * capacity * 10);
+    const data = new SharedArrayBuffer(
+      Float64Array.BYTES_PER_ELEMENT * capacity * GRAIN_EVENT_RING_FIELDS,
+    );
     const sched = new GrainScheduler(makeStubNode(), {
       capacity,
       header,

@@ -8,6 +8,7 @@
 
 import { ensureAudioWorklets } from './worklets';
 import type { MidiChannel } from '../core/midi';
+import { GRAIN_EVENT_RING_FIELDS } from '../core/grain-scheduler';
 
 export type GranulatorParamName =
   | 'position'
@@ -117,6 +118,8 @@ const CONTROL_DEFAULTS: Readonly<Record<GranulatorParamName, number>> = Object.f
 });
 const CONTROL_WRITE_SEQ_IDX = 0;
 export const GRAIN_EVENT_RING_CAPACITY = 2048;
+export const GRAIN_EVENT_RING_BYTES =
+  Float64Array.BYTES_PER_ELEMENT * GRAIN_EVENT_RING_CAPACITY * GRAIN_EVENT_RING_FIELDS;
 const RUNTIME_DIAG_RING_CAPACITY = 256;
 export const RUNTIME_DIAG_RING_FIELDS = 17;
 export const RUNTIME_DIAG_WRITE_SEQ_IDX = 0;
@@ -244,9 +247,7 @@ export class Granulator {
       this.#grainRing = {
         capacity: GRAIN_EVENT_RING_CAPACITY,
         header: new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT),
-        data: new SharedArrayBuffer(
-          Float64Array.BYTES_PER_ELEMENT * GRAIN_EVENT_RING_CAPACITY * 10,
-        ),
+        data: new SharedArrayBuffer(GRAIN_EVENT_RING_BYTES),
       };
       if (opts.provisionRuntimeDiagnostics ?? true) {
         this.#runtimeDiagnostics = {

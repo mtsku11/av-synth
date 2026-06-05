@@ -8,6 +8,19 @@ This file is project-scoped engineering memory, distinct from Claude's harness m
 
 ## Decisions
 
+### 2026-06-05 — Shared grain-event protocol tests must cover backing-store size, not just field offsets
+
+**Decision**: treat the grain-event ring's byte length as part of the shared-memory protocol and derive it from `GRAIN_EVENT_RING_FIELDS` instead of hardcoding a stride at the allocation site.
+
+**Why**:
+- The amplitude-depth pass expanded each grain event from 10 to 11 float64 fields, but `src/audio/granulator.ts` still allocated the SharedArrayBuffer as `capacity * 10`.
+- That left the worklet, main-thread scheduler, and tests agreeing on field offsets while still disagreeing on the actual ring backing-store size, which is enough to black out the visible grain composite even when the audio granulator is healthy.
+- A constant-sync suite that only checks field indices is incomplete for SharedArrayBuffer protocols; byte-length drift is the same class of correctness bug.
+
+**How to apply**:
+- Allocate the grain-event SAB with `Float64Array.BYTES_PER_ELEMENT * GRAIN_EVENT_RING_CAPACITY * GRAIN_EVENT_RING_FIELDS`.
+- Keep regression tests covering both the worklet constants and the derived backing-store size.
+
 ### 2026-06-05 — White-on-black contour extraction remains a preset recipe, not a revived standalone edge operator
 
 **Decision**: expose the strictest current “white lines on black” look as a curated preset built from canonical `structure -> composite(diff) -> extract`, rather than reintroducing a dedicated `edge` operator.

@@ -35,6 +35,7 @@ import {
 
 import {
   GRAIN_EVENT_RING_CAPACITY,
+  GRAIN_EVENT_RING_BYTES,
   RUNTIME_DIAG_RING_FIELDS,
   RUNTIME_DIAG_WRITE_SEQ_IDX,
   RUNTIME_DIAG_F_REL_TIME_SEC,
@@ -114,6 +115,10 @@ describe('worklet/main-thread constant sync', () => {
   describe('grain-event ring capacity (granulator.ts ↔ granulator.js)', () => {
     it('GRAIN_EVENT_RING_CAPACITY', () =>
       expect(GRAIN_EVENT_RING_CAPACITY).toBe(wk('GRAIN_EVENT_RING_CAPACITY')));
+    it('allocates enough backing storage for every grain-event field', () =>
+      expect(GRAIN_EVENT_RING_BYTES).toBe(
+        Float64Array.BYTES_PER_ELEMENT * GRAIN_EVENT_RING_CAPACITY * GRAIN_EVENT_RING_FIELDS,
+      ));
   });
 
   describe('runtime-diag ring protocol (granulator.ts ↔ granulator.js)', () => {

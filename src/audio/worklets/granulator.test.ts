@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { GRAIN_EVENT_RING_FIELDS } from '../../core/grain-scheduler';
 
 const source = readFileSync(resolve(process.cwd(), 'public/worklets/granulator.js'), 'utf-8');
 
@@ -112,7 +113,9 @@ function makeSharedGrainRing(capacity = 2048): {
   return {
     capacity,
     header: new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT),
-    data: new SharedArrayBuffer(Float64Array.BYTES_PER_ELEMENT * capacity * 10),
+    data: new SharedArrayBuffer(
+      Float64Array.BYTES_PER_ELEMENT * capacity * GRAIN_EVENT_RING_FIELDS,
+    ),
   };
 }
 
