@@ -8,6 +8,48 @@ This file is project-scoped engineering memory, distinct from Claude's harness m
 
 ## Decisions
 
+### 2026-06-04 — Commit the preset bank in canonical operator form and keep the loader shim as import compatibility
+
+**Decision**: rewrite `public/presets.json` onto the current canonical operator/param names now that the loader-side normaliser exists, but keep that normaliser in place for stale imported presets and future drift protection.
+
+**Why**:
+- The loader shim fixed the release-candidate crash path, but leaving dozens of legacy aliases committed in the bank made every preset harder to inspect and masked whether a bad scope lived in authored data or compatibility code.
+- Canonical JSON makes the public bank truthfully match the current operator registry (`grade`, `extract`, `glitch`, `warp`, unified routed `modulate*`, etc.) and lets tests fail when newly committed presets regress back to stale names.
+- One older program (`nelsonTwist`) also carried axis hints in `graph.values`, which the typed loader never modeled directly. Folding those into top-level `values` makes that intent explicit instead of depending on dead structure.
+
+**How to apply**:
+- Treat `public/presets.json` as canonical current-state authored data: new presets should be written against live operator names, not legacy aliases.
+- Keep `normalizeProgram()` in `src/core/presets.ts` as the compatibility boundary for imported/stale snapshots, including the `graph.values` fold-in path.
+- Enforce the rule in tests by asserting the committed bank is already equal to its normalized form.
+
+### 2026-06-04 — Preset loading now canonicalises legacy operator scopes at the loader boundary
+
+**Decision**: preserve release-candidate preset compatibility by normalising stale pre-consolidation scope names as programs are loaded from `public/presets.json`, instead of hand-editing only the one preset that happened to crash first.
+
+**Why**:
+- `Port / Pixelscape` exposed the real failure mode: the preset bank still contains old graph targets, automation keys, and macro targets (`saturate`, `hue`, `contrast`, routed modulate variants, older warp aliases, etc.) from the operator-merging pass.
+- `onProgram()` derives the operator instantiate list from those scopes. One stale key is enough to make the app try to instantiate a deleted op and abort the apply path before any user-facing fallback can happen.
+- A loader-side canonicalisation shim is safer for the RC than a sweeping manual rewrite of every preset JSON node, because it keeps the current authored bank loading while still allowing the canonical JSON to be cleaned up later on deliberate terms.
+
+**How to apply**:
+- Keep `public/presets.json` load-bearing but treat `src/core/presets.ts` as the compatibility boundary. Legacy aliases should normalise there into the current canonical ops/params plus the minimal injected defaults (`grade`, `extract.mode`, `glitch.type`, routed `source=1`, `warp.mode`, etc.).
+- Maintain a bank-wide smoke test over the committed preset JSON so future operator consolidations fail in CI if they leave behind un-normalised scopes.
+- Prefer removing stale aliases from the JSON over time, but do not delete the loader shim until the committed bank and any supported imported preset format are proven clean.
+
+### 2026-06-04 — Source relationship features stay on the existing 120 ms probe path
+
+**Decision**: add the new Source B mirrors and A/B-derived relationship signals on top of the existing low-rate feature sampler instead of adding a second GPU analysis path or new per-source render passes.
+
+**Why**:
+- The release-candidate constraint is stability first. The current sampler already extracts Source A luma/edge/flux from a 96×54 CPU probe and motion from the existing renderer motion field; extending that path keeps the new bus cheap and easy to reason about.
+- Source B only needed coarse low-rate control signals, not frame-accurate optical flow. Reusing the same CPU probe for Source B and treating its motion as flux-level activity is good enough for modulation while avoiding new renderer architecture.
+- Backwards compatibility mattered more than purity, so the legacy `v.luma` / `v.flux` / `v.edge` / `v.motion` names continue to mean Source A. The new fields are additive: `v.b.*` for Source B and `v.ab.*` for the derived relationship signals.
+
+**How to apply**:
+- Keep Source B / A-B fields hard-reset to zero when Source B is absent so old presets and single-source sessions behave exactly like before.
+- Route the new names through the same `VideoFeatureState` / `VideoFeatureName` / modulation-picker path the existing features already use; do not create a second modulation registry.
+- If a future version needs true Source B optical flow, prove the current flux-level proxy is insufficient before adding another renderer pass.
+
 ### 2026-06-03 — Recursive glitch sketches should land as bounded live-video feedback ops, not literal buffer graphs
 
 The requested RGB glitch sketch came in as a Shadertoy-style `Buffer A` / `Buffer B` / `Image` graph, but AV Synth should not grow a public multipass import surface for one look. The chosen extraction is `acidFeedback`: a single `Feedback`-family operator with per-instance `ownedState`, the loaded clip on `u_tex` as the canonical current-frame signal, and one recursive shader that derives RGB offsets from the operator’s own prior state before mixing back against live video.

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_AUDIO_BANDS, EMPTY_VIDEO_FEATURES } from './coupling';
-import { applyGlobalLfoAssignments, createDefaultGlobalLfoBank, sampleGlobalLfo } from './mod-bank';
+import {
+  applyGlobalLfoAssignments,
+  createDefaultGlobalLfoBank,
+  listGlobalLfoOptions,
+  sampleGlobalLfo,
+} from './mod-bank';
 
 describe('global lfo bank', () => {
   it('creates six public lfos with stable labels', () => {
@@ -20,6 +25,14 @@ describe('global lfo bank', () => {
     const bank = createDefaultGlobalLfoBank();
     expect(sampleGlobalLfo(bank[0]!, 0)).toBe(0);
     expect(sampleGlobalLfo(bank[5]!, 0.5)).toBe(sampleGlobalLfo(bank[5]!, 0.5));
+  });
+
+  it('lists Source B and A/B relationship signals alongside the legacy video features', () => {
+    const labels = listGlobalLfoOptions(createDefaultGlobalLfoBank()).map((option) => option.label);
+    expect(labels).toContain('v.luma');
+    expect(labels).toContain('v.b.luma');
+    expect(labels).toContain('v.ab.difference');
+    expect(labels).toContain('v.ab.tension');
   });
 
   it('applies lfo assignment as a bounded raw-param offset', () => {

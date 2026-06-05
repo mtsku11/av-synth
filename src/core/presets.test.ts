@@ -1,7 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { clock } from './clock.svelte';
+import { EMPTY_VIDEO_FEATURES } from './coupling';
 import { createParamLfoAssignment } from './mod-bank';
+import { getDef } from './operators';
+import { registerAllOps } from '../ops';
 import {
   applyProgram,
   applyProgramAudio,
@@ -10,6 +16,7 @@ import {
   getResolvedProgramSharedFeedback,
   getOrderedProgramOps,
   getProgramMacroDefaults,
+  normalizeProgram,
   resolveProgramState,
 } from './presets';
 import type { VideoEffectProgram } from './presets';
@@ -37,6 +44,18 @@ function makeInstance(op: string, params: Record<string, number>): OperatorInsta
     ),
   };
 }
+
+function expectRegisteredScope(scope: string): void {
+  if (!scope || scope === 'source' || /^src\(o[0-3]\)$/.test(scope)) return;
+  if (scope === 'clock' || scope === 'audio') return;
+  const match = /^(?<op>[^.#]+?)(?:#\d+)?$/.exec(scope);
+  const op = match?.groups?.op ?? null;
+  expect(op, `invalid program scope '${scope}'`).toBeTruthy();
+  if (!op) return;
+  expect(() => getDef(op)).not.toThrow();
+}
+
+registerAllOps();
 
 describe('applyProgram', () => {
   beforeEach(() => {
@@ -190,16 +209,56 @@ describe('applyProgram', () => {
     applyProgram(program, [flow]);
     applyProgramAutomation(program, [flow], {
       time: 0,
+      videoFeatures: { ...EMPTY_VIDEO_FEATURES, available: true, motion: 0.4 },
+    });
+
+    expect(flow.params.mix).toBeCloseTo(0.6, 6);
+  });
+
+  it('evaluates relationship-bus automation against the expanded video feature state', () => {
+    const modulate = makeInstance('modulate', { amount: 0.1 });
+    const program = {
+      title: 'Relationship',
+      tagline: 'relationship',
+      videoIntent: 'relationship',
+      audioIntent: 'relationship',
+      operatorFocus: ['modulate'],
+      values: {
+        'modulate.amount': 0.1,
+      },
+      automation: {
+        'modulate.amount': {
+          kind: 'video' as const,
+          feature: 'abDifference' as const,
+          scale: 0.3,
+          smooth: 0,
+        },
+      },
+    };
+
+    applyProgram(program, [modulate]);
+    applyProgramAutomation(program, [modulate], {
+      time: 0,
       videoFeatures: {
         available: true,
         luma: 0,
         flux: 0,
         edge: 0,
-        motion: 0.4,
+        motion: 0,
+        bLuma: 0,
+        bFlux: 0,
+        bEdge: 0,
+        bMotion: 0,
+        abLumaDiff: 0,
+        abFluxDiff: 0,
+        abEdgeAgreement: 0,
+        abDifference: 0.5,
+        abSimilarity: 0.5,
+        abTension: 0.2,
       },
     });
 
-    expect(flow.params.mix).toBeCloseTo(0.6, 6);
+    expect(modulate.params.amount).toBeCloseTo(0.25, 6);
   });
 
   it('resolves macro targets into video, clock, and audio state', () => {
@@ -277,13 +336,7 @@ describe('applyProgram', () => {
       [flow],
       {
         time: 0,
-        videoFeatures: {
-          available: true,
-          luma: 0,
-          flux: 0,
-          edge: 0,
-          motion: 0.4,
-        },
+        videoFeatures: { ...EMPTY_VIDEO_FEATURES, available: true, motion: 0.4 },
       },
       resolved.values,
     );
@@ -360,6 +413,69 @@ describe('applyProgram', () => {
 
     expect(ordered).toEqual(['color', 'rotate', 'color', 'rotate']);
   });
+
+  it('folds graph-local values into the canonical top-level values map', () => {
+    const program = normalizeProgram({
+      title: 'Graph values',
+      tagline: 'graph values',
+      videoIntent: 'graph values',
+      audioIntent: 'graph values',
+      operatorFocus: ['repeatX'],
+      chain: ['repeatX'],
+      graph: {
+        monitorBus: 0,
+        nodes: [{ target: 'repeatX#0', bus: 0, inputs: ['source'] }],
+        values: {
+          'repeatX#0.reps': 3,
+          'repeatX#0.offset': 0.25,
+        },
+      },
+      values: {},
+    });
+
+    expect(program.graph?.values).toBeUndefined();
+    expect(program.values['repeat#0.axis']).toBe(1);
+    expect(program.values['repeat#0.repeatX']).toBe(3);
+    expect(program.values['repeat#0.offsetX']).toBe(0.25);
+  });
+
+  it('normalizes the committed preset bank onto registered operators only', () => {
+    const bank = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'public/presets.json'), 'utf8'),
+    ) as Record<string, VideoEffectProgram>;
+
+    for (const [name, source] of Object.entries(bank)) {
+      const program = normalizeProgram(source);
+      expect(source, `${name} should already be committed in canonical preset form`).toEqual(
+        program,
+      );
+      for (const op of program.operatorFocus) {
+        expectRegisteredScope(op);
+      }
+      for (const op of program.chain ?? []) {
+        expectRegisteredScope(op);
+      }
+      for (const key of Object.keys(program.values)) {
+        expectRegisteredScope(key.slice(0, key.indexOf('.')));
+      }
+      for (const key of Object.keys(program.automation ?? {})) {
+        expectRegisteredScope(key.slice(0, key.indexOf('.')));
+      }
+      for (const macro of program.macros ?? []) {
+        for (const target of macro.targets) {
+          expectRegisteredScope(target.key.slice(0, target.key.indexOf('.')));
+        }
+      }
+      for (const node of program.graph?.nodes ?? []) {
+        expectRegisteredScope(node.target);
+        for (const input of node.inputs ?? []) {
+          expectRegisteredScope(input);
+        }
+      }
+      expect(getOrderedProgramOps(program, [])).toBeTruthy();
+      expect(program.values, `${name} should keep a values map after normalisation`).toBeTruthy();
+    }
+  });
 });
 
 describe('applyProgramAudio', () => {
@@ -380,6 +496,7 @@ describe('applyProgramAudio', () => {
     applyProgramAudio(
       program({
         granulator: {
+          inputSource: 'b',
           density: 35,
           duration: 70,
           gain: 0.55,
@@ -390,6 +507,7 @@ describe('applyProgramAudio', () => {
         feedbackDelay: { time: 0.28, feedback: 0.78, mix: 0.42 },
       }),
       {
+        setGranulatorInputSource: (value) => calls.push(`input:${value}`),
         setGranulatorParam: (name, value) => calls.push(`${name}:${value}`),
         setGranulatorEnvelope: (value) => calls.push(`envelope:${value}`),
         setGranulatorMode: (value) => calls.push(`mode:${value}`),
@@ -398,6 +516,7 @@ describe('applyProgramAudio', () => {
       },
     );
     expect(calls).toEqual([
+      'input:b',
       'density:35',
       'duration:70',
       'gain:0.55',

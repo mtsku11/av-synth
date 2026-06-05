@@ -20,6 +20,16 @@ export interface VideoFeatureState {
   flux: number;
   edge: number;
   motion: number;
+  bLuma: number;
+  bFlux: number;
+  bEdge: number;
+  bMotion: number;
+  abLumaDiff: number;
+  abFluxDiff: number;
+  abEdgeAgreement: number;
+  abDifference: number;
+  abSimilarity: number;
+  abTension: number;
 }
 
 export interface AudioBandState {
@@ -38,6 +48,16 @@ export const EMPTY_VIDEO_FEATURES: VideoFeatureState = {
   flux: 0,
   edge: 0,
   motion: 0,
+  bLuma: 0,
+  bFlux: 0,
+  bEdge: 0,
+  bMotion: 0,
+  abLumaDiff: 0,
+  abFluxDiff: 0,
+  abEdgeAgreement: 0,
+  abDifference: 0,
+  abSimilarity: 0,
+  abTension: 0,
 };
 
 export const EMPTY_AUDIO_BANDS: AudioBandState = {

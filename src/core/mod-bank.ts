@@ -1,5 +1,6 @@
 import type { CouplingContext, VideoFeatureName } from './coupling';
 import type { ParamSpec } from './params';
+import { formatVideoFeatureLabel, VIDEO_FEATURE_OPTIONS } from './video-features';
 
 export type { VideoFeatureName };
 import { TAU, clamp, lerp } from '../lib/math';
@@ -88,7 +89,7 @@ export function buildParamLfoAssignmentView(
   const videoFeature = a?.videoFeature ?? null;
   let label: string;
   if (videoFeature !== null) {
-    label = `v.${videoFeature}`;
+    label = formatVideoFeatureLabel(videoFeature);
   } else {
     label = lfoIndex === null ? 'mod off' : `lfo ${lfoIndex + 1}`;
   }
@@ -139,8 +140,6 @@ export function applyGlobalLfoAssignments(
   return next;
 }
 
-const VIDEO_FEATURE_NAMES: readonly VideoFeatureName[] = ['luma', 'flux', 'edge', 'motion'];
-
 export function listGlobalLfoOptions(
   bank: readonly GlobalLfo[],
 ): readonly { id: string; value: string; label: string }[] {
@@ -151,10 +150,10 @@ export function listGlobalLfoOptions(
       value: String(index),
       label: `lfo ${index + 1}`,
     })),
-    ...VIDEO_FEATURE_NAMES.map((f) => ({
-      id: `v-${f}`,
-      value: `v:${f}`,
-      label: `v.${f}`,
+    ...VIDEO_FEATURE_OPTIONS.map(({ name, label }) => ({
+      id: `v-${name}`,
+      value: `v:${name}`,
+      label,
     })),
   ];
 }

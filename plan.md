@@ -405,11 +405,11 @@ Status: `todo` for the universal/public surface. 2026-05-20 update: the built-in
 Hydra's audio-input subsystem feeds FFT bins into video as numeric values. We need it bidirectional:
 
 - **Audio → video**: `a.fft[i]` is a bin magnitude; usable as a parameter input to any video operator.
-- **Video → audio**: dual API `v.luma`, `v.flux`, `v.edge` exposes per-frame video features (mean luminance, frame-to-frame difference, edge density) as parameter inputs to any audio operator.
+- **Video → audio**: dual API `v.luma`, `v.flux`, `v.edge`, `v.motion` exposes Source A per-frame video features, while the same bus now also carries Source B mirrors (`v.b.*`) plus coarse A/B relationship signals (`v.ab.lumaDiff`, `v.ab.fluxDiff`, `v.ab.edgeAgreement`, `v.ab.difference`, `v.ab.similarity`, `v.ab.tension`) as parameter inputs to any audio or video target that already speaks the shared modulation model.
 
 Both directions share the same smoothing/cutoff/scale conventions.
 
-Status: `todo` for the public/general Hydra surface. The app now does have both primitives internally: `src/audio/engine.ts` owns an `AnalyserNode`, `src/App.svelte` samples `v.luma` / `v.flux` / `v.edge`, and built-in programs can already bind raw FFT bins or video features to parameter automation. What remains undone is the general user-facing `a.fft[i]` / `a.setBins` / `a.setSmooth` / `a.setCutoff` / `a.setScale` API rather than the absence of runtime signal plumbing.
+Status: `todo` for the public/general Hydra surface. The app now does have both primitives internally: `src/audio/engine.ts` owns an `AnalyserNode`, `src/App.svelte` samples Source A plus Source B / A-B relationship video features on the existing low-rate path, and built-in programs can already bind raw FFT bins or video features to parameter automation. What remains undone is the general user-facing `a.fft[i]` / `a.setBins` / `a.setSmooth` / `a.setCutoff` / `a.setScale` API rather than the absence of runtime signal plumbing.
 
 ---
 
@@ -935,7 +935,7 @@ Important anti-drift note: there is **no separate `attack/decay` control in v1**
 - MIDI is first-class, not stretch scope.
 - MPE support, MIDI-learn, and note-on latency targets are part of the release contract.
 - The six-LFO bank in `src/core/mod-bank.ts` remains the first public modulation language.
-- Video-derived features such as `v.luma`, `v.flux`, and `v.edge` remain valid modulation sources into granulator parameters, but should arrive through the same routing model rather than through standalone monitor-heavy UI.
+- Video-derived features such as `v.luma`, `v.flux`, `v.edge`, `v.motion`, the Source B mirrors (`v.b.*`), and the coarse A/B relationship signals (`v.ab.*`) remain valid modulation sources into granulator parameters, but should arrive through the same routing model rather than through standalone monitor-heavy UI.
 
 ### 14.6 QA and acceptance policy
 

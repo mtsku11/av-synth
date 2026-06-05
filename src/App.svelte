@@ -61,6 +61,7 @@
   } from './core/operators';
   import {
     BUS_INDICES,
+    SOURCE_B_NODE_ID,
     SOURCE_NODE_ID,
     busReturnId,
     graph,
@@ -113,6 +114,11 @@
     type ParamLfoAssignments,
     type VideoFeatureName,
   } from './core/mod-bank';
+  import {
+    buildVideoFeatureState,
+    computeTemporalFlux,
+    type AnalysedVideoFrame,
+  } from './core/video-features';
 
   let canvasEl: HTMLCanvasElement | undefined = $state();
   let videoEl: HTMLVideoElement | undefined = $state();
@@ -224,7 +230,8 @@
   let featureProbeCtx: CanvasRenderingContext2D | null = null;
   let featureSampleTimer = 0;
   let programAutomationRaf = 0;
-  let previousFeatureLumas: Float32Array<ArrayBuffer> | null = null;
+  let previousSourceAFeatureLumas: Float32Array<ArrayBuffer> | null = null;
+  let previousSourceBFeatureLumas: Float32Array<ArrayBuffer> | null = null;
   const operatorOptions = [...listOps()].sort((left, right) => {
     const leftIndex = DEFAULT_CHAIN.indexOf(left);
     const rightIndex = DEFAULT_CHAIN.indexOf(right);
@@ -259,6 +266,7 @@
     'halftoneFeedbackBloom',
     'slitScanHands',
     'glyphVortex',
+    'sourceRelationshipRelay',
   ]);
 
   const VIDEO_FEATURE_SAMPLE_WIDTH = 96;
@@ -574,8 +582,15 @@
   }
 
   function resetVideoFeatures(): void {
-    if (!videoFeatures.available && previousFeatureLumas === null) return;
-    previousFeatureLumas = null;
+    if (
+      !videoFeatures.available &&
+      previousSourceAFeatureLumas === null &&
+      previousSourceBFeatureLumas === null
+    ) {
+      return;
+    }
+    previousSourceAFeatureLumas = null;
+    previousSourceBFeatureLumas = null;
     videoFeatures = { ...EMPTY_VIDEO_FEATURES };
   }
 
@@ -804,56 +819,47 @@
     return previous + (next - previous) * VIDEO_FEATURE_SMOOTHING;
   }
 
+  function sampleVideoFrame(video: HTMLVideoElement): AnalysedVideoFrame | null {
+    const probe = ensureFeatureProbe();
+    if (!probe || !featureProbeCanvas || video.readyState < 2) return null;
+    probe.drawImage(video, 0, 0, featureProbeCanvas.width, featureProbeCanvas.height);
+    const image = probe.getImageData(0, 0, featureProbeCanvas.width, featureProbeCanvas.height);
+    return analyseCanvasFrame(image.data, featureProbeCanvas.width, featureProbeCanvas.height);
+  }
+
   function sampleVideoFeatureSignals(): void {
     sampleAudioBandSignals();
-    if (
-      typeof document === 'undefined' ||
-      sourceKind !== 'video' ||
-      !sourceLoaded ||
-      !videoEl ||
-      videoEl.readyState < 2
-    ) {
+    if (typeof document === 'undefined' || sourceKind !== 'video' || !sourceLoaded || !videoEl) {
       resetVideoFeatures();
       return;
     }
 
-    const probe = ensureFeatureProbe();
-    if (!probe || !featureProbeCanvas) {
+    const sourceAFrame = sampleVideoFrame(videoEl);
+    if (!sourceAFrame) {
       resetVideoFeatures();
       return;
     }
 
-    probe.drawImage(videoEl, 0, 0, featureProbeCanvas.width, featureProbeCanvas.height);
-    const image = probe.getImageData(0, 0, featureProbeCanvas.width, featureProbeCanvas.height);
-    const frame = analyseCanvasFrame(
-      image.data,
-      featureProbeCanvas.width,
-      featureProbeCanvas.height,
+    const sourceBFrame =
+      sourceBLoaded && videoElB && videoElB.readyState >= 2 ? sampleVideoFrame(videoElB) : null;
+    const sourceAFlux = computeTemporalFlux(sourceAFrame.lumas, previousSourceAFeatureLumas);
+    videoFeatures = buildVideoFeatureState(
+      videoFeatures,
+      {
+        frame: sourceAFrame,
+        previousLumas: previousSourceAFeatureLumas,
+        motion: renderer?.readMotionEnergy() ?? sourceAFlux,
+      },
+      sourceBFrame
+        ? {
+            frame: sourceBFrame,
+            previousLumas: previousSourceBFeatureLumas,
+          }
+        : null,
+      VIDEO_FEATURE_SMOOTHING,
     );
-    let flux = 0;
-    if (previousFeatureLumas) {
-      for (let index = 0; index < frame.lumas.length; index += 1) {
-        flux += Math.abs((frame.lumas[index] ?? 0) - (previousFeatureLumas[index] ?? 0));
-      }
-      flux /= frame.lumas.length;
-    }
-    const motion = renderer?.readMotionEnergy() ?? flux;
-    previousFeatureLumas = frame.lumas;
-    videoFeatures = videoFeatures.available
-      ? {
-          available: true,
-          luma: smoothFeatureValue(videoFeatures.luma, frame.meanLuma),
-          flux: smoothFeatureValue(videoFeatures.flux, flux),
-          edge: smoothFeatureValue(videoFeatures.edge, frame.edgeDensity),
-          motion: smoothFeatureValue(videoFeatures.motion, motion),
-        }
-      : {
-          available: true,
-          luma: frame.meanLuma,
-          flux,
-          edge: frame.edgeDensity,
-          motion,
-        };
+    previousSourceAFeatureLumas = sourceAFrame.lumas;
+    previousSourceBFeatureLumas = sourceBFrame?.lumas ?? null;
   }
 
   function startVideoFeatureSampling(): void {
@@ -1349,6 +1355,8 @@
     applyProgram(resolved.values, instances);
     graph.syncParams(instances);
     applyProgramAudioState(resolved.audio, {
+      setGranulatorInputSource: (value) => setGranulatorInputSource(value),
+      setGranulatorSourceBalance: (value) => setGranulatorSourceBalance(value),
       setGranulatorParam: (name, value) => {
         setGranulatorParam(name, value);
         pushGranulatorParam(name, value);
@@ -1671,6 +1679,7 @@
 
   function resolvePatchInputRef(input: string): string | null {
     if (input === 'source') return null;
+    if (input === 'sourceB') return SOURCE_B_NODE_ID;
     const busMatch = /^src\(o([0-3])\)$/.exec(input.trim());
     if (busMatch) {
       return busReturnId(Number(busMatch[1]) as BusIndex);

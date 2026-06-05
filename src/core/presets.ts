@@ -15,6 +15,7 @@ import type { GranulatorEnvelope, GranulatorMode, GranulatorQuality } from '../a
 import { GRANULATOR_ENVELOPES, GRANULATOR_MODES, GRANULATOR_QUALITIES } from '../audio/granulator';
 import type { GranulatorSliderParam } from '../audio/granulator-params';
 import type { FeedbackDelayParamName } from '../audio/feedback-delay-params';
+import type { GranulatorInputSource } from '../audio/granulator-source';
 import { TAU, clamp01, ease, lerp } from '../lib/math';
 import type {
   PresentationLensDirtName,
@@ -40,6 +41,7 @@ export interface VideoEffectProgramGraphNode {
 export interface VideoEffectProgramGraph {
   monitorBus?: BusIndex;
   nodes: readonly VideoEffectProgramGraphNode[];
+  values?: ProgramValues;
 }
 
 export interface ProgramAutomationRuntime {
@@ -73,6 +75,8 @@ export type GranulatorProgramState = Partial<Record<GranulatorSliderParam, numbe
   envelope?: GranulatorEnvelope;
   mode?: GranulatorMode;
   quality?: GranulatorQuality;
+  inputSource?: GranulatorInputSource;
+  sourceBalance?: number;
 };
 
 export type FeedbackDelayProgramState = Partial<Record<FeedbackDelayParamName, number>>;
@@ -124,11 +128,265 @@ export function getResolvedProgramSharedFeedback(state: ResolvedProgramState): n
 export async function loadPrograms(): Promise<VideoEffectProgramBank> {
   const res = await fetch(`${import.meta.env.BASE_URL}presets.json`);
   if (!res.ok) throw new Error(`Failed to load presets.json: ${res.status}`);
-  return (await res.json()) as VideoEffectProgramBank;
+  return normalizeProgramBank((await res.json()) as VideoEffectProgramBank);
 }
 
 export function loadPresets(): Promise<PresetBank> {
   return loadPrograms();
+}
+
+function formatProgramScope(op: string, index: number | null): string {
+  return index === null ? op : `${op}#${index}`;
+}
+
+function normaliseScopeRef(scope: string): {
+  scope: string;
+  injections: Readonly<Record<string, number>>;
+} {
+  const parsed = parseProgramScope(scope);
+  if (!parsed) return { scope, injections: {} };
+  const formatted = (op: string) => formatProgramScope(op, parsed.index);
+  switch (parsed.op) {
+    case 'brightness':
+      return { scope: formatted('grade'), injections: {} };
+    case 'contrast':
+      return { scope: formatted('grade'), injections: {} };
+    case 'saturate':
+      return { scope: formatted('grade'), injections: {} };
+    case 'hue':
+      return { scope: formatted('grade'), injections: {} };
+    case 'luma':
+      return { scope: formatted('extract'), injections: { [`${formatted('extract')}.mode`]: 0 } };
+    case 'thresh':
+      return { scope: formatted('extract'), injections: { [`${formatted('extract')}.mode`]: 1 } };
+    case 'invert':
+      return { scope: formatted('extract'), injections: { [`${formatted('extract')}.mode`]: 2 } };
+    case 'chromaShift':
+      return { scope: formatted('glitch'), injections: { [`${formatted('glitch')}.type`]: 1 } };
+    case 'chromaFract':
+      return { scope: formatted('glitch'), injections: { [`${formatted('glitch')}.type`]: 2 } };
+    case 'signalDamage':
+      return { scope: formatted('glitch'), injections: { [`${formatted('glitch')}.type`]: 0 } };
+    case 'modulateRouted':
+      return {
+        scope: formatted('modulate'),
+        injections: { [`${formatted('modulate')}.source`]: 1 },
+      };
+    case 'modulateRotateRouted':
+      return {
+        scope: formatted('modulateRotate'),
+        injections: { [`${formatted('modulateRotate')}.source`]: 1 },
+      };
+    case 'modulateScaleRouted':
+      return {
+        scope: formatted('modulateScale'),
+        injections: { [`${formatted('modulateScale')}.source`]: 1 },
+      };
+    case 'modulateRepeatRouted':
+      return {
+        scope: formatted('modulateRepeat'),
+        injections: { [`${formatted('modulateRepeat')}.source`]: 1 },
+      };
+    case 'modulatePixelateRouted':
+      return {
+        scope: formatted('modulatePixelate'),
+        injections: { [`${formatted('modulatePixelate')}.source`]: 1 },
+      };
+    case 'modulateHueRouted':
+      return {
+        scope: formatted('modulateHue'),
+        injections: { [`${formatted('modulateHue')}.source`]: 1 },
+      };
+    case 'modulateScrollYRouted':
+      return {
+        scope: formatted('modulateScrollY'),
+        injections: { [`${formatted('modulateScrollY')}.source`]: 1 },
+      };
+    case 'scrollX':
+      return { scope: formatted('scroll'), injections: {} };
+    case 'scrollY':
+      return { scope: formatted('scroll'), injections: {} };
+    case 'repeatX':
+      return { scope: formatted('repeat'), injections: { [`${formatted('repeat')}.axis`]: 1 } };
+    case 'repeatY':
+      return { scope: formatted('repeat'), injections: { [`${formatted('repeat')}.axis`]: 2 } };
+    case 'pinchBulge':
+      return { scope: formatted('warp'), injections: { [`${formatted('warp')}.mode`]: 0 } };
+    case 'sinkSourceField':
+      return { scope: formatted('warp'), injections: { [`${formatted('warp')}.mode`]: 1 } };
+    default:
+      return { scope, injections: {} };
+  }
+}
+
+function normaliseScopedParam(op: string, param: string): string {
+  switch (op) {
+    case 'brightness':
+      return param === 'amount' ? 'brightness' : param;
+    case 'contrast':
+      return param === 'amount' ? 'contrast' : param;
+    case 'saturate':
+      return param === 'amount' ? 'saturate' : param;
+    case 'hue':
+      return param === 'amount' ? 'hue' : param;
+    case 'luma':
+      return param === 'invert' ? 'flip' : param;
+    case 'thresh':
+      return param === 'invert' ? 'flip' : param;
+    case 'scrollX':
+      if (param === 'amount') return 'x';
+      if (param === 'speed') return 'speedX';
+      return param;
+    case 'scrollY':
+      if (param === 'amount') return 'y';
+      if (param === 'speed') return 'speedY';
+      return param;
+    case 'repeatX':
+      if (param === 'reps') return 'repeatX';
+      if (param === 'offset') return 'offsetX';
+      return param;
+    case 'repeatY':
+      if (param === 'reps') return 'repeatY';
+      if (param === 'offset') return 'offsetY';
+      return param;
+    case 'pinchBulge':
+      return param === 'amount' ? 'strength' : param;
+    case 'signalDamage':
+      return param === 'mix' ? 'amount' : param;
+    case 'chromaShift':
+      return param === 'mix' ? 'amount' : param;
+    case 'chromaFract':
+      return param === 'mix' ? 'amount' : param;
+    default:
+      return param;
+  }
+}
+
+function mergeNormalisationInjections(
+  target: Record<string, number>,
+  injections: Readonly<Record<string, number>>,
+): void {
+  for (const [key, value] of Object.entries(injections)) {
+    if (key in target) continue;
+    target[key] = value;
+  }
+}
+
+function normaliseProgramKey(key: string): {
+  key: string;
+  injections: Readonly<Record<string, number>>;
+} {
+  if (key.startsWith('clock.') || key.startsWith('audio.')) return { key, injections: {} };
+  const dot = key.indexOf('.');
+  if (dot < 0) return { key, injections: {} };
+  const scope = key.slice(0, dot);
+  const param = key.slice(dot + 1);
+  const parsed = parseProgramScope(scope);
+  if (!parsed) return { key, injections: {} };
+  const { scope: nextScope, injections } = normaliseScopeRef(scope);
+  const nextParam = normaliseScopedParam(parsed.op, param);
+  return { key: `${nextScope}.${nextParam}`, injections };
+}
+
+function normaliseProgramRef(ref: string): {
+  ref: string;
+  injections: Readonly<Record<string, number>>;
+} {
+  const trimmed = ref.trim();
+  if (!trimmed || trimmed === 'source' || /^src\(o[0-3]\)$/.test(trimmed)) {
+    return { ref: trimmed, injections: {} };
+  }
+  const { scope, injections } = normaliseScopeRef(trimmed);
+  return { ref: scope, injections };
+}
+
+function normaliseProgramOp(op: string): string {
+  return normaliseScopeRef(op).scope;
+}
+
+export function normalizeProgram(program: VideoEffectProgram): VideoEffectProgram {
+  const injectedValues: Record<string, number> = {};
+  const values = Object.fromEntries(
+    Object.entries(program.values).map(([key, value]) => {
+      const normalized = normaliseProgramKey(key);
+      mergeNormalisationInjections(injectedValues, normalized.injections);
+      return [normalized.key, value];
+    }),
+  );
+  for (const [key, value] of Object.entries(program.graph?.values ?? {})) {
+    const normalized = normaliseProgramKey(key);
+    mergeNormalisationInjections(injectedValues, normalized.injections);
+    if (!(normalized.key in values)) {
+      values[normalized.key] = value;
+    }
+  }
+  for (const [key, value] of Object.entries(injectedValues)) {
+    if (key in values) continue;
+    values[key] = value;
+  }
+
+  const graph = program.graph
+    ? {
+        monitorBus: program.graph.monitorBus,
+        nodes: program.graph.nodes.map((node) => {
+          const target = normaliseProgramRef(node.target);
+          mergeNormalisationInjections(injectedValues, target.injections);
+          const inputs = node.inputs?.map((input) => {
+            const normalized = normaliseProgramRef(input);
+            mergeNormalisationInjections(injectedValues, normalized.injections);
+            return normalized.ref;
+          });
+          return {
+            target: target.ref,
+            ...(node.bus === undefined ? {} : { bus: node.bus }),
+            ...(inputs ? { inputs } : {}),
+          };
+        }),
+      }
+    : undefined;
+
+  const automation = program.automation
+    ? Object.fromEntries(
+        Object.entries(program.automation).map(([key, value]) => {
+          const normalized = normaliseProgramKey(key);
+          mergeNormalisationInjections(injectedValues, normalized.injections);
+          return [normalized.key, value];
+        }),
+      )
+    : undefined;
+
+  const macros = program.macros?.map((macro) => ({
+    ...macro,
+    targets: macro.targets.map((target) => {
+      const normalized = normaliseProgramKey(target.key);
+      mergeNormalisationInjections(injectedValues, normalized.injections);
+      return {
+        ...target,
+        key: normalized.key,
+      };
+    }),
+  }));
+
+  for (const [key, value] of Object.entries(injectedValues)) {
+    if (key in values) continue;
+    values[key] = value;
+  }
+
+  return {
+    ...program,
+    operatorFocus: [...new Set(program.operatorFocus.map((op) => normaliseProgramOp(op)))],
+    chain: program.chain?.map((op) => normaliseProgramOp(op)),
+    graph,
+    values,
+    automation,
+    macros,
+  };
+}
+
+export function normalizeProgramBank(bank: VideoEffectProgramBank): VideoEffectProgramBank {
+  return Object.fromEntries(
+    Object.entries(bank).map(([name, program]) => [name, normalizeProgram(program)]),
+  );
 }
 
 function positiveModulo(value: number, modulus: number): number {
@@ -207,14 +465,7 @@ function resolveAutomatedValue(
     return base + Math.max(0, amplitude - automation.cutoff) * automation.scale;
   }
 
-  const featureValue =
-    automation.feature === 'luma'
-      ? runtime.videoFeatures?.luma
-      : automation.feature === 'flux'
-        ? runtime.videoFeatures?.flux
-        : automation.feature === 'motion'
-          ? runtime.videoFeatures?.motion
-          : runtime.videoFeatures?.edge;
+  const featureValue = runtime.videoFeatures?.[automation.feature];
   return base + (featureValue ?? 0) * automation.scale;
 }
 
@@ -400,6 +651,8 @@ export interface ApplyProgramAudioHandlers {
   setGranulatorEnvelope?: (value: GranulatorEnvelope) => void;
   setGranulatorMode?: (value: GranulatorMode) => void;
   setGranulatorQuality?: (value: GranulatorQuality) => void;
+  setGranulatorInputSource?: (value: GranulatorInputSource) => void;
+  setGranulatorSourceBalance?: (value: number) => void;
   setFeedbackDelayParam?: (name: FeedbackDelayParamName, value: number) => void;
 }
 
@@ -425,6 +678,18 @@ export function applyProgramAudioState(
       if (name === 'quality') {
         if (typeof value === 'string' && GRANULATOR_QUALITY_SET.has(value)) {
           handlers.setGranulatorQuality?.(value as GranulatorQuality);
+        }
+        continue;
+      }
+      if (name === 'inputSource') {
+        if (value === 'a' || value === 'b' || value === 'ab') {
+          handlers.setGranulatorInputSource?.(value);
+        }
+        continue;
+      }
+      if (name === 'sourceBalance') {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          handlers.setGranulatorSourceBalance?.(value);
         }
         continue;
       }

@@ -21,7 +21,7 @@ This repo uses a layered QA model:
 - Optional analyzer adapter config under `qa/analyzers.config.json` (copy from `qa/analyzers.config.example.json`)
 - Committed reference captures under [`qa/references`](./references)
 - A browser QA bridge exposed as `window.__AV_SYNTH_QA__` for deterministic test control/state inspection
-- Runtime `v.luma` / `v.flux` / `v.edge` signals sampled from the loaded clip and exposed through the QA bridge state
+- Runtime video-feature bus exposed through the QA bridge state: legacy Source A `v.luma` / `v.flux` / `v.edge` / `v.motion`, plus Source B mirrors and coarse A/B relationship signals when a second clip is loaded
 - App-side capture/export of rendered canvas + mixed audio as `.webm`
 - Granulator MIDI-latency proxy harness at `qa/e2e/d4-midi-latency-proxy.spec.ts`
 - A GitHub Actions workflow at `.github/workflows/qa.yml` that runs the committed QA pipeline in CI
@@ -75,6 +75,7 @@ Granulator-specific helpers:
 - `npm run qa:granulator:soak:matrix` reruns the warmed B2.3 discriminator for `no-spawn`, shipped `grainField`, and forced-dense patches. Override duration with `GRANULATOR_SOAK_S`; the release soak remains four hours.
 - `npm run qa:showcase:capture` records the curated eight-program showcase slate into `qa/results/showcase-captures/`. The slate leads with the graph-authored `Singularity Bloom`, `Fracture Relay`, and `Magnetic Cathedral` programs before the five typographic / time-domain supporting looks.
 - `qa/e2e/glyph-pack-programs.spec.ts` recalls the five public typographic / time-domain programs, checks their three-macro surfaces and low-rate audio-band feed, and holds each authored stack to a local ≥30 fps median floor.
+- `qa/e2e/ab-secondary-input-smoke.spec.ts` loads the bright two-clip showcase pair (`showcase-fracturerelay` + `showcase-slitscanhands`), routes `sourceB` through every registered two-input operator, and fails on console errors, black/flat output, or obviously inert A/B routing.
 - The review/protocol note for both harnesses lives at `qa/reviews/granulator/2026-05-24-d3-d4-harnesses.md`.
 
 Operator characterisation:
@@ -201,7 +202,7 @@ The repo is mid-transition.
 
 These exercise the actual user-facing product: an uploaded video clip is the signal, operators and programs manipulate that signal. This is the path users see and the surface a deploy is judged against.
 
-- **Sources / baseline** — `audit-source-video-baseline.json` (live `v.luma` / `v.flux` / `v.edge` come up on the loaded clip)
+- **Sources / baseline** — `audit-source-video-baseline.json` (legacy Source A `v.luma` / `v.flux` / `v.edge` / `v.motion` come up on the loaded clip; Source B / A-B fields stay zeroed until a second source exists)
 - **Programs / finish surface** — `audit-program-tunnel-video.json`, `audit-program-bloom-video.json`, `audit-program-kaleido-video.json`, `audit-finish-imported-lut-video.json`, plus the targeted Hydra-port smokes `audit-program-nelson-twist-video.json`, `audit-program-pixelscape-video.json`, `audit-program-disintegration-video.json`, `audit-program-acid-bus-seat-video.json`, `audit-program-glitchy-slit-scan-video.json`, `audit-program-velasco-video.json`, and `audit-program-broadcast-ghost-bloom-video.json` (named video-first treatments exercised through the real `applyProgram` UI path plus the imported-LUT finish path; `Pixelscape`, `Acid Bus Seat`, `Glitchy Slit Scan`, and the `lfscD7` approximation now also carry explicit video metric comparisons instead of prose-only smoke checks)
 - **Texture / glitch** — `audit-signal-damage-video-sweep.json` (dedicated current-frame transmission-damage sweep covering the `lfscD7` extraction operator directly on loaded video)
 - **Color / tonal** — `audit-brightness-video-sweep.json`, `audit-chromaShift-video-sweep.json`, `audit-invert-video-sweep.json`, `audit-luma-video-sweep.json`, `audit-posterize-video-sweep.json`, `audit-saturate-video-sweep.json`
@@ -228,7 +229,7 @@ Current stable gate status:
 
 - `npm run qa:audit` now regenerates a fully green `audit-*` batch and `npm run qa:audit:analyze` writes a green audit-only `analysis-summary.json`.
 - `npm run qa:references:sync` now snapshots the current `audit-*` `.webm` artifacts into committed `qa/references/`.
-- `audit-source-video-baseline.json` now asserts that `v.luma` / `v.flux` / `v.edge` become active on a real loaded video fixture, so the first shipped video-feature path is part of the committed smoke/audit surface.
+- `audit-source-video-baseline.json` now asserts that the legacy Source A video-feature path becomes active on a real loaded video fixture; the expanded Source B / A-B relationship bus is intentionally compatible with that baseline and stays pinned to zero when Source B is absent.
 - Live video metrics now include `meanR`, `meanG`, `meanB`, and `meanSaturation` so the color family is no longer audited only through grayscale proxies.
 - Exported-WAV segment assertions remain the hard audio gate wherever the fixture/metric pair is stable.
 - `qa:analyze` now attempts `mcp-music-analysis`, `ffmpeg-quality-metrics`, and `video-quality-mcp` through repo-local wrappers and persists their sidecar JSON beside each case artifact.
