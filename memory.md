@@ -8,6 +8,20 @@ This file is project-scoped engineering memory, distinct from Claude's harness m
 
 ## Decisions
 
+### 2026-06-05 — Legacy operator names stay discoverable through picker aliases, not duplicate registrations
+
+**Decision**: keep the consolidated operator registry as the public surface, but thread remembered legacy names like `edge`, `luma`, `invert`, `chromaShift`, `brightness`, and `pinchBulge` into the add-effect picker search instead of reviving them as separate registered ops.
+
+**Why**:
+- Most of the “missing” names were intentional consolidations, not accidental deletions: `grade`, `extract`, `glitch`, `warp`, `scroll`, `repeat`, and the unified `modulate*` family already cover the old math without duplicating the picker surface.
+- Re-registering the old names would immediately reverse the operator-consolidation pass and make the product surface harder to navigate again.
+- The real usability bug was discoverability: users remember old names, while the current `Patch` add-effect UI exposed only family dropdowns with canonical ids.
+
+**How to apply**:
+- Treat `OperatorUiMeta.aliases` as the stable place for legacy-name search tags.
+- `Patch.svelte` should search across canonical op id, family, blurb, intents, and aliases, and may surface short alias hints while a search query is active.
+- Do not use aliases as a reason to re-register duplicate public ops unless the underlying effect is genuinely absent from the canonical surface.
+
 ### 2026-06-05 — Cross-granulation stays above the existing granulator instead of becoming a second sampler
 
 **Decision**: implement the new cross-granulation modes as source-buffer resolution plus low-rate relationship-bus control on top of the current one-granulator path, rather than adding another public sampler, another worklet, or a second scheduling architecture.

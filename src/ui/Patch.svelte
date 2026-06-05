@@ -52,6 +52,7 @@
   const activeCount = $derived(nodes.filter((node) => node.active).length);
   const lfoOptions = $derived(listGlobalLfoOptions(lfoBank));
   let familySelections = $state<Record<string, string>>({});
+  let operatorSearch = $state('');
   const familyOrder = listOperatorFamilies();
   const operatorChoices = $derived(
     operatorOptions.map((op) => {
@@ -61,7 +62,45 @@
   );
 
   function getChoicesForFamily(family: OperatorFamily) {
-    return operatorChoices.filter((choice) => choice.family === family);
+    return operatorChoices.filter(
+      (choice) => choice.family === family && matchesOperatorSearch(choice, operatorSearch),
+    );
+  }
+
+  function matchesOperatorSearch(
+    choice: {
+      op: string;
+      family: OperatorFamily;
+      blurb: string;
+      intents: readonly string[];
+      aliases?: readonly string[];
+    },
+    query: string,
+  ) {
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed) return true;
+    const haystack = [
+      choice.op,
+      choice.family,
+      choice.blurb,
+      ...choice.intents,
+      ...(choice.aliases ?? []),
+    ]
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(trimmed);
+  }
+
+  const filteredOperatorCount = $derived(
+    operatorChoices.filter((choice) => matchesOperatorSearch(choice, operatorSearch)).length,
+  );
+
+  function renderChoiceLabel(choice: {
+    op: string;
+    aliases?: readonly string[];
+  }) {
+    if (!operatorSearch.trim() || !choice.aliases?.length) return choice.op;
+    return `${choice.op} · ${choice.aliases.slice(0, 2).join(' / ')}`;
   }
 
   function handleFamilySelection(family: OperatorFamily, value: string) {
@@ -125,6 +164,22 @@
     </article>
 
     {#if operatorOptions.length > 0}
+      <div class="picker-shell">
+        <label class="operator-search">
+          <span>search</span>
+          <input
+            data-qa="operator-search-input"
+            type="search"
+            bind:value={operatorSearch}
+            placeholder="search ops or legacy names"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </label>
+        {#if operatorSearch.trim()}
+          <p class="search-meta">{filteredOperatorCount} match{filteredOperatorCount === 1 ? '' : 'es'}</p>
+        {/if}
+      </div>
       <div class="family-picker-row">
         {#each familyOrder as family (family)}
           {@const choices = getChoicesForFamily(family)}
@@ -137,7 +192,7 @@
             >
               <option value="">{family.toLowerCase()}</option>
               {#each choices as choice (choice.op)}
-                <option value={choice.op}>{choice.op}</option>
+                <option value={choice.op}>{renderChoiceLabel(choice)}</option>
               {/each}
             </select>
           {/if}
@@ -405,6 +460,40 @@
     flex-wrap: wrap;
     gap: 0.4rem;
     align-items: center;
+  }
+
+  .picker-shell {
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .operator-search {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .operator-search span,
+  .search-meta {
+    color: var(--muted);
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+  }
+
+  .operator-search input {
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--line);
+    padding: 0.45rem 0.55rem;
+    font-size: 0.74rem;
+    font-family: var(--font-mono);
+  }
+
+  .operator-search input:hover,
+  .operator-search input:focus {
+    border-color: var(--accent);
+    outline: none;
   }
 
   .family-select {

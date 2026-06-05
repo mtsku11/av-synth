@@ -146,6 +146,22 @@ describe('operator UI metadata', () => {
     ]);
   });
 
+  it('keeps legacy operator names discoverable through canonical UI metadata aliases', () => {
+    expect(getOperatorUiMeta('structure').aliases).toContain('edge');
+    expect(getOperatorUiMeta('extract').aliases).toEqual(
+      expect.arrayContaining(['luma', 'thresh', 'invert']),
+    );
+    expect(getOperatorUiMeta('glitch').aliases).toEqual(
+      expect.arrayContaining(['signalDamage', 'chromaShift', 'chromaFract']),
+    );
+    expect(getOperatorUiMeta('grade').aliases).toEqual(
+      expect.arrayContaining(['brightness', 'contrast', 'saturate', 'hue']),
+    );
+    expect(getOperatorUiMeta('warp').aliases).toEqual(
+      expect.arrayContaining(['pinchBulge', 'sinkSourceField']),
+    );
+  });
+
   it('keeps every registered operator uniquely addressable with valid schema and UI metadata', () => {
     const ops = [...listOps()];
     expect(new Set(ops).size).toBe(ops.length);

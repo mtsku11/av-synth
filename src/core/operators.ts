@@ -163,6 +163,7 @@ export interface OperatorUiMeta {
   readonly blurb: string;
   readonly intents: readonly string[];
   readonly coreParams?: readonly string[];
+  readonly aliases?: readonly string[];
 }
 
 export interface OperatorInstance {
@@ -223,6 +224,7 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'edge / luma / flux masks drive contour memory and displacement',
     intents: ['feedback', 'contours', 'video texture'],
     coreParams: ['mix', 'mode', 'threshold', 'softness', 'displace', 'memory', 'glow'],
+    aliases: ['edge', 'edges', 'contour', 'contours', 'edge feedback'],
   },
   flow: {
     family: 'Feedback',
@@ -284,6 +286,16 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'radial warp — lens mode (pinch/bulge) or flow mode (sink/source with spin) around a movable centre',
     intents: ['feedback', 'video texture', 'motion'],
     coreParams: ['mode', 'mix', 'strength', 'radius', 'falloff', 'spin', 'drift'],
+    aliases: [
+      'pinch',
+      'bulge',
+      'pinch bulge',
+      'pinchBulge',
+      'sink source',
+      'sink source field',
+      'sinkSourceField',
+      'lens',
+    ],
   },
   polarRipple: {
     family: 'Feedback',
@@ -369,6 +381,7 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'isolate r, g, b, or alpha/luma as a greyscale matte',
     intents: ['matte', 'channel routing'],
     coreParams: ['mode'],
+    aliases: ['r', 'g', 'b', 'a', 'rgba', 'alpha'],
   },
   grain: {
     family: 'Audio Character',
@@ -381,6 +394,7 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'UV warp driven by an internal oscillator or a routed second source',
     intents: ['modulate', 'video texture', 'motion'],
     coreParams: ['source', 'amount'],
+    aliases: ['modulate routed', 'modulateRouted'],
   },
   modulateDisplace: {
     family: 'Modulate',
@@ -393,24 +407,28 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'per-pixel rotation angle driven by a second source',
     intents: ['modulate', 'motion'],
     coreParams: ['source', 'multiple', 'offset'],
+    aliases: ['modulate rotate routed', 'modulateRotateRouted'],
   },
   modulateScale: {
     family: 'Modulate',
     blurb: 'per-pixel zoom driven by a second source',
     intents: ['modulate', 'motion'],
     coreParams: ['source', 'multiple', 'offset'],
+    aliases: ['modulate scale routed', 'modulateScaleRouted'],
   },
   modulatePixelate: {
     family: 'Modulate',
     blurb: 'block size driven by a second source',
     intents: ['modulate', 'video texture'],
     coreParams: ['source', 'multiple', 'offset'],
+    aliases: ['modulate pixelate routed', 'modulatePixelateRouted'],
   },
   modulateRepeat: {
     family: 'Modulate',
     blurb: 'tile density and offset driven by a second source',
     intents: ['modulate', 'video texture'],
     coreParams: ['source', 'repeatX', 'repeatY', 'offsetX', 'offsetY'],
+    aliases: ['modulate repeat routed', 'modulateRepeatRouted'],
   },
   modulateScrollX: {
     family: 'Modulate',
@@ -423,6 +441,7 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'vertical scroll amount driven by a second source',
     intents: ['modulate', 'motion'],
     coreParams: ['source', 'amount', 'speed'],
+    aliases: ['modulate scroll y routed', 'modulateScrollYRouted'],
   },
   modulateKaleid: {
     family: 'Modulate',
@@ -459,12 +478,14 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'translate the frame on X and Y with independent time rates',
     intents: ['motion', 'video texture'],
     coreParams: ['x', 'y', 'speedX', 'speedY'],
+    aliases: ['scrollX', 'scrollY', 'scroll x', 'scroll y'],
   },
   repeat: {
     family: 'Motion',
     blurb: 'tile the frame into a denser lattice — both axes or one',
     intents: ['video texture', 'motion'],
     coreParams: ['axis', 'repeatX', 'repeatY', 'offsetX', 'offsetY'],
+    aliases: ['repeatX', 'repeatY', 'repeat x', 'repeat y'],
   },
   pixelate: {
     family: 'Texture',
@@ -483,12 +504,22 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'signal damage, chroma shift, or chroma fract — three glitch modes with one shared amount',
     intents: ['glitch', 'video texture', 'finishing'],
     coreParams: ['type', 'amount', 'displace', 'damage', 'jitter'],
+    aliases: [
+      'signal damage',
+      'signalDamage',
+      'chroma shift',
+      'chromaShift',
+      'chroma fract',
+      'chromaFract',
+      'aberration',
+    ],
   },
   grade: {
     family: 'Color',
     blurb: 'four-way colour grade: brightness, contrast, saturation, hue',
     intents: ['finishing', 'video tone'],
     coreParams: ['brightness', 'contrast', 'saturate', 'hue'],
+    aliases: ['brightness', 'contrast', 'saturate', 'hue'],
   },
   color: {
     family: 'Color',
@@ -507,6 +538,7 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'luma key, hard threshold, or colour invert — three extract modes with shared amount and threshold',
     intents: ['matte', 'finishing'],
     coreParams: ['mode', 'amount', 'threshold', 'tolerance'],
+    aliases: ['luma', 'thresh', 'threshold', 'invert', 'key', 'matte'],
   },
   colorama: {
     family: 'Color',
@@ -519,6 +551,7 @@ const OPERATOR_UI_META: Partial<Record<string, OperatorUiMeta>> = {
     blurb: 'add, subtract, multiply, diff, crossfade, screen, key, or mask two branches',
     intents: ['composite', 'matte', 'bus mix'],
     coreParams: ['mode', 'amount', 'threshold', 'tolerance', 'invert'],
+    aliases: ['add', 'sub', 'mult', 'diff', 'layer', 'blend', 'mask'],
   },
   sum: {
     family: 'Finish',
@@ -564,6 +597,7 @@ export function getOperatorUiMeta(op: string): OperatorUiMeta {
     blurb: 'coupled av effect',
     intents: ['video texture'],
     coreParams: fallbackCoreParams,
+    aliases: [],
     ...OPERATOR_UI_META[op],
   };
 }
