@@ -2440,6 +2440,132 @@
       }
     }
   },
+  "edgeOutline": {
+    "title": "Edge / White Outline",
+    "tagline": "Push contour energy into a hard matte so only the clip's strongest outlines survive as bright lines on black.",
+    "videoIntent": "Best on silhouettes, architecture, hands, instruments, and other high-contrast footage where contour separation is clearer than texture or shading.",
+    "audioIntent": "Keep the audio side restrained; this preset is mainly a visual utility for isolating contour rhythm.",
+    "operatorFocus": ["structure", "composite", "extract"],
+    "chain": ["structure", "composite", "extract"],
+    "graph": {
+      "monitorBus": 0,
+      "nodes": [
+        {
+          "target": "structure#0",
+          "bus": 1,
+          "inputs": ["source"]
+        },
+        {
+          "target": "composite#0",
+          "bus": 0,
+          "inputs": ["source", "structure#0"]
+        },
+        {
+          "target": "extract#0",
+          "bus": 0,
+          "inputs": ["composite#0"]
+        }
+      ]
+    },
+    "render": {
+      "look": "silver",
+      "quality": "standard",
+      "lut": "chrome",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.42,
+      "structure.mix": 1,
+      "structure#0.mix": 1,
+      "structure.mode": 0.52,
+      "structure#0.mode": 0.52,
+      "structure.threshold": 0.1,
+      "structure#0.threshold": 0.1,
+      "structure.softness": 0.04,
+      "structure#0.softness": 0.04,
+      "structure.displace": 0.01,
+      "structure#0.displace": 0.01,
+      "structure.memory": 0,
+      "structure#0.memory": 0,
+      "structure.glow": 1,
+      "structure#0.glow": 1,
+      "composite#0.mode": 3,
+      "composite#0.amount": 1,
+      "extract.mode": 1,
+      "extract#0.mode": 1,
+      "extract.amount": 1,
+      "extract#0.amount": 1,
+      "extract.threshold": 0.03,
+      "extract#0.threshold": 0.03,
+      "extract.tolerance": 0.02,
+      "extract#0.tolerance": 0.02
+    },
+    "macros": [
+      {
+        "id": "outline",
+        "label": "Outline",
+        "default": 0.62,
+        "targets": [
+          {
+            "key": "structure#0.threshold",
+            "min": 0.05,
+            "max": 0.18
+          },
+          {
+            "key": "extract#0.threshold",
+            "min": 0.015,
+            "max": 0.1
+          }
+        ],
+        "sliders": []
+      },
+      {
+        "id": "softness",
+        "label": "Softness",
+        "default": 0.18,
+        "targets": [
+          {
+            "key": "structure#0.softness",
+            "min": 0.01,
+            "max": 0.14
+          },
+          {
+            "key": "extract#0.tolerance",
+            "min": 0.01,
+            "max": 0.12
+          }
+        ],
+        "sliders": []
+      }
+    ],
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.18,
+        "feedback": 0.34,
+        "damping": 7200,
+        "cross": 0.7853981634,
+        "mix": 0.14
+      },
+      "granulator": {
+        "envelope": "hann",
+        "mode": "cloud",
+        "density": 14,
+        "duration": 88,
+        "durationJitter": 0.16,
+        "position": 0.5,
+        "positionJitter": 0.03,
+        "pitch": 0,
+        "pitchJitter": 2,
+        "panSpread": 0.24,
+        "ySpread": 0.08,
+        "reverseProbability": 0.02,
+        "distribution": 0.18,
+        "voiceCount": 14,
+        "gain": 0.42
+      }
+    }
+  },
   "datamoshSmear": {
     "title": "Datamosh Smear",
     "tagline": "Track motion between frames, then let that field drag the clip into blocky directional tears instead of generic blur.",

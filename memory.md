@@ -8,6 +8,19 @@ This file is project-scoped engineering memory, distinct from Claude's harness m
 
 ## Decisions
 
+### 2026-06-05 — White-on-black contour extraction remains a preset recipe, not a revived standalone edge operator
+
+**Decision**: expose the strictest current “white lines on black” look as a curated preset built from canonical `structure -> composite(diff) -> extract`, rather than reintroducing a dedicated `edge` operator.
+
+**Why**:
+- The current `structure` operator already owns contour analysis and user-facing “edge” semantics, but its shader is a contour-driven image treatment, not a pure mask generator.
+- The most usable result comes from differencing the contour-treated branch against the clean source first, then hard-thresholding that difference into a binary matte. That stays within the current registry and avoids treating `structure` itself like a pure edge-mask shader.
+- This preserves the recent operator-consolidation policy while still giving users an obvious way to reach the remembered edge-outline look.
+
+**How to apply**:
+- Keep `edgeOutline` and similar contour-matte looks authored as canonical presets against `structure`, `composite`, and `extract`.
+- If a future release needs a truly clean Sobel-style or Laplacian edge mask as a first-class building block, treat that as a new operator proposal rather than a reason to resurrect legacy names.
+
 ### 2026-06-05 — Legacy operator names stay discoverable through picker aliases, not duplicate registrations
 
 **Decision**: keep the consolidated operator registry as the public surface, but thread remembered legacy names like `edge`, `luma`, `invert`, `chromaShift`, `brightness`, and `pinchBulge` into the add-effect picker search instead of reviving them as separate registered ops.
