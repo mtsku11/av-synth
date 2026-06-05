@@ -8,6 +8,20 @@ This file is project-scoped engineering memory, distinct from Claude's harness m
 
 ## Decisions
 
+### 2026-06-05 — Cross-granulation stays above the existing granulator instead of becoming a second sampler
+
+**Decision**: implement the new cross-granulation modes as source-buffer resolution plus low-rate relationship-bus control on top of the current one-granulator path, rather than adding another public sampler, another worklet, or a second scheduling architecture.
+
+**Why**:
+- The Source Relationship Bus already provides the low-rate A/B state needed for trigger and density behavior, and the existing A/B audio path already supports resolving one decoded buffer from Source A, Source B, or A+B.
+- `A grains / B trigger` and `B grains / A trigger` only need one-shot note triggers plus a near-idle base density; they do not justify a new voice pool.
+- `Blend grains / AB tension density` and `Dual cloud stereo split` are both simple buffer-shape choices: one is a mixed stereo buffer, the other is A-mono-left / B-mono-right. Both fit cleanly inside the current worklet load contract.
+
+**How to apply**:
+- Keep cross mode state additive and default-off so existing presets and single-source sessions stay unchanged.
+- Treat cross modes as a compatibility layer above `Granulator.loadFromAudioBuffer(...)`: trigger modes resolve to one source buffer and fire `noteOn` events from relationship-bus motion, blend mode modulates `density` from `abTension`, and split mode resolves a stereo A/B buffer.
+- Do not add a second public granulator instance unless a future requirement cannot be expressed as one decoded buffer plus existing scheduler controls.
+
 ### 2026-06-04 — Commit the preset bank in canonical operator form and keep the loader shim as import compatibility
 
 **Decision**: rewrite `public/presets.json` onto the current canonical operator/param names now that the loader-side normaliser exists, but keep that normaliser in place for stale imported presets and future drift protection.

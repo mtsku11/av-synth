@@ -1,0 +1,105 @@
+{
+  "id": "audit-program-cross-granulation-video",
+  "title": "Cross-granulation showcase presets over the bright A/B pair",
+  "source": {
+    "kind": "video",
+    "fixture": "qa/results/showcase-captures/showcase-fracturerelay.webm",
+    "secondaryFixture": "qa/results/showcase-captures/showcase-slitscanhands.webm"
+  },
+  "transport": {
+    "start": true,
+    "settleMs": 1500
+  },
+  "recording": {
+    "filename": "audit-program-cross-granulation-video",
+    "tailMs": 900
+  },
+  "expectations": {
+    "sourceKind": "video",
+    "minVideoAdvanceSeconds": 1,
+    "videoFeaturesActive": true,
+    "audioActive": true,
+    "allowConsoleErrors": ["favicon.ico"],
+    "metricComparisons": [
+      {
+        "from": "cross-trigger-hold",
+        "to": "tension-blend-hold",
+        "domain": "audio",
+        "metric": "zeroCrossingRate",
+        "op": ">",
+        "delta": 0.005,
+        "source": "exported-audio",
+        "segmentPaddingMs": 220,
+        "description": "Tension Blend Cloud should produce a busier exported waveform than the sparse Cross Trigger Relay hold on the same A/B pair"
+      },
+      {
+        "from": "cross-trigger-hold",
+        "to": "tension-blend-hold",
+        "domain": "audio",
+        "metric": "dynamicRange",
+        "op": "<",
+        "delta": -10,
+        "source": "exported-audio",
+        "segmentPaddingMs": 220,
+        "description": "Tension Blend Cloud should read as a steadier bed than the peaky Cross Trigger Relay bursts, with materially lower exported dynamic range"
+      },
+      {
+        "from": "cross-trigger-hold",
+        "to": "tension-blend-hold",
+        "domain": "audio",
+        "metric": "crestFactor",
+        "op": "<",
+        "delta": -1,
+        "source": "exported-audio",
+        "segmentPaddingMs": 220,
+        "description": "Tension Blend Cloud should flatten the burst profile into a less peaky exported segment than Cross Trigger Relay"
+      }
+    ]
+  },
+  "audit": {
+    "family": "programs",
+    "operator": "crossGranulation",
+    "kind": "baseline",
+    "path": "product",
+    "expectedVideo": [
+      "Cross Trigger Relay should keep the image restrained while A/B motion still nudges feedback",
+      "Tension Blend Cloud should keep the routed Source B branch readable without overwhelming the blend cloud"
+    ],
+    "expectedAudio": [
+      "Cross Trigger Relay should read as sparse B-driven bursts rather than a constant wash",
+      "Tension Blend Cloud should open into a denser steadier bed as A/B tension rises, not necessarily a louder one",
+      "Stereo image and density differences should be inspectable in the exported spectrograms"
+    ],
+    "manualChecks": [
+      "Does Cross Trigger Relay stay pulse-like instead of collapsing into continuous chatter?",
+      "Does Tension Blend Cloud become noticeably denser and wider than Cross Trigger Relay on the same source pair?"
+    ]
+  },
+  "steps": [
+    {
+      "type": "wait",
+      "ms": 600,
+      "screenshot": "cross-gran-baseline-hold"
+    },
+    {
+      "type": "apply-program",
+      "name": "crossTriggerRelay",
+      "screenshot": "cross-trigger-applied"
+    },
+    {
+      "type": "wait",
+      "ms": 900,
+      "screenshot": "cross-trigger-hold"
+    },
+    {
+      "type": "apply-program",
+      "name": "tensionBlendCloud",
+      "screenshot": "tension-blend-applied"
+    },
+    {
+      "type": "wait",
+      "ms": 900,
+      "screenshot": "tension-blend-hold"
+    }
+  ]
+}

@@ -43,8 +43,16 @@
   import {
     clampGranulatorSourceBalance,
     createMixedGranulatorSourceBuffer,
+    createStereoSplitGranulatorSourceBuffer,
     type GranulatorInputSource,
   } from './audio/granulator-source';
+  import {
+    evaluateGranulatorCrossTrigger,
+    getGranulatorCrossModeParamOverrides,
+    granulatorCrossModeUsesSourceB,
+    granulatorCrossModeUsesSourceBalance,
+    type GranulatorCrossMode,
+  } from './audio/granulator-cross';
   import { GrainBuffer, planGrainBuffer } from './video/grain-buffer';
   import { estimateVideoFpsFromMediaTimes } from './video/clip-fps';
   import { GrainScheduler } from './core/grain-scheduler';
@@ -155,8 +163,12 @@
   let granulatorEnabled = $state(false);
   let granulatorLoadedSourceKey: string | null = null;
   let granulatorInputSource = $state<GranulatorInputSource>('a');
+  let granulatorCrossMode = $state<GranulatorCrossMode>('off');
   let granulatorSourceBalance = $state(0.5);
   let granulatorSourceLoadSeq = 0;
+  let granulatorCrossPreviousActivity = 0;
+  let granulatorCrossLastTriggerTime = Number.NEGATIVE_INFINITY;
+  let granulatorCrossTriggerChannel = 0;
   let granulatorSourceCacheA: { src: string; buffer: AudioBuffer } | null = null;
   let granulatorSourceCacheB: { src: string; buffer: AudioBuffer } | null = null;
   let granulatorEnvelope = $state<GranulatorEnvelope>('hann');
@@ -416,6 +428,7 @@
     setProgramMacro(id: string, value: number): Promise<boolean>;
     setGranulatorParam(name: string, value: number): Promise<boolean>;
     setGranulatorEnabled(enabled: boolean): Promise<boolean>;
+    setGranulatorCrossMode(mode: GranulatorCrossMode): Promise<boolean>;
     setGranulatorInputSource(source: GranulatorInputSource): Promise<boolean>;
     setGranulatorSourceBalance(balance: number): Promise<boolean>;
     setGranulatorDiagnostics(options: {
@@ -428,6 +441,7 @@
     getGranulatorRuntimeDiagnostics(): GranulatorRuntimeSnapshot[];
     getGranulatorControlAudit(): Promise<GranulatorControlAudit | null>;
     getGranulatorInputState(): {
+      crossMode: GranulatorCrossMode;
       source: GranulatorInputSource;
       balance: number;
       loaded: boolean;
@@ -591,6 +605,7 @@
     }
     previousSourceAFeatureLumas = null;
     previousSourceBFeatureLumas = null;
+    resetGranulatorCrossState();
     videoFeatures = { ...EMPTY_VIDEO_FEATURES };
   }
 
@@ -661,9 +676,33 @@
     audio.setSourceGain(1 - mix);
   }
 
+  function resetGranulatorCrossState(): void {
+    granulatorCrossPreviousActivity = 0;
+    granulatorCrossLastTriggerTime = Number.NEGATIVE_INFINITY;
+    granulatorCrossTriggerChannel = 0;
+  }
+
+  function nextGranulatorCrossTriggerChannel(): number {
+    granulatorCrossTriggerChannel = (granulatorCrossTriggerChannel % 15) + 1;
+    return granulatorCrossTriggerChannel;
+  }
+
   function getGranulatorSourceKey(): string | null {
     const sourceA = videoEl?.src || null;
     const sourceB = sourceBLoaded ? videoElB?.src || null : null;
+    if (granulatorCrossMode === 'aGrainsBTrigger') {
+      return sourceA && sourceB ? `cross:a-b-trigger:${sourceA}|${sourceB}` : null;
+    }
+    if (granulatorCrossMode === 'bGrainsATrigger') {
+      return sourceA && sourceB ? `cross:b-a-trigger:${sourceA}|${sourceB}` : null;
+    }
+    if (granulatorCrossMode === 'blendAbTensionDensity') {
+      if (!sourceA || !sourceB) return null;
+      return `cross:blend:${sourceA}|${sourceB}|${granulatorSourceBalance.toFixed(3)}`;
+    }
+    if (granulatorCrossMode === 'dualCloudStereoSplit') {
+      return sourceA && sourceB ? `cross:split:${sourceA}|${sourceB}` : null;
+    }
     if (granulatorInputSource === 'a') return sourceA ? `a:${sourceA}` : null;
     if (granulatorInputSource === 'b') return sourceB ? `b:${sourceB}` : null;
     if (!sourceA || !sourceB) return null;
@@ -693,6 +732,37 @@
     if (!key) return null;
     const sourceA = videoEl?.src || null;
     const sourceB = sourceBLoaded ? videoElB?.src || null : null;
+
+    if (granulatorCrossMode === 'aGrainsBTrigger') {
+      if (!sourceA || !sourceB) return null;
+      return { key, buffer: await decodeGranulatorSource(sourceA, 'a') };
+    }
+    if (granulatorCrossMode === 'bGrainsATrigger') {
+      if (!sourceA || !sourceB) return null;
+      return { key, buffer: await decodeGranulatorSource(sourceB, 'b') };
+    }
+    if (granulatorCrossMode === 'blendAbTensionDensity') {
+      if (!sourceA || !sourceB) return null;
+      const bufferA = await decodeGranulatorSource(sourceA, 'a');
+      const bufferB = await decodeGranulatorSource(sourceB, 'b');
+      return {
+        key,
+        buffer: createMixedGranulatorSourceBuffer(audio.ctx, {
+          sourceA: bufferA,
+          sourceB: bufferB,
+          balance: granulatorSourceBalance,
+        }),
+      };
+    }
+    if (granulatorCrossMode === 'dualCloudStereoSplit') {
+      if (!sourceA || !sourceB) return null;
+      const bufferA = await decodeGranulatorSource(sourceA, 'a');
+      const bufferB = await decodeGranulatorSource(sourceB, 'b');
+      return {
+        key,
+        buffer: createStereoSplitGranulatorSourceBuffer(audio.ctx, bufferA, bufferB),
+      };
+    }
 
     if (granulatorInputSource === 'a') {
       if (!sourceA) return null;
@@ -827,16 +897,38 @@
     return analyseCanvasFrame(image.data, featureProbeCanvas.width, featureProbeCanvas.height);
   }
 
+  function handleGranulatorCrossTrigger(features: VideoFeatureState): void {
+    const decision = evaluateGranulatorCrossTrigger(
+      granulatorCrossMode,
+      features,
+      granulatorCrossPreviousActivity,
+      granulatorCrossLastTriggerTime,
+      currentProgramTime(),
+      granulatorAppliedParams.duration ?? granulatorRawParams.duration,
+    );
+    granulatorCrossPreviousActivity = decision.activity;
+    if (!decision.fire || !granulator || !granulatorEnabled) return;
+    const pitch = granulatorAppliedParams.pitch ?? granulatorRawParams.pitch;
+    const channel = nextGranulatorCrossTriggerChannel();
+    granulator.triggerNoteOn(pitch, decision.velocity, channel);
+    granulatorCrossLastTriggerTime = currentProgramTime();
+    window.setTimeout(() => {
+      granulator?.releaseNote(channel, 69);
+    }, decision.holdMs);
+  }
+
   function sampleVideoFeatureSignals(): void {
     sampleAudioBandSignals();
     if (typeof document === 'undefined' || sourceKind !== 'video' || !sourceLoaded || !videoEl) {
       resetVideoFeatures();
+      resetGranulatorCrossState();
       return;
     }
 
     const sourceAFrame = sampleVideoFrame(videoEl);
     if (!sourceAFrame) {
       resetVideoFeatures();
+      resetGranulatorCrossState();
       return;
     }
 
@@ -858,6 +950,7 @@
         : null,
       VIDEO_FEATURE_SMOOTHING,
     );
+    handleGranulatorCrossTrigger(videoFeatures);
     previousSourceAFeatureLumas = sourceAFrame.lumas;
     previousSourceBFeatureLumas = sourceBFrame?.lumas ?? null;
   }
@@ -1355,6 +1448,7 @@
     applyProgram(resolved.values, instances);
     graph.syncParams(instances);
     applyProgramAudioState(resolved.audio, {
+      setGranulatorCrossMode: (value) => setGranulatorCrossMode(value),
       setGranulatorInputSource: (value) => setGranulatorInputSource(value),
       setGranulatorSourceBalance: (value) => setGranulatorSourceBalance(value),
       setGranulatorParam: (name, value) => {
@@ -1401,6 +1495,24 @@
     }
   }
 
+  function setGranulatorCrossMode(next: GranulatorCrossMode): void {
+    if (!(
+      next === 'off' ||
+      next === 'aGrainsBTrigger' ||
+      next === 'bGrainsATrigger' ||
+      next === 'blendAbTensionDensity' ||
+      next === 'dualCloudStereoSplit'
+    ))
+      return;
+    if (next !== 'off' && !sourceBLoaded) return;
+    if (granulatorCrossMode === next) return;
+    granulatorCrossMode = next;
+    granulatorLoadedSourceKey = null;
+    resetGranulatorCrossState();
+    syncVideoSourceDryGain();
+    if (audio.isInitialised && granulator) void ensureGranulatorClipLoaded();
+  }
+
   function setGranulatorInputSource(next: GranulatorInputSource): void {
     if (next !== 'a' && next !== 'b' && next !== 'ab') return;
     if ((next === 'b' || next === 'ab') && !sourceBLoaded) return;
@@ -1415,7 +1527,9 @@
     const clamped = clampGranulatorSourceBalance(next);
     if (granulatorSourceBalance === clamped) return;
     granulatorSourceBalance = clamped;
-    if (granulatorInputSource !== 'ab') return;
+    if (granulatorInputSource !== 'ab' && !granulatorCrossModeUsesSourceBalance(granulatorCrossMode)) {
+      return;
+    }
     granulatorLoadedSourceKey = null;
     syncVideoSourceDryGain();
     if (audio.isInitialised && granulator) void ensureGranulatorClipLoaded();
@@ -1484,6 +1598,7 @@
     if (granulatorLoadedSourceKey === sourceKey) {
       granulator.setEnabled(true);
       granulatorEnabled = true;
+      resetGranulatorCrossState();
       syncVideoSourceDryGain();
       return true;
     }
@@ -1496,6 +1611,7 @@
       granulator.setEnabled(true);
       granulatorEnabled = true;
       granulatorLoadedSourceKey = source.key;
+      resetGranulatorCrossState();
       syncVideoSourceDryGain();
       return true;
     } catch {
@@ -1698,6 +1814,7 @@
         sourceKind,
         clockRunning: clock.running,
         audioInitialised: audio.isInitialised,
+        sourceBLoaded,
         videoFeatures,
         audioBands,
         video: videoEl
@@ -1791,6 +1908,12 @@
         await tick();
         return true;
       },
+      setGranulatorCrossMode: async (mode) => {
+        if (!granulator) return false;
+        setGranulatorCrossMode(mode);
+        await tick();
+        return granulatorCrossMode === mode;
+      },
       setGranulatorInputSource: async (source) => {
         if (!granulator) return false;
         setGranulatorInputSource(source);
@@ -1829,6 +1952,7 @@
       getGranulatorRuntimeDiagnostics: () => granulator?.readRuntimeDiagnostics() ?? [],
       getGranulatorControlAudit: () => granulator?.readControlAudit() ?? Promise.resolve(null),
       getGranulatorInputState: () => ({
+        crossMode: granulatorCrossMode,
         source: granulatorInputSource,
         balance: granulatorSourceBalance,
         loaded:
@@ -2549,7 +2673,10 @@
       granulatorLfoAssignments,
       couplingCtx,
     );
-    pushGranulatorParams(modulated);
+    pushGranulatorParams({
+      ...modulated,
+      ...getGranulatorCrossModeParamOverrides(granulatorCrossMode, modulated, videoFeatures),
+    });
   }
 
   function applyProgramRenderStyle(style: VideoEffectRenderStyle | undefined): void {
@@ -2837,7 +2964,10 @@
     if (!file || !renderer || !videoElB) return;
     if (sourceBObjectUrl) URL.revokeObjectURL(sourceBObjectUrl);
     granulatorSourceCacheB = null;
-    const granulatorUsesSourceB = granulatorInputSource === 'b' || granulatorInputSource === 'ab';
+    const granulatorUsesSourceB =
+      granulatorInputSource === 'b' ||
+      granulatorInputSource === 'ab' ||
+      granulatorCrossModeUsesSourceB(granulatorCrossMode);
     if (granulatorUsesSourceB) granulatorLoadedSourceKey = null;
     const url = URL.createObjectURL(file);
     sourceBObjectUrl = url;
@@ -2876,9 +3006,14 @@
       sourceBObjectUrl = null;
     }
     granulatorSourceCacheB = null;
+    resetGranulatorCrossState();
     if (granulatorInputSource === 'b' || granulatorInputSource === 'ab') {
       granulatorLoadedSourceKey = null;
       granulatorInputSource = 'a';
+    }
+    if (granulatorCrossModeUsesSourceB(granulatorCrossMode)) {
+      granulatorCrossMode = 'off';
+      granulatorLoadedSourceKey = null;
     }
     sourceBLoaded = false;
     loadedVideoBName = null;
@@ -3242,6 +3377,7 @@
             quality={granulatorQuality}
             adaptiveQuality={granulatorAdaptiveQuality}
             inputSource={granulatorInputSource}
+            crossMode={granulatorCrossMode}
             sourceBAvailable={sourceBLoaded}
             sourceBalance={granulatorSourceBalance}
             runtimeSnapshot={granulatorRuntimeSnapshot}
@@ -3254,6 +3390,7 @@
             onSetQuality={setGranulatorQuality}
             onSetAdaptiveQuality={setGranulatorAdaptiveQuality}
             onSetInputSource={setGranulatorInputSource}
+            onSetCrossMode={setGranulatorCrossMode}
             onSetSourceBalance={setGranulatorSourceBalance}
             onSetParam={setGranulatorParam}
             onSetParamLfo={setGranulatorModSource}

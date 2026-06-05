@@ -34,11 +34,12 @@ This repo uses a layered QA model:
 The app now ships first-class AV export, so Playwright can save authoritative rendered `.webm` output from the synth itself. The remaining gap is richer external analyzer wiring:
 
 - `.webm` export is available now through the app QA bridge and transport UI.
-- `npm run qa:analyze` extracts `.wav`, probes media with `ffprobe`, measures basic audio level with `ffmpeg`, evaluates segmented exported-WAV comparisons, runs the configured analyzer wrappers, and writes `analysis.json` per case plus an `analysis-summary.json`.
+- `npm run qa:analyze` extracts `.wav`, probes media with `ffprobe`, measures basic audio level with `ffmpeg`, renders full-case plus checkpoint spectrogram PNGs, evaluates segmented exported-WAV comparisons, runs the configured analyzer wrappers, and writes `analysis.json` per case plus an `analysis-summary.json`.
 - The live QA bridge can expose runtime/audio-analyser state now, and seeded audit cases can assert checkpoint-to-checkpoint **video** deltas in-browser.
 - Live audio-analyser checkpoint metrics remain exploratory. The hard audio gate now comes from segmented exported-WAV analysis keyed off the Playwright checkpoints in `metrics.json`.
 - External analyzer adapters are now wired by default through repo-local wrapper scripts in `qa/adapters/`, but they still depend on locally available tools: MCP servers for `mcp-music-analysis` / `video-quality-mcp`, and a local `ffmpeg-quality-metrics` command or `uvx` environment for the authoritative visual metrics layer.
 - `qa/references/<recording filename>.webm` is now the default committed reference convention for the audit matrix.
+- Cross-granulation / Source Relationship preset review can now use the generated `*-spectrogram.png` artifacts the same way visual review uses screenshots: one full-render spectrogram per case, plus checkpoint-window spectrograms whenever the case defines exported-audio comparisons.
 
 The intended next flow is:
 
@@ -107,7 +108,11 @@ Each case manifest uses raw parameter values:
 {
   "id": "video-cello2-color-smoke",
   "title": "Color sweep on committed cello fixture",
-  "source": { "kind": "video", "fixture": "qa/fixtures/ci-smoke.mp4" },
+  "source": {
+    "kind": "video",
+    "fixture": "qa/fixtures/ci-smoke.mp4",
+    "secondaryFixture": "qa/results/showcase-captures/showcase-slitscanhands.webm"
+  },
   "transport": { "start": true, "settleMs": 1500 },
   "recording": { "filename": "video-cello2-color-smoke", "tailMs": 750 },
   "referenceVideo": "qa/references/video-cello2-color-smoke.webm",
@@ -137,6 +142,8 @@ Each case manifest uses raw parameter values:
   ]
 }
 ```
+
+`secondaryFixture` is optional and loads Source B through the same file-input path the app uses in normal runtime. Use it for Source Relationship Bus and cross-granulation coverage.
 
 Graph/bus smoke cases can also use:
 

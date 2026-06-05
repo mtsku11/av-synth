@@ -496,6 +496,7 @@ describe('applyProgramAudio', () => {
     applyProgramAudio(
       program({
         granulator: {
+          crossMode: 'blendAbTensionDensity',
           inputSource: 'b',
           density: 35,
           duration: 70,
@@ -507,6 +508,7 @@ describe('applyProgramAudio', () => {
         feedbackDelay: { time: 0.28, feedback: 0.78, mix: 0.42 },
       }),
       {
+        setGranulatorCrossMode: (value) => calls.push(`cross:${value}`),
         setGranulatorInputSource: (value) => calls.push(`input:${value}`),
         setGranulatorParam: (name, value) => calls.push(`${name}:${value}`),
         setGranulatorEnvelope: (value) => calls.push(`envelope:${value}`),
@@ -516,6 +518,7 @@ describe('applyProgramAudio', () => {
       },
     );
     expect(calls).toEqual([
+      'cross:blendAbTensionDensity',
       'input:b',
       'density:35',
       'duration:70',

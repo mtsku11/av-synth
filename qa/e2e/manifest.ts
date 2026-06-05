@@ -4,6 +4,7 @@ import path from 'node:path';
 export interface QaCaseSource {
   kind: string;
   fixture?: string;
+  secondaryFixture?: string;
 }
 
 export interface QaCaseTransport {

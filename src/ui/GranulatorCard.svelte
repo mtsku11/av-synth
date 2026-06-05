@@ -26,6 +26,11 @@
     type GrainCompositeParamName,
   } from '../video/grain-composite-params';
   import type { GranulatorInputSource } from '../audio/granulator-source';
+  import {
+    GRANULATOR_CROSS_MODES,
+    granulatorCrossModeUsesSourceBalance,
+    type GranulatorCrossMode,
+  } from '../audio/granulator-cross';
   import type { MidiBinding, MidiRouter } from '../core/midi';
   import { listGlobalLfoOptions, type GlobalLfo, type ParamLfoAssignments } from '../core/mod-bank';
   import type { ParamSpec } from '../core/params';
@@ -40,6 +45,7 @@
     quality: GranulatorQuality;
     adaptiveQuality: boolean;
     inputSource: GranulatorInputSource;
+    crossMode: GranulatorCrossMode;
     sourceBAvailable: boolean;
     sourceBalance: number;
     runtimeSnapshot: GranulatorRuntimeSnapshot | null;
@@ -52,6 +58,7 @@
     onSetQuality: (next: GranulatorQuality) => void;
     onSetAdaptiveQuality: (next: boolean) => void;
     onSetInputSource: (next: GranulatorInputSource) => void;
+    onSetCrossMode: (next: GranulatorCrossMode) => void;
     onSetSourceBalance: (next: number) => void;
     onSetParam: (name: GranulatorSliderParam, value: number) => void;
     onSetParamLfo: (name: GranulatorSliderParam, encoded: string) => void;
@@ -70,6 +77,7 @@
     quality,
     adaptiveQuality,
     inputSource,
+    crossMode,
     sourceBAvailable,
     sourceBalance,
     runtimeSnapshot,
@@ -82,6 +90,7 @@
     onSetQuality,
     onSetAdaptiveQuality,
     onSetInputSource,
+    onSetCrossMode,
     onSetSourceBalance,
     onSetParam,
     onSetParamLfo,
@@ -181,6 +190,21 @@
     const max = Math.round(snapshot.voiceCount);
     return `${active}/${max}${fading > 0 ? ` +${fading} fading` : ''}`;
   }
+
+  function formatCrossModeLabel(mode: GranulatorCrossMode): string {
+    switch (mode) {
+      case 'aGrainsBTrigger':
+        return 'A grains / B trigger';
+      case 'bGrainsATrigger':
+        return 'B grains / A trigger';
+      case 'blendAbTensionDensity':
+        return 'blend grains / AB tension';
+      case 'dualCloudStereoSplit':
+        return 'dual cloud stereo split';
+      default:
+        return 'off';
+    }
+  }
 </script>
 
 <article class="granulator-card" data-qa="granulator-card">
@@ -215,7 +239,7 @@
           type="button"
           class:active={inputSource === 'a'}
           onclick={() => onSetInputSource('a')}
-          disabled={!granulator}
+          disabled={!granulator || crossMode !== 'off'}
           data-qa="gran-input-a"
         >
           A
@@ -224,7 +248,7 @@
           type="button"
           class:active={inputSource === 'b'}
           onclick={() => onSetInputSource('b')}
-          disabled={!granulator || !sourceBAvailable}
+          disabled={!granulator || !sourceBAvailable || crossMode !== 'off'}
           data-qa="gran-input-b"
         >
           B
@@ -233,14 +257,29 @@
           type="button"
           class:active={inputSource === 'ab'}
           onclick={() => onSetInputSource('ab')}
-          disabled={!granulator || !sourceBAvailable}
+          disabled={!granulator || !sourceBAvailable || crossMode !== 'off'}
           data-qa="gran-input-ab"
         >
           A+B
         </button>
       </div>
     </div>
-    {#if inputSource === 'ab'}
+    <label class="cross-mode-control">
+      <span>cross</span>
+      <select
+        value={crossMode}
+        onchange={(e) => onSetCrossMode((e.currentTarget as HTMLSelectElement).value as GranulatorCrossMode)}
+        disabled={!granulator}
+        data-qa="gran-cross-mode"
+      >
+        {#each GRANULATOR_CROSS_MODES as modeName (modeName)}
+          <option value={modeName} disabled={modeName !== 'off' && !sourceBAvailable}>
+            {formatCrossModeLabel(modeName)}
+          </option>
+        {/each}
+      </select>
+    </label>
+    {#if inputSource === 'ab' || granulatorCrossModeUsesSourceBalance(crossMode)}
       <label class="balance-control">
         <span>A</span>
         <input
@@ -495,6 +534,16 @@
     max-width: 12rem;
     color: var(--muted);
     font-size: 0.62rem;
+  }
+  .cross-mode-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted);
+    font-size: 0.62rem;
+  }
+  .cross-mode-control select {
+    min-width: 12rem;
   }
   .balance-control input {
     min-width: 0;

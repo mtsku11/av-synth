@@ -16,6 +16,7 @@ import { GRANULATOR_ENVELOPES, GRANULATOR_MODES, GRANULATOR_QUALITIES } from '..
 import type { GranulatorSliderParam } from '../audio/granulator-params';
 import type { FeedbackDelayParamName } from '../audio/feedback-delay-params';
 import type { GranulatorInputSource } from '../audio/granulator-source';
+import type { GranulatorCrossMode } from '../audio/granulator-cross';
 import { TAU, clamp01, ease, lerp } from '../lib/math';
 import type {
   PresentationLensDirtName,
@@ -76,6 +77,7 @@ export type GranulatorProgramState = Partial<Record<GranulatorSliderParam, numbe
   mode?: GranulatorMode;
   quality?: GranulatorQuality;
   inputSource?: GranulatorInputSource;
+  crossMode?: GranulatorCrossMode;
   sourceBalance?: number;
 };
 
@@ -652,6 +654,7 @@ export interface ApplyProgramAudioHandlers {
   setGranulatorMode?: (value: GranulatorMode) => void;
   setGranulatorQuality?: (value: GranulatorQuality) => void;
   setGranulatorInputSource?: (value: GranulatorInputSource) => void;
+  setGranulatorCrossMode?: (value: GranulatorCrossMode) => void;
   setGranulatorSourceBalance?: (value: number) => void;
   setFeedbackDelayParam?: (name: FeedbackDelayParamName, value: number) => void;
 }
@@ -684,6 +687,18 @@ export function applyProgramAudioState(
       if (name === 'inputSource') {
         if (value === 'a' || value === 'b' || value === 'ab') {
           handlers.setGranulatorInputSource?.(value);
+        }
+        continue;
+      }
+      if (name === 'crossMode') {
+        if (
+          value === 'off' ||
+          value === 'aGrainsBTrigger' ||
+          value === 'bGrainsATrigger' ||
+          value === 'blendAbTensionDensity' ||
+          value === 'dualCloudStereoSplit'
+        ) {
+          handlers.setGranulatorCrossMode?.(value);
         }
         continue;
       }

@@ -10,6 +10,15 @@ function readChannel(buffer: AudioBuffer, channel: number): Float32Array {
   return buffer.getChannelData(Math.min(channel, buffer.numberOfChannels - 1));
 }
 
+function readSample(data: Float32Array, index: number): number {
+  return data[index] ?? 0;
+}
+
+function readMonoSample(buffer: AudioBuffer, index: number): number {
+  if (buffer.numberOfChannels <= 1) return readSample(readChannel(buffer, 0), index);
+  return (readSample(readChannel(buffer, 0), index) + readSample(readChannel(buffer, 1), index)) * 0.5;
+}
+
 export function clampGranulatorSourceBalance(value: number): number {
   return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0.5));
 }
@@ -30,9 +39,26 @@ export function createMixedGranulatorSourceBuffer(
     const a = readChannel(mix.sourceA, channel);
     const b = readChannel(mix.sourceB, channel);
     for (let i = 0; i < length; i += 1) {
-      target[i] = (a[i] ?? 0) * gainA + (b[i] ?? 0) * gainB;
+      target[i] = readSample(a, i) * gainA + readSample(b, i) * gainB;
     }
   }
 
+  return out;
+}
+
+export function createStereoSplitGranulatorSourceBuffer(
+  ctx: BaseAudioContext,
+  sourceA: AudioBuffer,
+  sourceB: AudioBuffer,
+): AudioBuffer {
+  const length = Math.max(sourceA.length, sourceB.length);
+  const sampleRate = sourceA.sampleRate;
+  const out = ctx.createBuffer(2, length, sampleRate);
+  const left = out.getChannelData(0);
+  const right = out.getChannelData(1);
+  for (let i = 0; i < length; i += 1) {
+    left[i] = readMonoSample(sourceA, i);
+    right[i] = readMonoSample(sourceB, i);
+  }
   return out;
 }

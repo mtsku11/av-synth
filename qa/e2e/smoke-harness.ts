@@ -13,6 +13,7 @@ interface QaState {
   sourceKind: string;
   clockRunning: boolean;
   audioInitialised: boolean;
+  sourceBLoaded?: boolean;
   videoFeatures: {
     available: boolean;
     luma: number;
@@ -374,6 +375,17 @@ async function loadSource(page: Page, qaCase: QaCase): Promise<void> {
         return state?.sourceKind;
       })
       .toBe('video');
+    if (qaCase.source.secondaryFixture) {
+      await page
+        .locator('input[data-qa="source-b-file-input"]')
+        .setInputFiles(resolveFixturePath(qaCase.source.secondaryFixture));
+      await expect
+        .poll(async () => {
+          const state = await getQaState(page);
+          return state?.sourceBLoaded ?? false;
+        })
+        .toBe(true);
+    }
     return;
   }
 

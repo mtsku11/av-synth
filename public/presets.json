@@ -5887,6 +5887,157 @@
       }
     }
   },
+  "crossTriggerRelay": {
+    "title": "Cross Trigger Relay",
+    "tagline": "Source A grains pulse when Source B surges, with shared feedback tightening around the same A/B tension.",
+    "videoIntent": "Load two clips with distinct motion. The image stays restrained so the rhythm from the cross-triggered audio remains legible while A/B difference still leans on feedback.",
+    "audioIntent": "Source A supplies the grains, Source B triggers them on rising motion, and the shared delay keeps the bursts connected without becoming a constant wash.",
+    "operatorFocus": ["feedback", "grade"],
+    "chain": ["feedback", "grade"],
+    "render": {
+      "look": "clean",
+      "quality": "standard",
+      "lut": "chrome",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.32,
+      "feedback.feedback": 0.24,
+      "grade.contrast": 1.06,
+      "grade.saturate": 1.02
+    },
+    "automation": {
+      "feedback.feedback": {
+        "kind": "video",
+        "feature": "abDifference",
+        "scale": 0.24,
+        "smooth": 0.82
+      }
+    },
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.19,
+        "feedback": 0.28,
+        "damping": 5400,
+        "cross": 0.3926990817,
+        "mix": 0.14
+      },
+      "granulator": {
+        "crossMode": "aGrainsBTrigger",
+        "inputSource": "a",
+        "envelope": "expdec",
+        "mode": "loop",
+        "quality": "balanced",
+        "density": 18,
+        "duration": 92,
+        "durationJitter": 0.08,
+        "position": 0.34,
+        "positionJitter": 0.03,
+        "pitch": -5,
+        "pitchJitter": 2,
+        "panSpread": 0.28,
+        "ySpread": 0.12,
+        "reverseProbability": 0.04,
+        "distribution": 0.1,
+        "voiceCount": 12,
+        "gain": 0.52
+      }
+    }
+  },
+  "tensionBlendCloud": {
+    "title": "Tension Blend Cloud",
+    "tagline": "Blend both sources into one cloud, then let A/B tension open the grain density while the video branch stays lightly routed.",
+    "videoIntent": "Best with two clips loaded: Source B feeds a routed modulation branch, but the composition remains mild so the blend cloud can carry the scene.",
+    "audioIntent": "Both clips become one grain bed. A/B tension drives cloud density inside the existing granulator path, so contrast between clips reads as a thicker, more urgent texture instead of a second engine.",
+    "operatorFocus": ["glitch", "modulate", "feedback", "grade"],
+    "chain": ["glitch", "modulate", "feedback", "grade"],
+    "graph": {
+      "monitorBus": 0,
+      "nodes": [
+        {
+          "target": "glitch#0",
+          "bus": 1
+        },
+        {
+          "target": "modulate#0",
+          "bus": 0,
+          "inputs": ["source", "glitch#0"]
+        },
+        {
+          "target": "feedback#0",
+          "bus": 0,
+          "inputs": ["modulate#0"]
+        },
+        {
+          "target": "grade#0",
+          "bus": 0,
+          "inputs": ["feedback#0"]
+        }
+      ]
+    },
+    "render": {
+      "look": "clean",
+      "quality": "standard",
+      "lut": "chrome",
+      "postPreset": "none",
+      "lensDirt": "none"
+    },
+    "values": {
+      "clock.rate": 0.36,
+      "glitch.type": 2,
+      "glitch.amount": 0.04,
+      "modulate.source": 1,
+      "modulate.amount": 0.05,
+      "feedback.feedback": 0.26,
+      "grade.contrast": 1.04,
+      "grade.saturate": 1.08
+    },
+    "automation": {
+      "modulate.amount": {
+        "kind": "video",
+        "feature": "abDifference",
+        "scale": 0.28,
+        "smooth": 0.8
+      },
+      "feedback.feedback": {
+        "kind": "video",
+        "feature": "abTension",
+        "scale": 0.28,
+        "smooth": 0.84
+      }
+    },
+    "audio": {
+      "feedbackDelay": {
+        "time": 0.27,
+        "feedback": 0.34,
+        "damping": 6100,
+        "cross": 0.5235987756,
+        "mix": 0.18
+      },
+      "granulator": {
+        "crossMode": "blendAbTensionDensity",
+        "inputSource": "ab",
+        "sourceBalance": 0.5,
+        "envelope": "gaussian",
+        "mode": "cloud",
+        "quality": "balanced",
+        "density": 16,
+        "duration": 118,
+        "durationJitter": 0.28,
+        "position": 0.46,
+        "positionJitter": 0.08,
+        "pitch": 0,
+        "pitchJitter": 5,
+        "panSpread": 0.52,
+        "ySpread": 0.24,
+        "reverseProbability": 0.12,
+        "distribution": 0.3,
+        "voiceCount": 22,
+        "gain": 0.46
+      }
+    }
+  },
   "grainDrift": {
     "title": "Grain Drift",
     "tagline": "A slow orbital spiral field with a sustained 32-voice gaussian grain cloud and cross-fed delay.",

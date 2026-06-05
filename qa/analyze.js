@@ -110,9 +110,60 @@ function parseVolumeOutput(output) {
 function listScreenshots(dirPath) {
   return fs
     .readdirSync(dirPath)
-    .filter((entry) => entry.endsWith('.png'))
+    .filter((entry) => entry.endsWith('.png') && !entry.endsWith('-spectrogram.png'))
     .sort()
     .map((entry) => path.relative(ROOT, path.join(dirPath, entry)));
+}
+
+function renderSpectrogram(wavPath, outputPath, startSeconds = null, durationSeconds = null) {
+  const args = ['-hide_banner', '-y'];
+  if (typeof startSeconds === 'number') args.push('-ss', startSeconds.toFixed(6));
+  if (typeof durationSeconds === 'number') args.push('-t', durationSeconds.toFixed(6));
+  args.push(
+    '-i',
+    wavPath,
+    '-filter_complex',
+    '[0:a]showspectrumpic=s=1600x640:legend=1:mode=combined:scale=log[v]',
+    '-map',
+    '[v]',
+    '-frames:v',
+    '1',
+    outputPath,
+  );
+  const result = spawnSync('ffmpeg', args, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  if (result.status !== 0) {
+    throw new Error(`${result.stdout ?? ''}\n${result.stderr ?? ''}`.trim() || 'ffmpeg failed');
+  }
+}
+
+function createSpectrogramArtifact(
+  id,
+  wavPath,
+  outputPath,
+  startSeconds = null,
+  durationSeconds = null,
+  extra = {},
+) {
+  try {
+    renderSpectrogram(wavPath, outputPath, startSeconds, durationSeconds);
+    return {
+      id,
+      status: 'ok',
+      ...extra,
+      file: statFile(outputPath),
+    };
+  } catch (error) {
+    return {
+      id,
+      status: 'failed',
+      ...extra,
+      path: path.relative(ROOT, outputPath),
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function maybeLoadMetrics(caseDir) {
@@ -347,7 +398,7 @@ function evaluateComparison(metricCheckpoints, comparison) {
   };
 }
 
-function buildExportedAudioAnalysis(qaCase, wavPath, wavProbe, liveMetrics) {
+function buildExportedAudioAnalysis(qaCase, wavPath, wavProbe, liveMetrics, caseDir) {
   const comparisons = (qaCase.expectations?.metricComparisons ?? []).filter(
     (comparison) => comparison.source === 'exported-audio',
   );
@@ -376,11 +427,31 @@ function buildExportedAudioAnalysis(qaCase, wavPath, wavProbe, liveMetrics) {
         wavDurationSeconds,
         comparison.segmentPaddingMs,
       );
+      const spectrogramPath = path.join(
+        caseDir,
+        `${qaCase.recording.filename}-${checkpointId}-pad${comparison.segmentPaddingMs ?? 120}ms-spectrogram.png`,
+      );
       checkpoints[cacheKey] = {
         checkpointId,
         ...(segment
-          ? { metrics: measureSegmentAudio(wavPath, segment), segment }
-          : { metrics: null, segment: null }),
+          ? {
+              metrics: measureSegmentAudio(wavPath, segment),
+              segment,
+              spectrogram: createSpectrogramArtifact(
+                checkpointId,
+                wavPath,
+                spectrogramPath,
+                segment.startSeconds,
+                segment.durationSeconds,
+                {
+                  checkpointId,
+                  segmentPaddingMs: comparison.segmentPaddingMs ?? 120,
+                  startSeconds: segment.startSeconds,
+                  durationSeconds: segment.durationSeconds,
+                },
+              ),
+            }
+          : { metrics: null, segment: null, spectrogram: null }),
       };
     }
   }
@@ -506,7 +577,24 @@ function buildCaseAnalysis(qaCase, config) {
   const screenshots = listScreenshots(caseDir);
   const liveMetrics = maybeLoadMetrics(caseDir);
   const audioVolume = measureVolume(wavPath);
-  const exportedAudio = buildExportedAudioAnalysis(qaCase, wavPath, wavProbe, liveMetrics);
+  const fullSpectrogram = createSpectrogramArtifact(
+    'full',
+    wavPath,
+    path.join(caseDir, `${qaCase.recording.filename}-spectrogram.png`),
+  );
+  const exportedAudio = buildExportedAudioAnalysis(
+    qaCase,
+    wavPath,
+    wavProbe,
+    liveMetrics,
+    caseDir,
+  );
+  const spectrograms = [
+    fullSpectrogram,
+    ...Object.values(exportedAudio?.checkpoints ?? {})
+      .map((checkpoint) => checkpoint.spectrogram)
+      .filter(Boolean),
+  ];
   const videoReference = qaCase.referenceVideo
     ? path.resolve(ROOT, qaCase.referenceVideo)
     : defaultReferenceVideo(qaCase);
@@ -532,6 +620,7 @@ function buildCaseAnalysis(qaCase, config) {
       webm: statFile(webmPath),
       wav: statFile(wavPath),
       screenshots,
+      spectrograms,
       playwrightVideo: fs.existsSync(path.join(caseDir, 'video.webm'))
         ? statFile(path.join(caseDir, 'video.webm'))
         : null,

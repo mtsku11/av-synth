@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   clampGranulatorSourceBalance,
   createMixedGranulatorSourceBuffer,
+  createStereoSplitGranulatorSourceBuffer,
 } from './granulator-source';
 
 class TestAudioBuffer {
@@ -67,5 +68,21 @@ describe('granulator source buffer mixing', () => {
 
     expect(out.length).toBe(3);
     expect([...out.getChannelData(0)]).toEqual([0.5, 0.5, 0.5]);
+  });
+
+  it('builds a stereo split buffer with Source A on left and Source B on right', () => {
+    const sourceA = new TestAudioBuffer([
+      [1, 0.5, -0.5],
+      [0, 0.5, 0.5],
+    ]) as unknown as AudioBuffer;
+    const sourceB = new TestAudioBuffer([
+      [0.25, 0.75, 0],
+      [0.75, 0.25, -0.5],
+    ]) as unknown as AudioBuffer;
+
+    const out = createStereoSplitGranulatorSourceBuffer(testCtx, sourceA, sourceB);
+
+    expect([...out.getChannelData(0)]).toEqual([0.5, 0.5, 0]);
+    expect([...out.getChannelData(1)]).toEqual([0.5, 0.5, -0.25]);
   });
 });
