@@ -24,7 +24,7 @@ Browser-based video-first audio/visual effects app with Hydra-inspired video ope
 
 - `plan.md` — authoritative Hydra-to-audio mapping and status notes
 - `todo.md` — milestone checklist and current implementation backlog
-- `memory.md` — append-only design decisions and tensions
+- `memory.md` — live design decisions and tensions (pruned, <400 lines; full history in `memory-archive.md`, grep-only)
 - `references/granulator-port-spec.md` — authoritative granulator engineering contract; mandatory before audio/granulator/modulation work
 - `references/README.md` — reference provenance, license boundary, and anti-drift notes for the granulator work
 - `src/core/coupling.ts` — runtime control-law evaluation for both domains

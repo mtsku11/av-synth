@@ -22,9 +22,10 @@ Always read these *as files* — never reconstruct their contents from chat hist
 
 | File | Purpose | When to read |
 |---|---|---|
-| `plan.md` | Product direction, video-operator math, release policy, and the summary wrapper around the granulator contract. | Before implementing any operator or making scope/release decisions. |
+| `plan.md` | Product direction, video-operator math, release policy, and the summary wrapper around the granulator contract. | Skim the first 80 lines + release policy at session start; read only the section relevant to the task beyond that. Never the whole file. |
 | `todo.md` | Live backlog and milestone status. | Before starting work. Update as items close. |
-| `memory.md` | Decision log + open questions + design tensions. | At start of session. Append when a non-obvious decision is made. |
+| `memory.md` | **Live** decision log + open questions + design tensions. Kept under ~400 lines by its own maintenance rules. | At start of session, in full. Add decisions at the top; prune superseded entries to the archive as you add. |
+| `memory-archive.md` | Verbatim history of every pruned decision/landing entry since 2026-05-16. | **Never read whole.** `grep -n '^##' memory-archive.md` for the index, then read the specific entry — only when investigating a decision's history. |
 | `references/granulator-port-spec.md` | The authoritative engineering contract for the new audio core. | **Mandatory before any audio, MIDI, modulation-routing, or `Audio` tab work.** |
 | `references/README.md` | Provenance and license boundary for the granulator references. | Before implementing DSP details or borrowing ideas from the references. |
 | `qa/README.md` | QA policy, especially the distinction between legacy operator-audio coverage and the future granulator release gate. | Before changing tests or claiming release readiness. |
@@ -89,7 +90,7 @@ Do not reintroduce the old assumption that "coupled" means "every Hydra operator
 - **Documentation sync is mandatory.** If implementation changes project state, update the relevant Markdown files in the same task before stopping:
   - `todo.md` when milestone status, backlog, blockers, or next steps change
   - `plan.md` when operator scope, release policy, acceptance criteria, or QA/deploy gates change
-  - `memory.md` when a non-obvious decision, reversal, or design tension appears
+  - `memory.md` when a non-obvious decision, reversal, or design tension appears (prune superseded entries to `memory-archive.md` in the same pass; keep the live file under ~400 lines)
   - `CLAUDE.md` when repo operating rules, handoff rules, or anti-drift instructions change
 - **Do not leave repo docs stale on purpose.** If code and docs disagree, treat the code as truth and update the docs immediately.
 - **Git writes require explicit user approval.** Do not `git commit`, `git push`, amend commits, rebase, or rewrite history unless the user explicitly asks for that action after review.
@@ -148,8 +149,8 @@ Project-local Claude Code skills (in `.claude/skills/`):
 
 CLI tools (always available, see `~/.claude/CLAUDE.md`):
 
-- `ask-deepseek file1 file2 … -q "question"` — bulk file reading. **Mandatory** for ≥3 files, files >300 lines, or codebase exploration. The prototype HTML is 999 lines: read it via DeepSeek for any survey-shaped task; use `Read` only for line-targeted edits.
-- `deepseek-write "spec" [-c files…] [-o out]` — boilerplate generation. **Mandatory** for test files, configs (Vite, TS, ESLint, Vitest), docstrings, fixture/preset JSON, README sections, CI workflows.
+- `ask-deepseek file1 file2 … -q "question"` — bulk file reading for survey-shaped tasks (10+ files or >2,000 lines where only the conclusion matters). Use `Read` whenever line numbers, edits, or judgment are involved. See the global DeepSeek policy in `~/.claude/CLAUDE.md`.
+- `deepseek-write "spec" [-c files…] [-o out]` — large boilerplate generation (>150 lines of mechanical scaffolds: configs, fixture/preset JSON, docstring batches). Treat output as a draft; spot-check before relying on it.
 
 Never delegate to DeepSeek: debugging, architecture decisions, security-sensitive code, tight cross-file integration, the AV-coupling math (that's the product).
 
@@ -187,10 +188,9 @@ If a fact contradicts between chat history and a file, the file wins.
 
 ## 8. Things to do at the start of every session
 
-1. Read `memory.md` for outstanding decisions and questions.
-2. Read `todo.md` for the active milestone.
-3. Skim `plan.md` for the current product/release direction before guessing.
-4. If the task touches audio, modulation, MIDI, or the `Audio` tab, read `references/granulator-port-spec.md` before touching code.
-5. Check whether the task is for **staging/manual testing** or **public/professional release**; do not conflate them.
-6. Before ending the session, sync any affected Markdown files (`todo.md`, `plan.md`, `memory.md`, `CLAUDE.md`) to match the implementation and policy state.
-7. State the assumed task in one sentence, declare any assumption, then go.
+1. Prefer `/session-start` — it performs steps 1–3 with capped reads and prints the orientation block.
+2. Otherwise: read `memory.md` (in full — it is the small live log), read `todo.md` for the active milestone, and skim `plan.md` (first 80 lines + release policy).
+3. If the task touches audio, modulation, MIDI, or the `Audio` tab, read `references/granulator-port-spec.md` before touching code.
+4. Check whether the task is for **staging/manual testing** or **public/professional release**; do not conflate them.
+5. Before ending the session, sync any affected Markdown files (`todo.md`, `plan.md`, `memory.md`, `CLAUDE.md`) to match the implementation and policy state.
+6. State the assumed task in one sentence, declare any assumption, then go.
