@@ -2,7 +2,7 @@
 
 This file is the contract Claude reads on every session in this repo. It overrides defaults. Keep it terse, factual, and updated when conventions change.
 
-> **Personal global rules** at `~/.claude/CLAUDE.md` also apply (post-push verification, surgical changes, DeepSeek delegation protocol, surface-assumptions-don't-ask). They are not duplicated here.
+> **Personal global rules** at `~/.claude/CLAUDE.md` also apply (post-push verification, surgical changes, DeepSeek delegation protocol, ask-don't-assume). They are not duplicated here.
 
 ---
 
@@ -86,15 +86,15 @@ Do not reintroduce the old assumption that "coupled" means "every Hydra operator
 - **No silent reformatting.** Match existing style even if you wouldn't write it that way.
 - **No new abstractions until a third concrete caller appears.** Rule of three.
 - **No comments explaining what the code does.** Only comments for non-obvious *why* — hidden constraints, perf workarounds, browser quirks.
-- **Surface assumptions, declare the choice, proceed.** Don't ask permission for default-shaped decisions. See `~/.claude/CLAUDE.md`.
+- **Ask, don't assume — when the user can answer.** If a requirement is unclear, has multiple valid interpretations, or implies a design choice you weren't told to make, ask before writing code. Only when the user can't respond (background/scheduled/`--yolo`) pick the most defensible interpretation, declare it explicitly, and proceed. See `~/.claude/CLAUDE.md`.
 - **Documentation sync is mandatory.** If implementation changes project state, update the relevant Markdown files in the same task before stopping:
   - `todo.md` when milestone status, backlog, blockers, or next steps change
   - `plan.md` when operator scope, release policy, acceptance criteria, or QA/deploy gates change
   - `memory.md` when a non-obvious decision, reversal, or design tension appears (prune superseded entries to `memory-archive.md` in the same pass; keep the live file under ~400 lines)
   - `CLAUDE.md` when repo operating rules, handoff rules, or anti-drift instructions change
 - **Do not leave repo docs stale on purpose.** If code and docs disagree, treat the code as truth and update the docs immediately.
-- **Git writes require explicit user approval.** Do not `git commit`, `git push`, amend commits, rebase, or rewrite history unless the user explicitly asks for that action after review.
-- **Default stopping point:** implement, update docs, run verification, and stop for review. Do not decide on your own that work should be committed or pushed.
+- **Local checkpoint commits are allowed without asking; pushing and history rewrites are not.** Per the global "Commit Verified Increments" rule, run `/checkpoint` after each verified increment (local commit, source files only, no ask needed). Do not `git push`, amend commits, rebase, or rewrite history unless the user explicitly asks for that action after review.
+- **Default stopping point:** implement, update docs, run verification, checkpoint the increment, then stop before pushing. Pushing stays user-approved.
 
 ### Video/Hydra-fidelity rules
 
